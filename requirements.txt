@@ -1,0 +1,4 @@
+apiclient
+tweepy
+discord
+asyncio
