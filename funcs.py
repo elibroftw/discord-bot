@@ -1,12 +1,16 @@
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 import discord
-#  import logging
+# import logging
 import tweepy
 import re
 import os
 from apiclient import discovery
 
 
-#  logger = logging.getLogger()
+# logger = logging.getLogger()
 
 google_api_key = os.environ['google']
 youtube = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
@@ -29,7 +33,7 @@ def richembed(title, url, image, icon, desc, author='', colour=discord.Color.red
 
 def youtubesearch(text):
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
-    #  logger.setLevel(logging.ERROR)
+    # logger.setLevel(logging.ERROR)
     p = re.compile('--[1-9][0-9]|--[1-2]')
     try:
         re_result = p.search(text)
@@ -159,6 +163,25 @@ def discord_search_twitter_user(text, redirect=False):
     if redirect:
         return "```Were you searching for a User?\nHere are some names:" + msg
     return '```'+msg
+
+
+def send_email():
+    password = os.environ['PASSWORD']
+    name, recipient = 'E', os.environ['EMAIL']
+    my_address = recipient
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.starttls()
+    s.login(my_address, password)
+    msg = MIMEMultipart()
+    # message_template = read_template('message.txt')
+    # message = message_template.substitute(PERSON_NAME=name.title())
+    message = 'the code works'
+    msg['From'] = my_address
+    msg['To'] = recipient
+    msg['Subject'] = 'Heroku'
+    msg.attach(MIMEText(message, 'plain'))
+    s.send_message(msg)
+    s.quit()
 
 
 if __name__ == '__main__':
