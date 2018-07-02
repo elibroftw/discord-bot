@@ -103,14 +103,13 @@ def youtubesearch(text):
     # return True, embed
 
 
-def check_networth(author):
+def check_networth(author: str):
         return f'You have ${os.environ[author]}\nNot as rich as me'
 
 
-def update_networth(author):
+def update_networth(author: str):
     try:
-        networth = os.environ[author] + 1
-        os.environ[author] = str(networth)
+        os.environ[author] = str(int(os.environ[author]) + 1)
     except KeyError:
         os.environ[author] = '1'
 
@@ -167,8 +166,11 @@ def discord_search_twitter_user(text, redirect=False):
 
 
 def send_email():
-    password = os.environ['PASSWORD']
-    name, recipient = 'E', os.environ['EMAIL']
+    # password = os.environ['PASSWORD']
+    password = 'isfc5390'
+    recipient = 'xxelibroxx@gmail.com'
+    # name = 'E'
+    # recipient = os.environ['EMAIL']
     my_address = recipient
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.starttls()
