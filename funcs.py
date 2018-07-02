@@ -6,7 +6,7 @@ import os
 from apiclient import discovery
 
 
-logger = logging.getLogger()
+#  logger = logging.getLogger()
 
 google_api_key = os.environ['google']
 youtube = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
