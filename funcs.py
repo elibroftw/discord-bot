@@ -29,7 +29,7 @@ def richembed(title, url, image, icon, desc, author='', colour=discord.Color.red
 
 def youtubesearch(text):
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
-    logger.setLevel(logging.ERROR)
+    #  logger.setLevel(logging.ERROR)
     p = re.compile('--[1-9][0-9]|--[1-2]')
     try:
         re_result = p.search(text)
