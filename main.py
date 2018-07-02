@@ -230,5 +230,4 @@ async def on_message(message):
         # TODO: ADD !help function that sends bot commands to the author that send the message
         await client.send_message(author, help_message)
 
-send_email()
 client.run(os.environ['discord'])
