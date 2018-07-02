@@ -44,7 +44,7 @@ async def on_message(message):
     author = message.author
     user_msg = message.content
     # if message.author == client.user: return  # checks if the bot is replying to itself
-    if str(author) != 'El Chapo#2608': update_networth(author)
+    if str(author) != 'El Chapo#2608': update_networth(str(author))
     if user_msg.lower() == '!shop' or user_msg.lower() == '!math' or user_msg.lower() == '!eval':
         await client.send_message(message.channel, 'This command is in development!')
     if user_msg.startswith('!create_role ') and str(author.top_role) == 'Admin':
