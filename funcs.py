@@ -109,7 +109,8 @@ def check_networth(author):
 
 def update_networth(author):
     try:
-        os.environ[author] = str(int(os.environ[author]) + 1)
+        networth = os.environ[author] + 1
+        os.environ[author] = str(networth)
     except KeyError:
         os.environ[author] = '1'
 
