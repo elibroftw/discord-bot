@@ -46,7 +46,6 @@ async def on_message(message):
 
 @bot.command(pass_context=True)
 async def hi(ctx):
-    # await bot.send_message(ctx.message.channel, 'hey!')
     await bot.say("Hey there" + " " + ctx.message.author.name + "!")
 
 
@@ -69,19 +68,19 @@ async def sleep(ctx):
 @bot.command(pass_context=True, aliases=['bal'])
 async def balance(ctx):
     await bot.say(check_networth(str(ctx.message.author)))
-# bot.run(os.environ['BOT_TOKEN'])
 
 
-@bot.command(pass_context=True)
+@bot.command(pass_context=True, aliases=['createrole'])
 async def create_role(ctx):
     if str(ctx.message.author.top_role) == 'Admin':
         server = ctx.message.server
         role_name = ctx.message.content[13:]
-        await bot.create_role(server, name=role_name)  # TODO: Should I delete the await???
+        bot.create_role(server, name=role_name)  # TODO: Should I delete the await???
         await bot.say(f'Role {role_name} created')
         print(f'{ctx.message.author}created role {role_name}')
 
 
+# TODO: delete_roll
 @bot.command(pass_context=True)
 async def add_role(ctx):
     if str(ctx.message.author.top_role) == 'Admin':
