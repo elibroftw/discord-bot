@@ -114,12 +114,13 @@ async def on_message(message):
     # search_users()
     elif user_msg.startswith('!thank'):
         await bot.send_message(message.channel, f"You're welcome {author.mention}")
-    elif user_msg.startswith('!clear'):
+        elif user_msg.startswith('!clear'):
         server = message.channel.server
         moderator = discord.utils.get(server.roles, name='Moderator')
         if message.author.top_role >= moderator:
-            await bot.send_message(message.channel, 'Clearing messages...')
-            number = 3
+            # await bot.send_message(message.channel, 'Clearing messages...')
+            await bot.change_presence(game=discord.Game(name='Clearing messages...'))
+            number = 2
             if user_msg[7:].isnumeric():  # len(user_msg) > 7 and
                 number = min(99, 2 + int(user_msg[7:]))
                 # if int(user_msg[7:]) > 98: number = 100 - int(user_msg[7:])
@@ -127,11 +128,12 @@ async def on_message(message):
             msg = []
             async for m in bot.logs_from(message.channel, limit=number):
                 date = m.timestamp
-                if (datetime.now() - date).days > 14:  # if older than 14: delete else add onto msg list
+                if (datetime.now() - date).days > 14:  # delete if older than 14 else add onto msg list
                     await bot.delete_message(m)
                     # await asyncio.sleep(0.1)
                 else: msg.append(m)
             await bot.delete_messages(msg)
+        await bot.change_presence(game=discord.Game(name='Prison Break'))
         print(f'{author} cleared {number-2} message(s)')
     elif user_msg.startswith('!eval ') and str(author.top_role) == 'Admin':
         await bot.send_message(message.channel, str(eval(user_msg[6:])))
