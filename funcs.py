@@ -1,16 +1,16 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
 import discord
-# import logging
+import logging
 import tweepy
 import re
 import os
 from apiclient import discovery
 
 
-# logger = logging.getLogger()
+logger = logging.getLogger()
+logger.setLevel(logging.ERROR)
 
 google_api_key = os.environ['google']
 youtube = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
@@ -22,19 +22,18 @@ twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['tw
 twitter_api = tweepy.API(twitter_auth)
 
 
-def richembed(title, url, image, icon, desc, author='', colour=discord.Color.red()):
+def rich_embed(title, url, image, icon, desc, author='', colour=discord.Color.red()):
     embed = discord.Embed(url=url, title=title, color=colour, description=desc)
     embed.set_thumbnail(url=icon)
     embed.set_image(url=image)
-    authoricon = 'https://cdn.discordapp.com/avatars/282274755426385921/fa592e14d10668e80e981b7e1066746a.webp?size=256'
-    if author != '': embed.set_author(name=author, url=url, icon_url=authoricon)
+    author_icon = 'https://cdn.discordapp.com/avatars/282274755426385921/fa592e14d10668e80e981b7e1066746a.webp?size=256'
+    if author != '': embed.set_author(name=author, url=url, icon_url=author_icon)
     return embed
 
 
 def youtubesearch(text):
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
-    # logger.setLevel(logging.ERROR)
-    p = re.compile('--[1-9][0-9]|--[1-2]')
+    p = re.compile('--[1-4][0-9]|--[1-2]')
     try:
         re_result = p.search(text)
         result = int(re_result.group()[2:])
@@ -165,30 +164,17 @@ def discord_search_twitter_user(text, redirect=False):
     return '```'+msg
 
 
-def send_email():
-    # password = os.environ['PASSWORD']
-    password = 'isfc5390'
-    recipient = 'xxelibroxx@gmail.com'
-    # name = 'E'
-    # recipient = os.environ['EMAIL']
-    my_address = recipient
+def send_email(recipient, name=''):
+    password = os.environ['PASSWORD']
+    my_address = os.environ['EMAIL']
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.starttls()
     s.login(my_address, password)
     msg = MIMEMultipart()
-    # message_template = read_template('message.txt')
-    # message = message_template.substitute(PERSON_NAME=name.title())
-    message = 'the code works'
+    message = 'Hey, this is just a test'
     msg['From'] = my_address
     msg['To'] = recipient
-    msg['Subject'] = 'Heroku'
+    msg['Subject'] = 'TEST'
     msg.attach(MIMEText(message, 'plain'))
     s.send_message(msg)
     s.quit()
-
-
-if __name__ == '__main__':
-    for x in get_tweet_from('PyrocynicalVEVO'): print(x)
-    # print(search_twitter_user('Pyro'))
-    # for x in get_tweet_from('pyrocynicalvevo', number_of_tweets=1): print(x)
-    # print(youtubesearch('Ricegum'))
