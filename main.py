@@ -119,10 +119,9 @@ async def on_message(message):
         moderator = discord.utils.get(server.roles, name='Moderator')
         if message.author.top_role >= moderator:
             # await bot.send_message(message.channel, 'Clearing messages...')
-            # await bot.change_presence(game=discord.Game(name='Clearing messages...'))
             number = 2
             if user_msg[7:].isnumeric():  # len(user_msg) > 7 and
-                number = min(99, 1 + int(user_msg[7:]))
+                number = min(20, 1 + int(user_msg[7:]))
                 # if int(user_msg[7:]) > 98: number = 100 - int(user_msg[7:])
                 # number += int(user_msg[7:]) - 1
             msg = []
@@ -132,7 +131,6 @@ async def on_message(message):
                     await bot.delete_message(m)
                     # await asyncio.sleep(0.1)
                 else: msg.append(m)
-            # await bot.change_presence(game=discord.Game(name='Prison Break'))
             await bot.delete_messages(msg)
         print(f'{author} cleared {number-1} message(s)')
     elif user_msg.startswith('!eval ') and str(author.top_role) == 'Admin':
