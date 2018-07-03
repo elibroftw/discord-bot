@@ -31,7 +31,7 @@ def rich_embed(title, url, image, icon, desc, author='', colour=discord.Color.re
     return embed
 
 
-def youtubesearch(text):
+def youtube_search(text):
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
     p = re.compile('--[1-4][0-9]|--[1-2]')
     try:
@@ -113,6 +113,7 @@ def update_networth(author: str):
         os.environ[author] = '1'
 
 
+# TODO: TURN GET TWEET INTO ONE FUNCTION
 def get_tweet_from(user, quantity=1):
     try:
         statuses = twitter_api.user_timeline(user, count=quantity)
@@ -164,7 +165,7 @@ def discord_search_twitter_user(text, redirect=False):
     return '```'+msg
 
 
-def send_email(recipient, name=''):
+def send_email(recipient, name=''):  # TODO: for later
     password = os.environ['PASSWORD']
     my_address = os.environ['EMAIL']
     s = smtplib.SMTP('smtp.gmail.com', 587)
