@@ -90,10 +90,10 @@ async def on_message(message):
     elif user_msg.startswith('!RUN'): await bot.send_message(message.channel, 'Haha you have humour')
     elif user_msg.lower().startswith('!run'): await bot.send_message(message.channel, 'N o t  h y p e  e n o u g h')
     elif user_msg.startswith('!yt '):
-        msg = youtubesearch(user_msg)
+        msg = youtube_search(user_msg)
         await bot.send_message(message.channel, msg)
     elif user_msg.startswith('!youtube '):
-        msg = youtubesearch(user_msg)
+        msg = youtube_search(user_msg)
         await bot.send_message(message.channel, msg)
     elif user_msg.lower().startswith('!gettweet '):
         msg = discord_get_tweet_from(user_msg[10:])
@@ -160,7 +160,7 @@ async def on_message(message):
             ttt_round = 0
             players_in_game.clear()  # TODO: DELETE ANY DICTIONARY ENTRIES OF PLAYERS THAT AREN'T IN GAME
             tic_tac_toe_data[author] = {'username': author, 'comp_moves': [], 'user_moves': [],
-                                      'danger': None, 'danger2': None, 'game_over': False}
+                                        'danger': None, 'danger2': None, 'game_over': False}
             players_in_game.append(author)
             timers[0][1] = time.time()
             user_msg, in_game, game_channel = None, True, message.channel
@@ -188,7 +188,7 @@ async def on_message(message):
                         await bot.send_message(game_channel, 'You have ended your tic-tac-toe game')
                         continue
                     timers[0][1] = time.time()
-                    ttt_round = 1
+                    ttt_round = 1  # TODO: Shouldn't ttt_round be part of the data??? right????
                     temp_msg = tictactoe.greeting(tic_tac_toe_data[author], user_msg)  # msg is y or n
                     await bot.send_message(game_channel, temp_msg)
             while in_game:
@@ -201,13 +201,13 @@ async def on_message(message):
                         await bot.send_message(game_channel, 'You have ended your tic-tac-toe game')
                         continue
                     player_move = int(user_msg.content)
-                    temp_msg, tic_tac_toe_data[author] = tictactoe.validmove(player_move, tic_tac_toe_data[author])
+                    temp_msg, tic_tac_toe_data[author] = tictactoe.valid_move(player_move, tic_tac_toe_data[author])
                     if not temp_msg:  # so ''
                         await bot.send_message(game_channel, 'That was not a valid move')
                     else:
                         temp_msg += '\n'
                         tic_tac_toe_data[author]['user_moves'].append(player_move)
-                        tempt, win = tictactoe.tictactoe_move(ttt_round, tic_tac_toe_data[author])
+                        tempt, win = tictactoe.tic_tac_toe_move(ttt_round, tic_tac_toe_data[author])
                         if tic_tac_toe_data[author]['game_over']:
                             timers[0][1] = 0
                             # TODO: CLEAN ALL OF THIS UP
