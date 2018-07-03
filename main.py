@@ -121,9 +121,9 @@ async def on_message(message):
             await bot.send_message(message.channel, 'Clearing messages...')
             number = 3
             if user_msg[7:].isnumeric():  # len(user_msg) > 7 and
-                if int(user_msg[7:]) > 98: number = 100 - int(user_msg[7:])
-                number += int(user_msg[7:]) - 1
-            else: number += 1
+                number = min(99, 2 + int(user_msg[7:]))
+                # if int(user_msg[7:]) > 98: number = 100 - int(user_msg[7:])
+                # number += int(user_msg[7:]) - 1
             msg = []
             async for m in bot.logs_from(message.channel, limit=number):
                 date = m.timestamp
