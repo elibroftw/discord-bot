@@ -43,13 +43,14 @@ async def on_message(message):
     user_msg = message.content
     # if message.author == client.user: return  # checks if the bot is replying to itself
     if str(author) != 'El Chapo#2608': update_networth(str(author))
-    if user_msg.lower() == '!shop' or user_msg.lower() == '!math' or user_msg.lower() == '!eval':
+    if user_msg.lower() == '!shop' or user_msg.lower() == '!math':
         await bot.send_message(message.channel, 'This command is in development!')
     if user_msg.startswith('!create_role ') and str(author.top_role) == 'Admin':
         server = message.server
         role_name = user_msg[13:]
-        await bot.create_role(server, name=role_name)
+        await bot.create_role(server, name=role_name)  # todo: do I need the await?
         await bot.send_message(message.channel, f'Role {role_name} created')
+        print(f'{author}created role {role_name}')
     elif user_msg.startswith('!delete_channel ') and str(author.top_role) == 'Admin':
         channel = user_msg[16:]
         server = message.server
@@ -58,9 +59,11 @@ async def on_message(message):
             for channel in channels:
                 channel = discord.utils.get(bot.get_all_channels(), server__name=str(server), name=channel)
                 await bot.delete_channel(channel)
+            print(f'{author} deleted channels: {channels}')
         else:
             channel = discord.utils.get(bot.get_all_channels(), server__name=str(server), name=channel)
             await bot.delete_channel(channel)
+            print(f'{author} deleted channel {channel}')
     elif user_msg.startswith('!add_role ') and str(author.top_role) == 'Admin':
         mark = user_msg.index(' ')
         server = message.server
@@ -69,6 +72,7 @@ async def on_message(message):
         member = user_msg[12:mark-1]
         member = server.get_member(member)
         await bot.add_roles(member, role)
+        print(f'{author} gave {member} role {role_name}')
     elif user_msg == '!balance' or user_msg == '!bal':
         await bot.send_message(message.channel, check_networth(author))
         # counter = 0  # checks how many messages you have
@@ -127,9 +131,10 @@ async def on_message(message):
                     # await asyncio.sleep(0.1)
                 else: msg.append(m)
             await bot.delete_messages(msg)
-    elif user_msg.startswith('!eval ') and str(
-            message.author.top_role) == 'Admin':
-        eval(user_msg[6:])
+        print(f'{author} cleared {number-2} message(s)')
+    elif user_msg.startswith('!eval ') and str(author.top_role) == 'Admin':
+        await bot.say(str(eval(user_msg[6:])))
+        print(f'{author} used eval')
     elif user_msg.startswith('!invitecode') or user_msg.startswith('!invite') or user_msg.startswith('!invitelink'):
         await bot.send_message(message.channel, discord.Invite(channel=message.channel, code=invitation_code).url)
     # TODO: Music command
