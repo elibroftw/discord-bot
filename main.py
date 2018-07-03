@@ -114,7 +114,7 @@ async def on_message(message):
     # search_users()
     elif user_msg.startswith('!thank'):
         await bot.send_message(message.channel, f"You're welcome {author.mention}")
-        elif user_msg.startswith('!clear'):
+    elif user_msg.startswith('!clear'):
         server = message.channel.server
         moderator = discord.utils.get(server.roles, name='Moderator')
         if message.author.top_role >= moderator:
