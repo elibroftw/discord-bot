@@ -133,7 +133,7 @@ async def on_message(message):
             await bot.delete_messages(msg)
         print(f'{author} cleared {number-2} message(s)')
     elif user_msg.startswith('!eval ') and str(author.top_role) == 'Admin':
-        await bot.say(str(eval(user_msg[6:])))
+        await bot.send_message(message.channel, str(eval(user_msg[6:])))
         print(f'{author} used eval')
     elif user_msg.startswith('!invitecode') or user_msg.startswith('!invite') or user_msg.startswith('!invitelink'):
         await bot.send_message(message.channel, discord.Invite(channel=message.channel, code=invitation_code).url)
