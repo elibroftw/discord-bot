@@ -36,10 +36,10 @@ async def on_message(message):
     author = message.author
     if str(author) != 'El Chapo#2608': update_networth(str(author))
     if author == bot.user: print('am same user')
-    if message.startswith('!RUN'): await bot.say('I GOT EXTRADITED! :(')
-    elif message.lower().startswith('!run'):
+    if message.content.startswith('!RUN'): await bot.say('I GOT EXTRADITED! :(')
+    elif message.content.lower().startswith('!run'):
         await bot.say('N o t  h y p e  e n o u g h')
-    elif message.lower().startswith('!help'):
+    elif message.content.lower().startswith('!help'):
         await bot.send_message(message.author, help_message)
     await bot.process_commands(message)
 
