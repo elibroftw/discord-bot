@@ -34,8 +34,7 @@ async def on_member_join(member):
 @bot.event
 async def on_message(message):
     author = message.author
-    if str(author) != 'El Chapo#2608': update_networth(str(author))
-    if author == bot.user: print('am same user')
+    if author != bot.user: update_networth(str(author))
     if message.content.startswith('!RUN'): await bot.say('I GOT EXTRADITED! :(')
     elif message.content.lower().startswith('!run'):
         await bot.say('N o t  h y p e  e n o u g h')
@@ -75,9 +74,9 @@ async def create_role(ctx):
     if str(ctx.message.author.top_role) == 'Admin':
         server = ctx.message.server
         role_name = ctx.message.content[13:]
-        bot.create_role(server, name=role_name)  # TODO: Should I delete the await???
+        await bot.create_role(server, name=role_name)
         await bot.say(f'Role {role_name} created')
-        print(f'{ctx.message.author}created role {role_name}')
+        print(f'{ctx.message.author} created role {role_name}')
 
 
 # TODO: delete_roll
