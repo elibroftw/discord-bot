@@ -39,6 +39,8 @@ async def on_message(message):
     if message.startswith('!RUN'): await bot.say('I GOT EXTRADITED! :(')
     elif message.lower().startswith('!run'):
         await bot.say('N o t  h y p e  e n o u g h')
+    elif message.lower().startswith('!help'):
+        await bot.send_message(message.author, help_message)
     await bot.process_commands(message)
 
 
@@ -276,9 +278,9 @@ async def shift():
     await bot.say('https://elibroftw.itch.io/shift')
 
 
-@bot.command(pass_context=True, aliases=['help'])
-async def _help(ctx):
-    await bot.send_message(ctx.message.author, help_message)
+# @bot.command(pass_context=True)
+# async def _help(ctx):
+#     await bot.send_message(ctx.message.author, help_message)
 
 
 # @bot.command(pass_context=True)
@@ -289,5 +291,4 @@ async def _help(ctx):
     # await bot.join_voice_channel(channel)
 
 
-token = os.environ['discord']
-bot.run(token)
+bot.run(os.environ['discord'])

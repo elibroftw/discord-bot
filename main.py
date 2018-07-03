@@ -15,7 +15,7 @@ bot = discord.Client()
 # *** CONSTANTS AND DECLARATIONS ***
 
 
-invitation_code = os.environ['invitation_code']
+invitation_code = os.environ['INVITATION_CODE']
 ttt_round = 0
 players_in_game = []
 tic_tac_toe_data: dict = {}
@@ -222,8 +222,8 @@ async def on_message(message):
                             if ttt_round == 5: await bot.send_message(user_msg.channel, f'Your Move{temp_msg+tempt}')
                             else: await bot.send_message(game_channel, f'Your Move{temp_msg}My Move{tempt}')
                         else:  # TODO: rich embed???
-                            await bot.send_message(game_channel, f'Your Move{temp_msg}My Move{tempt}\nEnter your '
-                                                                    f'move (#)')
+                            await bot.send_message(game_channel,
+                                                   f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
                             timers[0][1] = time.time()
                         ttt_round += 1
     elif user_msg.lower() == '!shift':
