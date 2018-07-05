@@ -45,7 +45,7 @@ def youtube_search(text):
         kind = re_result.group()[2:]
     except AttributeError: kind = 'video'
     try: text = text[text.index(' '):text.index('--')]
-    except ValueError: text = text[text.index(' '):]
+    except ValueError: pass
     # region = 'Canada'
     if kind == 'channel':
         search_response = youtube.search().list(q=text, part="id,snippet", maxResults=result + 20,

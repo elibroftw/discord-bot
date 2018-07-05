@@ -79,7 +79,7 @@ async def create_role(ctx):
         print(f'{ctx.message.author} created role {role_name}')
 
 
-# TODO: delete_roll
+# TODO: delete_role
 @bot.command(pass_context=True)
 async def add_role(ctx):
     if str(ctx.message.author.top_role) == 'Admin':
