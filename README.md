@@ -1,2 +1,2 @@
 # discord-bot
-A discord bot I made using discord.py. Hosted on Repl.it.
+A discord bot I made using the discord.py module. 
