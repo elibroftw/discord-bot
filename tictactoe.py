@@ -2,8 +2,7 @@ def print_board(board):
     msg = '\n'
     for i in range(9):
         msg += str(board[i])
-        if (i + 1) % 3 != 0:
-            msg += ' | '
+        if (i + 1) % 3 != 0: msg += ' | '
         else:
             msg += '\n'
             if (i + 1) / 3 < 3: msg += '----------\n'
@@ -29,8 +28,7 @@ def greeting(data, choice):
     elif choice == 'n' or choice == 'n':
         greet, comp_symbol, user_symbol, start = 'My Move', 'X', 'O', True
         data['comp_moves'].append(7)
-    else:  # IMPOSSIBLE
-        return 'Please enter "yes" or "no"'
+    else: return 'Please enter "yes" or "no"'  # IMPOSSIBLE
     data['start'] = start
     data['comp_symbol'] = comp_symbol
     data['user_symbol'] = user_symbol
@@ -52,10 +50,8 @@ def valid_move(move, data):
     board = board_creation(data)
     if move < 1 or move > 9 or board[move - 1] != '   ': return '', data
     board[move - 1] = data['user_symbol']
-    if not data['user_moves']:
-        data['user_moves'].append(move)
-    else:
-        data['user_moves'].append(move)
+    if not data['user_moves']: data['user_moves'].append(move)
+    else: data['user_moves'].append(move)
     return print_board(board), data
 
 
@@ -68,14 +64,14 @@ def simple_move(board, user_moves, comp_moves, skip=False):
             for y in comp_moves:
                 if y in x:
                     x.remove(y)
-                if len(x) == 1 and board[x[0]-1] == '   ':
+                if len(x) == 1 and board[x[0] - 1] == '   ':
                     move = x[0]
                     return move  # this is the move not the index
     for x in combos:
         for y in user_moves:
             if y in x:
                 x.remove(y)
-            if len(x) == 1 and board[x[0]-1] == '   ':
+            if len(x) == 1 and board[x[0] - 1] == '   ':
                 move = x[0]
                 return move  # this is the move not the index
     # checking for pins eg: 1, 2, 4 where 3 and 7 are open
@@ -162,10 +158,8 @@ def move_three(data: dict):
     comp_move1, comp_move2 = data['comp_moves'][0], data['comp_moves'][1]
     if start:
         if user_move1 != 5:
-            if user_move3 == danger:
-                board[int(danger2) - 1] = comp_symbol
-            else:
-                board[danger - 1] = comp_symbol
+            if user_move3 == danger: board[int(danger2) - 1] = comp_symbol
+            else: board[danger - 1] = comp_symbol
             data['game_over'] = True
             return print_board(board) + endgame(True), data
         else:
@@ -202,10 +196,8 @@ def move_four(data: dict):
     comp_symbol = data['comp_symbol']
     user_move4 = data['user_moves'][-1]
     if start:
-        if user_move4 == 2:
-            board[2] = comp_symbol
-        else:
-            board[1] = comp_symbol
+        if user_move4 == 2: board[2] = comp_symbol
+        else: board[1] = comp_symbol
         data['game_over'] = True
         return print_board(board) + endgame(False), data
     else:
@@ -214,10 +206,8 @@ def move_four(data: dict):
         comp_moves = data['comp_moves']
         move4 = simple_move(board, user_moves, comp_moves)
         # move4 = simpleMove(board, user_moves, comp_moves) - 1
-        if move4 is None:
-            move4 = board.index('   ')
-        else:
-            move4 -= 1
+        if move4 is None: move4 = board.index('   ')
+        else: move4 -= 1
         board[move4] = comp_symbol
         comp_moves.append(move4 + 1)
         win_combos = [[comp_moves[i], comp_moves[j], comp_moves[k]] for i in range(4) for j in range(i + 1, 4)
@@ -228,15 +218,15 @@ def move_four(data: dict):
                 data['game_over'] = True
                 return print_board(board) + endgame(True), data
         msg = print_board(board)
-        data['comp_moves'].append(move4+1)
+        data['comp_moves'].append(move4 + 1)
         return msg, data
 
 
+move_functions = [move_one, move_two, move_three, move_four]
+
+
 def tic_tac_toe_move(ttt_round, data: dict):
-    if ttt_round == 1: return move_one(data)
-    if ttt_round == 2: return move_two(data)
-    if ttt_round == 3: return move_three(data)
-    if ttt_round == 4: return move_four(data)
-    else:
+    try: move_functions[ttt_round - 1]
+    except IndexError:
         data['game_over'] = True
         return endgame(False), data  # ttt_move == 5
