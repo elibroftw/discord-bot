@@ -3,3 +3,4 @@ tweepy
 discord
 asyncio
 google-api-python-client
+flask

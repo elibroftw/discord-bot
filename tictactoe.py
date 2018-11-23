@@ -2,7 +2,8 @@ def print_board(board):
     msg = '\n'
     for i in range(9):
         msg += str(board[i])
-        if (i + 1) % 3 != 0: msg += ' | '
+        if (i + 1) % 3 != 0:
+            msg += ' | '
         else:
             msg += '\n'
             if (i + 1) / 3 < 3: msg += '----------\n'
@@ -28,7 +29,8 @@ def greeting(data, choice):
     elif choice == 'n' or choice == 'n':
         greet, comp_symbol, user_symbol, start = 'My Move', 'X', 'O', True
         data['comp_moves'].append(7)
-    else: return 'Please enter "yes" or "no"'  # IMPOSSIBLE
+    else:  # IMPOSSIBLE
+        return 'Please enter "yes" or "no"'
     data['start'] = start
     data['comp_symbol'] = comp_symbol
     data['user_symbol'] = user_symbol
@@ -50,8 +52,10 @@ def valid_move(move, data):
     board = board_creation(data)
     if move < 1 or move > 9 or board[move - 1] != '   ': return '', data
     board[move - 1] = data['user_symbol']
-    if not data['user_moves']: data['user_moves'].append(move)
-    else: data['user_moves'].append(move)
+    if not data['user_moves']:
+        data['user_moves'].append(move)
+    else:
+        data['user_moves'].append(move)
     return print_board(board), data
 
 
@@ -87,8 +91,10 @@ def simple_move(board, user_moves, comp_moves, skip=False):
 
 
 def endgame(win):
-    if win: msg = 'You lost, I, El Chapo reign'
-    else: msg = 'You tied me, good job!'
+    if win:
+        msg = 'You lost, I, El Chapo reign'
+    else:
+        msg = 'You tied me, good job!'
     return msg + '\nThanks for testing out the beta!\nIf there was a bug please contact ElibroFTW'
 
 
@@ -97,19 +103,29 @@ def move_one(data):
     user_move = data['user_moves'][-1]
     start = data['start']
     if start:
-        if user_move == 1: move, danger = 8, 9
-        elif user_move == 2: move, danger = 9, 8
-        elif user_move == 3: move, danger = 9, 8
-        elif user_move == 4: move, danger = 5, 3
-        elif user_move == 5: move, danger = 8, 9
-        elif user_move == 6: move, danger = 5, 3
-        elif user_move == 8: move, danger = 5, 3
-        else: move, danger = 4, 1
+        if user_move == 1:
+            move, danger = 8, 9
+        elif user_move == 2:
+            move, danger = 9, 8
+        elif user_move == 3:
+            move, danger = 9, 8
+        elif user_move == 4:
+            move, danger = 5, 3
+        elif user_move == 5:
+            move, danger = 8, 9
+        elif user_move == 6:
+            move, danger = 5, 3
+        elif user_move == 8:
+            move, danger = 5, 3
+        else:
+            move, danger = 4, 1
         data['danger'] = danger
         data['comp_moves'].append(move)
     else:
-        if board[4] == '   ': move = 5
-        else: move = 7
+        if board[4] == '   ':
+            move = 5
+        else:
+            move = 7
         data['comp_moves'].append(move)
     board[move - 1] = data['comp_symbol']
     return print_board(board), data
@@ -120,14 +136,22 @@ def move_two(data: dict):
     user_move1, user_move2 = data['user_moves'][0], data['user_moves'][-1]
     if start:
         if user_move2 == danger:
-            if user_move1 == 1: move2, danger, danger2 = 5, 2, 3
-            elif user_move1 == 2: move2, danger, danger2 = 5, 1, 3
-            elif user_move1 == 3: move2, danger, danger2 = 1, 4, 5
-            elif user_move1 == 4: move2, danger, danger2 = 8, 2, 9
-            elif user_move1 == 5: move2, danger, danger2 = 1, 4, None
-            elif user_move1 == 6: move2, danger, danger2 = 9, 1, 8
-            elif user_move1 == 8: move2, danger, danger2 = 4, 1, 6
-            else: move2, danger, danger2 = 5, 3, 6
+            if user_move1 == 1:
+                move2, danger, danger2 = 5, 2, 3
+            elif user_move1 == 2:
+                move2, danger, danger2 = 5, 1, 3
+            elif user_move1 == 3:
+                move2, danger, danger2 = 1, 4, 5
+            elif user_move1 == 4:
+                move2, danger, danger2 = 8, 2, 9
+            elif user_move1 == 5:
+                move2, danger, danger2 = 1, 4, None
+            elif user_move1 == 6:
+                move2, danger, danger2 = 9, 1, 8
+            elif user_move1 == 8:
+                move2, danger, danger2 = 4, 1, 6
+            else:
+                move2, danger, danger2 = 5, 3, 6
             data['danger'], data['danger2'] = danger, danger2
             data['comp_moves'].append(move2)
             board[move2 - 1] = comp_symbol
@@ -140,10 +164,14 @@ def move_two(data: dict):
     else:
         move2 = simple_move(board, data['user_moves'], data['comp_moves'], skip=True)
         if move2 is None:
-            if board[4] == comp_symbol and board[1] == '   ': move2 = 2
-            elif board[4] == comp_symbol and board[2] == '   ': move2 = 3
-            elif board[2] == '   ': move2 = 3
-            else: move2 = 9
+            if board[4] == comp_symbol and board[1] == '   ':
+                move2 = 2
+            elif board[4] == comp_symbol and board[2] == '   ':
+                move2 = 3
+            elif board[2] == '   ':
+                move2 = 3
+            else:
+                move2 = 9
         data['comp_moves'].append(move2)
         board[move2 - 1] = comp_symbol
         msg = print_board(board)
@@ -158,8 +186,10 @@ def move_three(data: dict):
     comp_move1, comp_move2 = data['comp_moves'][0], data['comp_moves'][1]
     if start:
         if user_move1 != 5:
-            if user_move3 == danger: board[int(danger2) - 1] = comp_symbol
-            else: board[danger - 1] = comp_symbol
+            if user_move3 == danger:
+                board[int(danger2) - 1] = comp_symbol
+            else:
+                board[danger - 1] = comp_symbol
             data['game_over'] = True
             return print_board(board) + endgame(True), data
         else:
@@ -175,10 +205,14 @@ def move_three(data: dict):
     else:
         move3 = simple_move(board, data['user_moves'], data['comp_moves'])
         if move3 is None:
-            if board[6] == '   ': move3 = 7
-            elif board[5] == '   ': move3 = 6
-            elif board[7] == '   ': move3 = 8
-            else: move3 = 3
+            if board[6] == '   ':
+                move3 = 7
+            elif board[5] == '   ':
+                move3 = 6
+            elif board[7] == '   ':
+                move3 = 8
+            else:
+                move3 = 3
         board[move3 - 1] = comp_symbol
         x = [comp_move1, comp_move2, move3]
         x.sort()
@@ -196,8 +230,10 @@ def move_four(data: dict):
     comp_symbol = data['comp_symbol']
     user_move4 = data['user_moves'][-1]
     if start:
-        if user_move4 == 2: board[2] = comp_symbol
-        else: board[1] = comp_symbol
+        if user_move4 == 2:
+            board[2] = comp_symbol
+        else:
+            board[1] = comp_symbol
         data['game_over'] = True
         return print_board(board) + endgame(False), data
     else:
@@ -206,8 +242,10 @@ def move_four(data: dict):
         comp_moves = data['comp_moves']
         move4 = simple_move(board, user_moves, comp_moves)
         # move4 = simpleMove(board, user_moves, comp_moves) - 1
-        if move4 is None: move4 = board.index('   ')
-        else: move4 -= 1
+        if move4 is None:
+            move4 = board.index('   ')
+        else:
+            move4 -= 1
         board[move4] = comp_symbol
         comp_moves.append(move4 + 1)
         win_combos = [[comp_moves[i], comp_moves[j], comp_moves[k]] for i in range(4) for j in range(i + 1, 4)
@@ -222,11 +260,11 @@ def move_four(data: dict):
         return msg, data
 
 
-move_functions = [move_one, move_two, move_three, move_four]
-
-
 def tic_tac_toe_move(ttt_round, data: dict):
-    try: move_functions[ttt_round - 1]
-    except IndexError:
+    if ttt_round == 1: return move_one(data)
+    if ttt_round == 2: return move_two(data)
+    if ttt_round == 3: return move_three(data)
+    if ttt_round == 4: return move_four(data)
+    else:
         data['game_over'] = True
         return endgame(False), data  # ttt_move == 5

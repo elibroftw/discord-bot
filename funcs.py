@@ -6,15 +6,13 @@ import logging
 import tweepy
 import re
 import os
-from apiclient import discovery
-
+from googleapiclient import discovery
 
 logger = logging.getLogger()
 logger.setLevel(logging.ERROR)
 
 google_api_key = os.environ['google']
 youtube = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
-
 
 twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
 twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
@@ -43,14 +41,18 @@ def youtube_search(text):
     try:
         re_result = p.search(text)
         kind = re_result.group()[2:]
-    except AttributeError: kind = 'video'
-    try: text = text[text.index(' '):text.index('--')]
-    except ValueError: pass
+    except AttributeError:
+        kind = 'video'
+    try:
+        text = text[text.index(' '):text.index('--')]
+    except ValueError:
+        pass
     # region = 'Canada'
     if kind == 'channel':
         search_response = youtube.search().list(q=text, part="id,snippet", maxResults=result + 20,
                                                 order='relevance').execute()
-    search_response = youtube.search().list(q=text, part="id,snippet", maxResults=result+2, order='relevance').execute()
+    search_response = youtube.search().list(q=text, part="id,snippet", maxResults=result + 2,
+                                            order='relevance').execute()
     videos, channels, playlists = [], [], []
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
@@ -73,28 +75,37 @@ def youtube_search(text):
     if kind == 'video':
         while result > 0:
             try:
-                title, video_id, desc = videos[result-1]
+                title, video_id, desc = videos[result - 1]
                 break
-            except IndexError: result -= 1
+            except IndexError:
+                result -= 1
     elif kind == 'channel':
         while result > 0:
             try:
-                channel_id = channels[result-1][1]
+                channel_id = channels[result - 1][1]
                 break
-            except IndexError: result -= 1
+            except IndexError:
+                result -= 1
     else:
         while result > 0:
             try:
-                playlist_id = playlists[result-1][1]
+                playlist_id = playlists[result - 1][1]
                 print(playlist_id)
                 break
-            except IndexError: result -= 1
-    if kind == 'video' and title is None: url = f'No {kind} found'
-    elif kind == 'video': url = f'https://www.youtube.com/watch?v={video_id}'
-    elif kind == 'channel' and channel_id is None: url = f'No {kind} found'
-    elif kind == 'channel': url = f'https://www.youtube.com/channel/{channel_id}'
-    elif kind == 'playlist' and playlist_id is None: url = f'No {kind} found'
-    else: url = f'https://www.youtube.com/playlist?list={playlist_id}'
+            except IndexError:
+                result -= 1
+    if kind == 'video' and title is None:
+        url = f'No {kind} found'
+    elif kind == 'video':
+        url = f'https://www.youtube.com/watch?v={video_id}'
+    elif kind == 'channel' and channel_id is None:
+        url = f'No {kind} found'
+    elif kind == 'channel':
+        url = f'https://www.youtube.com/channel/{channel_id}'
+    elif kind == 'playlist' and playlist_id is None:
+        url = f'No {kind} found'
+    else:
+        url = f'https://www.youtube.com/playlist?list={playlist_id}'
     return url
     # image = f'https://img.youtube.com/vi/{video_id}/mqdefault.jpg'
     # desc = '`Click title to go to video`\n' + desc
@@ -103,7 +114,7 @@ def youtube_search(text):
 
 
 def check_networth(author: str):
-        return f'You have ${os.environ[author]}\nNot as rich as me'
+    return f'You have ${os.environ[author]}\nNot as rich as me'
 
 
 def update_networth(author: str):
@@ -132,7 +143,8 @@ def search_twitter_user(q, users_to_search=5):
         try:
             user = q[i]
             users.append((user.name, user.screen_name))
-        except IndexError: break
+        except IndexError:
+            break
     return users
 
 
@@ -150,8 +162,10 @@ def discord_get_tweet_from(text):
     links, twitter_user = get_tweet_from(twitter_user, quantity=num)
     msg = 'Here is/are the latest tweet(s)'
     for index, link in enumerate(links):
-        if index > 0: msg += '\n<'+link+'>'
-        else: msg += '\n'+link
+        if index > 0:
+            msg += '\n<' + link + '>'
+        else:
+            msg += '\n' + link
     return msg
 
 
@@ -162,7 +176,7 @@ def discord_search_twitter_user(text, redirect=False):
         msg += f'\n{name} | @{screenName}'
     if redirect:
         return "```Were you searching for a User?\nHere are some names:" + msg
-    return '```'+msg
+    return '```' + msg
 
 
 def send_email(recipient, name=''):  # TODO: for later
@@ -175,7 +189,7 @@ def send_email(recipient, name=''):  # TODO: for later
     message = 'Hey, this is just a test'
     msg['From'] = my_address
     msg['To'] = recipient
-    msg['Subject'] = 'TEST'
+    msg['Subject'] = 'EMAIL TEST FROM DISCORD BOT'  # TODO: change this
     msg.attach(MIMEText(message, 'plain'))
     s.send_message(msg)
     s.quit()
