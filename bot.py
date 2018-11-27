@@ -1,11 +1,12 @@
 import time
+import os
 from datetime import datetime
 
 from discord.ext import commands
 from funcs import *
+from keep_alive import keep_alive
 import tictactoe
 import asyncio
-import os
 
 bot = commands.Bot(command_prefix="!")
 bot.command()
@@ -15,11 +16,13 @@ ttt_round = 0
 players_in_game = []
 tic_tac_toe_data: dict = {}
 timers = [['[Beta]Tic-Tac-Toe(!ttt)', 0], ['[Alpha]Shift(!shift)', 0]]
+# timers_2 = {'[Beta]Tic-Tac-Toe(!ttt)': 0, '[Alpha]Shift(!shift)': 0}
 with open('help.txt') as f: help_message = f.read()
 
 
 @bot.event
 async def on_ready():
+    print('Logged In')
     await bot.change_presence(game=discord.Game(name='Prison Break'))
 
 
@@ -27,20 +30,24 @@ async def on_ready():
 async def on_member_join(member):
     server = member.server
     msg = f'Welcome inmate {member.mention} to the {server.name} server!\n'
+    # await bot.send_message(server, msg)
     msg += 'Use !help for my functions'
-    await bot.send_message(server, msg)
+    await bot.send_message(member, msg)  # untested
 
 
 @bot.event
 async def on_message(message):
     author = message.author
-    if author != bot.user: update_networth(str(author))
-    if message.content.startswith('!RUN'): await bot.say('I GOT EXTRADITED! :(')
+    if author != bot.user: update_net_worth(str(author))
+    if message.content.startswith('!RUN'):
+        await bot.say('I GOT EXTRADITED! :(')
     elif message.content.lower().startswith('!run'):
         await bot.say('N o t  h y p e  e n o u g h')
     elif message.content.lower().startswith('!help'):
         await bot.send_message(message.author, help_message)
-    await bot.process_commands(message)
+        await bot.delete_message(message)
+    else:
+        await bot.process_commands(message)
 
 
 @bot.command(pass_context=True)
@@ -50,15 +57,17 @@ async def hi(ctx):
 
 @bot.command(pass_context=True)
 async def test(ctx):
-    if str(ctx.channel) == 'bot_testing':
+    if str(ctx.message.channel) == 'bot_testing':
         await bot.say('TEST\nI DID SOMETHING')
 
 
 @bot.command(pass_context=True)
 async def sleep(ctx):
     if ctx.message.author.top_role == 'Admin':
-        try: secs = int(ctx.message.content[7:])
-        except ValueError: secs = 5
+        try:
+            secs = int(ctx.message.content[7:])
+        except ValueError:
+            secs = 5
         print(f'Sleeping for {secs} seconds')
         await asyncio.sleep(secs)
         await bot.say('Done sleeping')
@@ -66,7 +75,8 @@ async def sleep(ctx):
 
 @bot.command(pass_context=True, aliases=['bal'])
 async def balance(ctx):
-    await bot.say(check_networth(str(ctx.message.author)))
+    await bot.send_message(ctx.message.author, check_networth(str(ctx.message.author)))
+    await bot.delete_message(ctx.message)
 
 
 @bot.command(pass_context=True, aliases=['createrole'])
@@ -123,15 +133,17 @@ async def youtube(ctx):
 async def twitter(ctx):
     # TODO: add --integer to define how many statuses, use regex
     # TODO: add a clamp (3 for this 10 for the next) so nobody can abuse the system
-    msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ')+1:])  # TODO: execpt ValueError
+    msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])  # TODO: execpt ValueError
     await bot.say(msg)
 
 
 @bot.command(pass_context=True, aliases=['searchuser' 'search_user'])
 async def search_twitter_user(ctx):
-    text = ctx.message.content[ctx.message.content.index(' ')+1:]  # TODO: except ValueError
+    text = ctx.message.content[ctx.message.content.index(' ') + 1:]  # TODO: except ValueError
     bot_message = discord_search_twitter_user(text)
     await bot.say(bot_message)
+
+
 # search_users()
 
 
@@ -144,6 +156,7 @@ async def thank(ctx):
 async def clear(ctx):
     server = ctx.message.channel.server
     moderator = discord.utils.get(server.roles, name='Moderator')
+    print(ctx.message.author.top_role > 8)  # .top_role is Admin
     if ctx.message.author.top_role >= moderator:
         await bot.say('Clearing messages...')
         await bot.change_presence(game=discord.Game(name='Clearing messages...'))
@@ -156,13 +169,14 @@ async def clear(ctx):
             date = m.timestamp
             if (datetime.now() - date).days > 14:  # if older than 14: delete else add onto msg list
                 await bot.delete_message(m)
-            else: msg.append(m)
+            else:
+                msg.append(m)
         await bot.delete_messages(msg)
     await bot.change_presence(game=discord.Game(name='Prison Break'))
     print(f'{ctx.message.author} cleared {number-2} message(s)')
 
 
-@bot.command(aliases=['shop', 'math', 'music', 'ban'])
+@bot.command(aliases=['shop', 'math', 'music', 'ban', 'remove_role', 'delete_role'])
 async def todo():  # TODO
     await bot.say('This command still needs to be implemented!')
 
@@ -201,8 +215,8 @@ async def ttt(ctx):
     if time.time() - timers[0][1] < 120:
         await bot.say('There is another tic-tac-toe game in progress')
     else:
-        msg = 'You have started a Tic-Tac-Toe game\nGame can end after 2 minutes of ' \
-              'inactivity or if you do !end\nWould you like to go first?'  # Removed '(y/n)'
+        msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
+              'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
         await bot.say(msg)
         ttt_round = 0
         players_in_game.clear()  # TODO: DELETE ANY DICTIONARY ENTRIES OF PLAYERS THAT AREN'T IN GAME
@@ -285,8 +299,9 @@ async def shift():
 # async def music(ctx):
 #     server = ctx.message.channel.server
 #  #     channel = discord.utils.get(bot.get_all_channels(), server__name=str(server), name=channel)
-    # channel = discord.utils.get(server.channels, name='music', type=discord.ChannelType.voice)
-    # await bot.join_voice_channel(channel)
+# channel = discord.utils.get(server.channels, name='music', type=discord.ChannelType.voice)
+# await bot.join_voice_channel(channel)
 
 
+keep_alive()
 bot.run(os.environ['discord'])

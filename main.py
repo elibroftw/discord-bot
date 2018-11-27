@@ -16,6 +16,7 @@ ttt_round = 0
 players_in_game = []
 tic_tac_toe_data: dict = {}
 timers = [['[Beta]Tic-Tac-Toe(!ttt)', 0], ['[Alpha]Shift(!shift)', 0]]
+# timers_2 = {'[Beta]Tic-Tac-Toe(!ttt)': 0, '[Alpha]Shift(!shift)': 0}
 with open('help.txt') as f: help_message = f.read()
 
 
@@ -25,7 +26,6 @@ async def on_ready():
     await bot.change_presence(game=discord.Game(name='Prison Break'))
 
 
-@bot.event
 @bot.event
 async def on_member_join(member):
     server = member.server
@@ -38,13 +38,14 @@ async def on_member_join(member):
 @bot.event
 async def on_message(message):
     author = message.author
-    if author != bot.user: update_networth(str(author))
+    if author != bot.user: update_net_worth(str(author))
     if message.content.startswith('!RUN'):
         await bot.say('I GOT EXTRADITED! :(')
     elif message.content.lower().startswith('!run'):
         await bot.say('N o t  h y p e  e n o u g h')
     elif message.content.lower().startswith('!help'):
         await bot.send_message(message.author, help_message)
+        await bot.delete_message(message)
     else:
         await bot.process_commands(message)
 
@@ -56,7 +57,7 @@ async def hi(ctx):
 
 @bot.command(pass_context=True)
 async def test(ctx):
-    if str(ctx.channel) == 'bot_testing':
+    if str(ctx.message.channel) == 'bot_testing':
         await bot.say('TEST\nI DID SOMETHING')
 
 
@@ -132,7 +133,16 @@ async def youtube(ctx):
 async def twitter(ctx):
     # TODO: add --integer to define how many statuses, use regex
     # TODO: add a clamp (3 for this 10 for the next) so nobody can abuse the system
-    msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])  # TODO: execpt ValueError
+    # msg = discord_get_tweet_from()  # TODO: except ValueError
+    text = ctx.message.content[ctx.message.content.index(' ') + 1:]
+    redirect = False
+    msg = '\n[Name | Screen name]```'
+    users = search_twitter_user(text)
+    for name, screenName in users:
+        msg += f'\n{name} | @{screenName}'
+    if redirect:
+        msg = "```Were you searching for a User?\nHere are some names:" + msg
+    msg = '```' + msg
     await bot.say(msg)
 
 
@@ -155,6 +165,7 @@ async def thank(ctx):
 async def clear(ctx):
     server = ctx.message.channel.server
     moderator = discord.utils.get(server.roles, name='Moderator')
+    print(ctx.message.author.top_role > 8)  # .top_role is Admin
     if ctx.message.author.top_role >= moderator:
         await bot.say('Clearing messages...')
         await bot.change_presence(game=discord.Game(name='Clearing messages...'))
@@ -174,7 +185,7 @@ async def clear(ctx):
     print(f'{ctx.message.author} cleared {number-2} message(s)')
 
 
-@bot.command(aliases=['shop', 'math', 'music', 'ban'])
+@bot.command(aliases=['shop', 'math', 'music', 'ban', 'remove_role', 'delete_role'])
 async def todo():  # TODO
     await bot.say('This command still needs to be implemented!')
 

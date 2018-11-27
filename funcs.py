@@ -117,7 +117,7 @@ def check_networth(author: str):
     return f'You have ${os.environ[author]}\nNot as rich as me'
 
 
-def update_networth(author: str):
+def update_net_worth(author: str):
     try:
         os.environ[author] = str(int(os.environ[author]) + 1)
     except KeyError:
@@ -125,6 +125,17 @@ def update_networth(author: str):
 
 
 # TODO: TURN GET TWEET INTO ONE FUNCTION
+
+def discord_search_twitter_user(text, redirect=False):
+    msg = '\n[Name | Screen name]```'
+    users = search_twitter_user(text)
+    for name, screenName in users:
+        msg += f'\n{name} | @{screenName}'
+    if redirect:
+        return "```Were you searching for a User?\nHere are some names:" + msg
+    return '```' + msg
+
+
 def get_tweet_from(user, quantity=1):
     try:
         statuses = twitter_api.user_timeline(user, count=quantity)
@@ -169,14 +180,7 @@ def discord_get_tweet_from(text):
     return msg
 
 
-def discord_search_twitter_user(text, redirect=False):
-    msg = '\n[Name | Screen name]```'
-    users = search_twitter_user(text)
-    for name, screenName in users:
-        msg += f'\n{name} | @{screenName}'
-    if redirect:
-        return "```Were you searching for a User?\nHere are some names:" + msg
-    return '```' + msg
+
 
 
 def send_email(recipient, name=''):  # TODO: for later
