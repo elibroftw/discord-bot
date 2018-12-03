@@ -40,9 +40,9 @@ async def on_message(message):
     author = message.author
     if author != bot.user: update_net_worth(str(author))
     if message.content.startswith('!RUN'):
-        await bot.say('I GOT EXTRADITED! :(')
+        await bot.say(message.channel, 'I GOT EXTRADITED! :(')
     elif message.content.lower().startswith('!run'):
-        await bot.say('N o t  h y p e  e n o u g h')
+        await bot.say(message.channel, 'N o t  h y p e  e n o u g h')
     elif message.content.lower().startswith('!help'):
         await bot.send_message(message.author, help_message)
         await bot.delete_message(message)
@@ -57,8 +57,8 @@ async def hi(ctx):
 
 @bot.command(pass_context=True)
 async def test(ctx):
-    if str(ctx.message.channel) == 'bot_testing':
-        await bot.say('TEST\nI DID SOMETHING')
+    if str(ctx.message.channel) == 'bot-testing':
+        await bot.send_message(ctx.message.channel, 'TEST\nI DID SOMETHING')
 
 
 @bot.command(pass_context=True)
@@ -75,7 +75,7 @@ async def sleep(ctx):
 
 @bot.command(pass_context=True, aliases=['bal'])
 async def balance(ctx):
-    await bot.send_message(ctx.message.author, check_networth(str(ctx.message.author)))
+    await bot.send_message(ctx.message.author, check_net_worth(str(ctx.message.author)))
     await bot.delete_message(ctx.message)
 
 
@@ -129,6 +129,13 @@ async def youtube(ctx):
         await bot.say('ERROR: No search parameter given')
 
 
+# @bot.command(pass_context=True, aliases=['gettweet', 'get_tweet'])
+# async def twitter(ctx):
+#     # TODO: add --integer to define how many statuses, use regex
+#     # TODO: add a clamp (3 for this 10 for the next) so nobody can abuse the system
+#     msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])  # TODO: execpt ValueError
+
+
 @bot.command(pass_context=True, aliases=['gettweet', 'get_tweet'])
 async def twitter(ctx):
     # TODO: add --integer to define how many statuses, use regex
@@ -165,7 +172,7 @@ async def thank(ctx):
 async def clear(ctx):
     server = ctx.message.channel.server
     moderator = discord.utils.get(server.roles, name='Moderator')
-    print(ctx.message.author.top_role > 8)  # .top_role is Admin
+    print(ctx.message.author.top_role.position)  # .top_role is Admin
     if ctx.message.author.top_role >= moderator:
         await bot.say('Clearing messages...')
         await bot.change_presence(game=discord.Game(name='Clearing messages...'))
