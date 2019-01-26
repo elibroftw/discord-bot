@@ -319,5 +319,49 @@ async def music(ctx):
     await bot.join_voice_channel(channel)
 
 
+@bot.command(pass_context=True)
+async def play(ctx):
+    pass
+    # search_query = ctx.message[6:]
+
+
+@bot.command(pass_context=True)
+async def pause(ctx):
+    pass
+    # search_query = ctx.message[6:]
+
+
+@bot.command(pass_context=True)
+async def stop(ctx):
+    pass
+    # search_query = ctx.message[6:]
+
+@bot.command(pass_context=True, aliases=['playnext'])
+async def play_next(ctx):
+    pass
+    # search_query = ctx.message[6:]
+
+@bot.command(pass_context=True)
+async def queue(ctx):
+    pass
+    # search_query = ctx.message[6:]
+
+@bot.command(pass_context=True)
+async def skip(ctx):
+    pass
+    # search_query = ctx.message[6:]
+
+@bot.command(pass_context=True)
+async def restart(ctx):
+    pass
+    # search_query = ctx.message[6:]
+
+
+@bot.command(pass_context=True)
+async def loop(ctx):
+    pass
+    # search_query = ctx.message[6:]
+
+
 keep_alive()
 bot.run(os.environ['discord'])
