@@ -192,7 +192,7 @@ async def clear(ctx):
     print(f'{ctx.message.author} cleared {number-2} message(s)')
 
 
-@bot.command(aliases=['shop', 'math', 'music', 'ban', 'remove_role', 'delete_role'])
+@bot.command(aliases=['shop', 'math', 'ban', 'remove_role', 'delete_role'])
 async def todo():  # TODO
     await bot.say('This command still needs to be implemented!')
 
@@ -311,12 +311,12 @@ async def shift():
 #     await bot.send_message(ctx.message.author, help_message)
 
 
-# @bot.command(pass_context=True)
-# async def music(ctx):
-#     server = ctx.message.channel.server
-#  #     channel = discord.utils.get(bot.get_all_channels(), server__name=str(server), name=channel)
-# channel = discord.utils.get(server.channels, name='music', type=discord.ChannelType.voice)
-# await bot.join_voice_channel(channel)
+@bot.command(pass_context=True, aliases=['play_music'])
+async def music(ctx):
+    server = ctx.message.channel.server
+    #  channel = discord.utils.get(bot.get_all_channels(), server__name=str(server), name=channel)
+    channel = discord.utils.get(server.channels, name='music', type=discord.ChannelType.voice)
+    await bot.join_voice_channel(channel)
 
 
 keep_alive()
