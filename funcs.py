@@ -7,6 +7,7 @@ import tweepy
 import re
 import os
 from googleapiclient import discovery
+from urllib.parse import urlparse
 
 logger = logging.getLogger()
 logger.setLevel(logging.ERROR)
@@ -197,3 +198,26 @@ def send_email(recipient, name=''):  # TODO: for later
     msg.attach(MIMEText(message, 'plain'))
     s.send_message(msg)
     s.quit()
+
+
+def video_id(url):
+    """
+    Examples:
+    - http://youtu.be/SA2iWivDJiE
+    - http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu
+    - http://www.youtube.com/embed/SA2iWivDJiE
+    - http://www.youtube.com/v/SA2iWivDJiE?version=3&amp;hl=en_US
+    """
+    o = urlparse(url)
+    if o.netloc == 'youtu.be':
+        return o.path[1:]
+    elif o.netloc in ('www.youtube.com', 'youtube.com'):
+        if o.path == '/watch':
+            id_index = o.query.index('v=')
+            return o.query[id_index+2:id_index+13]
+        elif o.path[:7] == '/embed/':
+            return o.path.split('/')[2]
+        elif o.path[:3] == '/v/':
+            return o.path.split('/')[2]
+    return None  # fail?
+
