@@ -1,33 +1,43 @@
+from __future__ import unicode_literals
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import discord
 import logging
-import tweepy
+from discord import opus
+# import tweepy
 import re
 import os
 from googleapiclient import discovery
 from urllib.parse import urlparse
+import youtube_dl
 
 logger = logging.getLogger()
 logger.setLevel(logging.ERROR)
 
-google_api_key = os.environ['google']
+try:
+    google_api_key = os.environ['google']
+except KeyError:
+    from environs import Env
+
+    env = Env()
+    env.read_env()
+    google_api_key = os.environ['google']
 youtube = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
 
-twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
-twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
 
-twitter_api = tweepy.API(twitter_auth)
+# twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
+# twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
+#
+# twitter_api = tweepy.API(twitter_auth)
 
 
-def rich_embed(title, url, image, icon, desc, author='', colour=discord.Color.red()):
-    embed = discord.Embed(url=url, title=title, color=colour, description=desc)
-    embed.set_thumbnail(url=icon)
-    embed.set_image(url=image)
-    author_icon = 'https://cdn.discordapp.com/avatars/282274755426385921/fa592e14d10668e80e981b7e1066746a.webp?size=256'
-    if author != '': embed.set_author(name=author, url=url, icon_url=author_icon)
-    return embed
+# def rich_embed(title, url, image, icon, desc, author='', colour=discord.Color.red()):
+#     embed = discord.Embed(url=url, title=title, color=colour, description=desc)
+#     embed.set_thumbnail(url=icon)
+#     embed.set_image(url=image)
+#     author_icon = 'https://cdn.discordapp.com/avatars/282274755426385921/fa592e14d10668e80e981b7e1066746a.webp?size=256'
+#     if author != '': embed.set_author(name=author, url=url, icon_url=author_icon)
+#     return embed
 
 
 def youtube_search(text):
@@ -114,7 +124,22 @@ def youtube_search(text):
     # return True, embed
 
 
-def check_networth(author: str):
+ydl_opts = {
+    'format': 'bestaudio/best',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
+}
+
+
+def youtube_download(url):
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+
+
+def check_networth(author: str):  # use a database
     return f'You have ${os.environ[author]}\nNot as rich as me'
 
 
@@ -125,63 +150,75 @@ def update_net_worth(author: str):
         os.environ[author] = '1'
 
 
+OPUS_LIBS = ['libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib']
+
+
+def load_opus_lib(opus_libs=OPUS_LIBS):
+    if opus.is_loaded():
+        return True
+
+    for opus_lib in opus_libs:
+        try:
+            opus.load_opus(opus_lib)
+            return
+        except OSError:
+            pass
+
+        raise RuntimeError('Could not load an opus lib. Tried %s' % (', '.join(opus_libs)))
 # TODO: TURN GET TWEET INTO ONE FUNCTION
 
-def discord_search_twitter_user(text, redirect=False):
-    msg = '\n[Name | Screen name]```'
-    users = search_twitter_user(text)
-    for name, screenName in users:
-        msg += f'\n{name} | @{screenName}'
-    if redirect:
-        return "```Were you searching for a User?\nHere are some names:" + msg
-    return '```' + msg
-
-
-def get_tweet_from(user, quantity=1):
-    try:
-        statuses = twitter_api.user_timeline(user, count=quantity)
-        screen_name = twitter_api.get_user(user).screen_name
-        # f'https://twitter.com/{user}/status/{tweet.id_str}'
-        tweets = [f'https://twitter.com/{screen_name}/status/{status.id_str}' for status in statuses]
-        return tweets, screen_name
-    except tweepy.TweepError:
-        return ['NA'], 'TWITTER USER DOES NOT EXIST'
-
-
-def search_twitter_user(q, users_to_search=5):
-    q = twitter_api.search_users(q, perpage=users_to_search)
-    users = []
-    for i in range(users_to_search):
-        try:
-            user = q[i]
-            users.append((user.name, user.screen_name))
-        except IndexError:
-            break
-    return users
-
-
-def discord_get_tweet_from(text):
-    try:
-        p = text.index(' -')  # p: parameter
-        twitter_user = text[0:p]
-        num = int(text[p + 2:])
-        num = max(min(num, 3), 1)
-    except (ValueError, IndexError):
-        num = 1
-        twitter_user = text[0:]
-    if twitter_user.count(' ') > 0: return discord_search_twitter_user(twitter_user, redirect=True)
-    if not search_twitter_user(twitter_user): return 'NO USER FOUND, YOU MUST BE DYSGRAPHIC'
-    links, twitter_user = get_tweet_from(twitter_user, quantity=num)
-    msg = 'Here is/are the latest tweet(s)'
-    for index, link in enumerate(links):
-        if index > 0:
-            msg += '\n<' + link + '>'
-        else:
-            msg += '\n' + link
-    return msg
-
-
-
+# def discord_search_twitter_user(text, redirect=False):
+#     msg = '\n[Name | Screen name]```'
+#     users = search_twitter_user(text)
+#     for name, screenName in users:
+#         msg += f'\n{name} | @{screenName}'
+#     if redirect:
+#         return "```Were you searching for a User?\nHere are some names:" + msg
+#     return '```' + msg
+#
+#
+# def get_tweet_from(user, quantity=1):
+#     try:
+#         statuses = twitter_api.user_timeline(user, count=quantity)
+#         screen_name = twitter_api.get_user(user).screen_name
+#         # f'https://twitter.com/{user}/status/{tweet.id_str}'
+#         tweets = [f'https://twitter.com/{screen_name}/status/{status.id_str}' for status in statuses]
+#         return tweets, screen_name
+#     except tweepy.TweepError:
+#         return ['NA'], 'TWITTER USER DOES NOT EXIST'
+#
+#
+# def search_twitter_user(q, users_to_search=5):
+#     q = twitter_api.search_users(q, perpage=users_to_search)
+#     users = []
+#     for i in range(users_to_search):
+#         try:
+#             user = q[i]
+#             users.append((user.name, user.screen_name))
+#         except IndexError:
+#             break
+#     return users
+#
+#
+# def discord_get_tweet_from(text):
+#     try:
+#         p = text.index(' -')  # p: parameter
+#         twitter_user = text[0:p]
+#         num = int(text[p + 2:])
+#         num = max(min(num, 3), 1)
+#     except (ValueError, IndexError):
+#         num = 1
+#         twitter_user = text[0:]
+#     if twitter_user.count(' ') > 0: return discord_search_twitter_user(twitter_user, redirect=True)
+#     if not search_twitter_user(twitter_user): return 'NO USER FOUND, YOU MUST BE DYSGRAPHIC'
+#     links, twitter_user = get_tweet_from(twitter_user, quantity=num)
+#     msg = 'Here is/are the latest tweet(s)'
+#     for index, link in enumerate(links):
+#         if index > 0:
+#             msg += '\n<' + link + '>'
+#         else:
+#             msg += '\n' + link
+#     return msg
 
 
 def send_email(recipient, name=''):  # TODO: for later
@@ -214,10 +251,9 @@ def video_id(url):
     elif o.netloc in ('www.youtube.com', 'youtube.com'):
         if o.path == '/watch':
             id_index = o.query.index('v=')
-            return o.query[id_index+2:id_index+13]
+            return o.query[id_index + 2:id_index + 13]
         elif o.path[:7] == '/embed/':
             return o.path.split('/')[2]
         elif o.path[:3] == '/v/':
             return o.path.split('/')[2]
     return None  # fail?
-

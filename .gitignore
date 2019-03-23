@@ -1,1 +1,4 @@
 .idea
+.env
+ffmpeg
+__pycache__
