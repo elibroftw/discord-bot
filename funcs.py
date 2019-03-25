@@ -22,7 +22,7 @@ except KeyError:
     env = Env()
     env.read_env()
     google_api_key = os.environ['google']
-youtube = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
+youtube_API = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
 
 if not os.path.exists('Music'):
     os.mkdir('Music')
@@ -64,9 +64,9 @@ def youtube_search(text):
         pass
     # region = 'Canada'
     if kind == 'channel':
-        search_response = youtube.search().list(q=text, part="id,snippet", maxResults=result + 20,
+        search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 20,
                                                 order='relevance').execute()
-    search_response = youtube.search().list(q=text, part="id,snippet", maxResults=result + 2,
+    search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 2,
                                             order='relevance').execute()
     videos, channels, playlists = [], [], []
     # Add each result to the appropriate list, and then display the lists of

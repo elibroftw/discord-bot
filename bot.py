@@ -1,10 +1,12 @@
-import time
-from datetime import datetime
-import discord
-from discord.ext import commands
-from funcs import *
-import tictactoe
 import asyncio
+import discord
+import time
+import tictactoe
+from datetime import datetime
+from discord.ext import commands
+from discord.ext.commands.errors import CommandInvokeError
+from funcs import *
+from subprocess import run
 
 bot = commands.Bot(command_prefix='!')
 bot.command()
@@ -88,7 +90,7 @@ async def create_role(ctx):
         if len(role_name) > 1:
             role_name = ' '.join(role_name[1:])
             guild: discord.guild = ctx.guild
-            await guild.create_role(server, name=role_name)
+            await guild.create_role(guild, name=role_name)
             await ctx.send(f'Role {role_name} created')
             print(f'{m.author} created role {role_name}')
 
@@ -133,6 +135,21 @@ async def youtube(ctx):
         await ctx.send(youtube_search(text))
     except ValueError:
         await ctx.send('ERROR: No search parameter given')
+
+
+@bot.command()
+async def exit(ctx):
+    moderator = discord.utils.get(ctx.guild.roles, name='Moderator')
+    if ctx.author.top_role >= moderator:
+        quit()
+
+@bot.command()
+async def restart(ctx):
+    moderator = discord.utils.get(ctx.guild.roles, name='Moderator')
+    if ctx.author.top_role >= moderator:
+        print('Restarting')
+        run('python bot.py')
+        quit()
 
 
 # @bot.command(, aliases=['gettweet', 'get_tweet'])
@@ -310,7 +327,10 @@ async def created_at(ctx):
         user = discord.utils.get(ctx.guild.members, name=' '.join(args[1:]))
     else:
         user = ctx.author
-    await ctx.send(user.created_at)
+    try: await ctx.send(user.created_at)
+    except CommandInvokeError:
+        await ctx.send(f'could not find that user in the server')
+
 
 
 @bot.command()
@@ -363,18 +383,19 @@ async def play(ctx):
         music_queue = music_queues[guild]
         # print('added song to queue')
 
-        def next_song(error):
+        async def next_song(error):
             music_queues[guild].pop(0)
             mq = music_queues[guild]
             if mq:
                 # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
                 voice_client.play(music_queue[0], after=next_song)
             else:
-                # await bot.change_presence(activity=discord.Game('Prison Break'))
+                await bot.change_presence(activity=discord.Game('Prison Break'))
 
         if not voice_client.is_playing():
-            # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
             voice_client.play(audio_source, after=next_song)
+            # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
+            
     else:
         if voice_client.is_paused():
             voice_client.resume()
@@ -447,13 +468,12 @@ async def stop(ctx):
 @bot.command()
 async def volume(ctx):
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    if voice_client:
-        amount = ctx.message.content[8:]
-        voice_client.volume
+    # if voice_client:
+    #     amount = ctx.message.content[8:]
+    #     voice_client.volume
 
     # discord.PCMVolumeTransformer
     # https://discordpy.readthedocs.io/en/rewrite/api.html#discord.PCMVolumeTransformer
-    pass
 
 
 bot.run(os.environ['discord'])
