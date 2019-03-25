@@ -9,13 +9,16 @@ import asyncio
 
 bot = commands.Bot(command_prefix='!')
 bot.command()
-invitation_code = os.environ['INVITATION_CODE']
-ttt_round = 0
 
+invitation_code = os.environ['INVITATION_CODE']
+load_opus_lib()
+ttt_round = 0
 players_in_game = []
 tic_tac_toe_data: dict = {}
-timers = [['[Beta]Tic-Tac-Toe(!ttt)', 0], ['[Alpha]Shift(!shift)', 0]]
+timers = [['[Beta]Tic-Tac-Toe(!ttt)', 0]]
 # timers_2 = {'[Beta]Tic-Tac-Toe(!ttt)': 0, '[Alpha]Shift(!shift)': 0}
+music_queues = {}
+
 with open('help.txt') as f: help_message = f.read()
 
 
@@ -39,7 +42,7 @@ async def on_message(message):
     author: discord.User = message.author
     if author != bot.user: update_net_worth(str(author))
     if message.content.startswith('!RUN'):
-        await message.channnel.send('I GOT EXTRADITED! :(')
+        await message.channel.send('I GOT EXTRADITED! :(')
     elif message.content.lower().startswith('!run'):
         await message.send('N o t  h y p e  e n o u g h')
     elif message.content.lower().startswith('!help'):
@@ -153,29 +156,31 @@ async def thank(ctx):
 
 @bot.command()
 async def clear(ctx):
-    channel: discord.TextChannel = ctx.message.channel
-    guild = channel.guild
-    moderator = discord.utils.get(guild.roles, name='Moderator')
-    ctx.message.author.top_role: discord.Role  # .top_role is Admin
-    print(ctx.message.author.top_role.position)
-    if ctx.message.author.top_role >= moderator:
-        await ctx.send('Clearing messages...')
-        await bot.change_presence(activity=discord.Game('Clearing messages...'))
-        number = 3
-        if ctx.message.content[7:].isnumeric():  # len(user_msg) > 7 and
-            if int(ctx.message.content[7:]) > 98: number = 100 - int(ctx.message.content[7:])
-            number += int(ctx.message.content[7:]) - 1
-        messages = []
-        async for m in channel.history(limit=number):
-            m: discord.Message
-            date = m.created_at
-            if (datetime.now() - date).days > 14:  # if older than 14: delete else add onto msg list
-                await m.delete()
-            else:
-                messages.append(m)
-        await channel.delete_messages(messages)
-        print(f'{ctx.message.author} cleared {number - 2} message(s)')
-    await bot.change_presence(activity=discord.Game('Prison Break'))
+    try:
+        channel: discord.TextChannel = ctx.message.channel
+        guild = channel.guild
+        moderator = discord.utils.get(guild.roles, name='Moderator')
+        ctx.message.author.top_role: discord.Role  # .top_role is Admin
+        # print(ctx.message.author.top_role.position)  # printed 4
+        if ctx.message.author.top_role >= moderator:
+            # await ctx.send('Clearing messages...')
+            await bot.change_presence(activity=discord.Game('Clearing messages...'))
+            number = 3
+            if ctx.message.content[7:].isnumeric():  # len(user_msg) > 7 and
+                if int(ctx.message.content[7:]) > 98: number = 100 - int(ctx.message.content[7:])
+                number += int(ctx.message.content[7:]) - 1
+            messages = []
+            async for m in channel.history(limit=number):
+                date = m.created_at
+                if (datetime.now() - date).days > 14:  # if older than 14: delete else add onto msg list
+                    await m.delete()
+                else:
+                    messages.append(m)
+            await channel.delete_messages(messages)
+            print(f'{ctx.message.author} cleared {number - 2} message(s)')
+        await bot.change_presence(activity=discord.Game('Prison Break'))
+    except AttributeError: pass
+
 
 
 # aliases=['shop', 'math', 'ban', 'remove_role', 'delete_role']
@@ -301,29 +306,118 @@ async def summon(ctx):
     if not author.voice:
         channel = discord.utils.get(guild.channels, name='music', type=discord.VoiceChannel)
     else:
-        channel = author.voice.channel
+        channel: discord.VoiceChannel = author.voice.channel
     await channel.connect()
 
 
-@bot.command()
+@bot.command(aliases=['paly', 'queue', 'que'])
 async def play(ctx):
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    guild = ctx.guild
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    if voice_client is None:
+        command = bot.get_command('summon')
+        await command.callback(ctx)
+        voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     url_or_query = ctx.message.content[5:]
     if url_or_query:
+        # get url
         if url_or_query.startswith('https://'):
-            pass
+            url = url_or_query
         else:  # query
             url = youtube_search(url_or_query)
+        music_file = f'Music/{video_id(url)}.mp3'
+        # download if it does not exist
+        # use db to determine which files get constantly used
+        if not os.path.exists(music_file):
+            m = await ctx.message.channel.send(f'Downloading song...')
             youtube_download(url)
-            # download and the play
+            await m.delete()
+
+        # voice_client.play(discord.AudioSource())
+        # playing time
+        audio_source = discord.FFmpegPCMAudio(music_file)
+        try:
+            music_queues[guild].append(audio_source)
+        except KeyError:
+            music_queues[guild] = [audio_source]
+        music_queue = music_queues[guild]
+        print('added song to queue')
+
+        def next_song(error):
+            music_queues[guild].pop(0)
+            mq = music_queues[guild]
+            if mq:
+                # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
+                voice_client.play(music_queue[0], after=next_song)
+
+        if not voice_client.is_playing():
+            # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
+            voice_client.play(audio_source, after=next_song)
 
 
-@bot.command(alias=['stop', 'unsummon', 'disconnect'])
+@bot.command()
+async def skip(ctx):
+    guild = ctx.guild
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    if voice_client and music_queues[guild]:
+        print('Skipped')
+        music_queues[guild].pop(0)
+        music_queue = music_queues[guild]
+        if music_queue:
+            def next_song(error):
+                music_queues[guild].pop(0)
+                mq = music_queues[guild]
+                if mq:
+                    # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
+                    voice_client.play(music_queue[0], after=next_song)
+            voice_client.stop()
+            voice_client.play(music_queue[0], after=next_song)
+            # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
+
+
+@bot.command()
+async def pause(ctx):
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if voice_client.is_paused():
+        voice_client.resume()
+    else:
+        voice_client.pause()
+
+
+@bot.command()
+async def resume(ctx):
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if voice_client:
+        if voice_client.is_paused():
+            voice_client.resume()
+        else:
+            voice_client.pause()
+
+
+@bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss'])
 async def leave(ctx):
     # clear query
+    music_queues[ctx.guild] = []
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    await voice_client.disconnect()
-    # voice_client.channel
+    if voice_client:
+        await voice_client.disconnect()
+
+
+@bot.command()
+async def stop(ctx):
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if voice_client:
+        if voice_client.is_playing():
+            guild = ctx.guild
+            music_queues[guild].pop(0)
+            voice_client.stop()
+
+
+@bot.command()
+async def volume(ctx):
+    # discord.PCMVolumeTransformer
+    # https://discordpy.readthedocs.io/en/rewrite/api.html#discord.PCMVolumeTransformer
+    pass
 
 keep_alive()
 bot.run(os.environ['discord'])

@@ -6,9 +6,7 @@ eg: !yt Pop Music -- 2 --playlist
 + !bal / same as !balance
 + !thank
 / You're welcome
-+ !invitecode / Default will be added
-// -n : invite code that doesn't expire
-// -t : temporary invite code
++ !invitecode, !invite
 + !games
 // list of games
 + !ttt
@@ -16,6 +14,8 @@ eg: !yt Pop Music -- 2 --playlist
 + !gettweet twitter_screen_name
 + !searchuser query
 + !twitter twitter_screen_name
+// Music
++ !play, !que, !queue //
 -Moderators- // And upcoming
 + !clear
 + !math
