@@ -42,7 +42,7 @@ if not os.path.exists('Music'):
 #     return embed
 
 
-def youtube_search(text):
+def youtube_search(text, return_info=False):
     if text == 'maagnolia':
         text = 'magnolia'
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
@@ -121,7 +121,10 @@ def youtube_search(text):
         url = f'No {kind} found'
     else:
         url = f'https://www.youtube.com/playlist?list={playlist_id}'
-    return url
+    if return_info:
+        return url, title, video_id
+    else:
+        return url
     # image = f'https://img.youtube.com/vi/{vid_id}/mqdefault.jpg'
     # desc = '`Click title to go to video`\n' + desc
     # embed = richembed(title, url, image, icon, desc)
@@ -136,7 +139,7 @@ ydl_opts = {
         'preferredquality': '192',
     }],
     # 'outtmpl': 'Music/%(id)s.%(ext)s',
-    'outtmpl': 'Music/%(title)s.%(ext)s',
+    'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
     'ffmpeg_location': 'ffmpeg/bin/'
 }
 
@@ -144,8 +147,8 @@ ydl_opts = {
 def youtube_download(url):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
-        info_dict = ydl.extract_info(url, download=False)
-        return info_dict
+        # info_dict = ydl.extract_info(url, download=False)
+        # return info_dict
 
 
 def get_video_id(url):
