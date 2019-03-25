@@ -2,7 +2,9 @@ import asyncio
 import discord
 import time
 import tictactoe
+from collections import namedtuple
 from datetime import datetime
+from discord import FFmpegPCMAudio
 from discord.ext import commands
 from discord.ext.commands.errors import CommandInvokeError
 from funcs import *
@@ -17,9 +19,10 @@ ttt_round = 0
 players_in_game = []
 tic_tac_toe_data: dict = {}
 timers = [['[Beta]Tic-Tac-Toe(!ttt)', 0]]
+ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 # timers_2 = {'[Beta]Tic-Tac-Toe(!ttt)': 0, '[Alpha]Shift(!shift)': 0}
 music_queues = {}
-
+# Song = namedtuple('Song', ('title', 'audio_source'))
 with open('help.txt') as f: help_message = f.read()
 
 
@@ -45,10 +48,9 @@ async def on_message(message):
     if message.content.startswith('!RUN'):
         await message.channel.send('I GOT EXTRADITED! :(')
     elif message.content.lower().startswith('!run'):
-        await message.send('N o t  h y p e  e n o u g h')
+        await message.channel.send('N o t  h y p e  e n o u g h')
     elif message.content.lower().startswith('!help'):
         await author.send(help_message)
-        await message.delete()
     else:
         await bot.process_commands(message)
 
@@ -137,11 +139,12 @@ async def youtube(ctx):
         await ctx.send('ERROR: No search parameter given')
 
 
-@bot.command()
-async def exit(ctx):
+@bot.command(name='exit', aliases=['quit'])
+async def _exit(ctx):
     moderator = discord.utils.get(ctx.guild.roles, name='Moderator')
     if ctx.author.top_role >= moderator:
         quit()
+
 
 @bot.command()
 async def restart(ctx):
@@ -332,7 +335,6 @@ async def created_at(ctx):
         await ctx.send(f'could not find that user in the server')
 
 
-
 @bot.command()
 async def summon(ctx):
     guild = ctx.message.channel.guild
@@ -349,95 +351,119 @@ async def summon(ctx):
             await voice_client.move_to(channel)
             
 
-@bot.command(aliases=['paly', 'queue', 'que', 'p'])
+@bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q'])
 async def play(ctx):
+    # TODO: add auto play option
+    # TODO: add repeat play option
+    # TODO: (not for play) account for errors that may arise (order of commands)
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client is None:
-        command = bot.get_command('summon')
-        await command.callback(ctx)
+        await bot.get_command('summon').callback(ctx)
         voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     url_or_query = ctx.message.content.split(' ')
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
-    if url_or_query:
+    else:
+        url_or_query = ''
+    if url_or_query or voice_client.is_playing():
         # get url
-        if url_or_query.startswith('https://'):
-            url = url_or_query
-        else:  # query
-            url = youtube_search(url_or_query)
-        music_file = f'Music/{video_id(url)}.mp3'
-        # download if it does not exist
-        # use a db to determine which files get constantly used
-        if not os.path.exists(music_file):
-            m = await ctx.message.channel.send(f'Downloading song...')
-            youtube_download(url)
-            await m.delete()
+        if not voice_client.is_playing():
+            if url_or_query.startswith('https://'): url = url_or_query
+            else: url = youtube_search(url_or_query)
+            vid_id = get_video_id(url)
+            title = get_video_title(vid_id)
+            music_file = f'Music/{title}.mp3'
 
-        # playing time
-        audio_source = discord.FFmpegPCMAudio(music_file, executable='ffmpeg/bin/ffmpeg')
-        if guild in music_queues:
-            music_queues[guild].append(audio_source)
-        else:
-            music_queues[guild] = [audio_source]
-        music_queue = music_queues[guild]
+            # download if it does not exist
+            # use a db to determine which files get constantly used
+            if not os.path.exists(music_file):
+                m = await ctx.message.channel.send(f'Downloading song...')
+                youtube_download(url)
+                await m.delete()
+
+            if guild in music_queues: music_queues[guild]['music_queue'].append(title)
+            else: music_queues[guild] = {'music_queue': [title], 'done_queue': []}
+
+        music_queue = music_queues[guild]['music_queue']
+        title = music_queue[0]
+
         # print('added song to queue')
 
         async def next_song(error):
-            music_queues[guild].pop(0)
-            mq = music_queues[guild]
-            if mq:
-                # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
-                voice_client.play(music_queue[0], after=next_song)
+            # TODO: account for auto play and repeat=True
+            dq = music_queues[guild]['done_queue']
+            dq.append(music_queue.pop(0))
+            if music_queue:
+                next_title = music_queue[0]
+                await bot.change_presence(activity=discord.Game(next_title))
+                voice_client.play(FFmpegPCMAudio(f'Music/{next_title }.mp3', executable=ffmpeg_path), after=next_song)
             else:
                 await bot.change_presence(activity=discord.Game('Prison Break'))
 
         if not voice_client.is_playing():
-            voice_client.play(audio_source, after=next_song)
-            # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
-            
+            voice_client.play(FFmpegPCMAudio(f'Music/{title }.mp3', executable=ffmpeg_path), after=next_song)
+            await bot.change_presence(activity=discord.Game(title))
     else:
-        if voice_client.is_paused():
-            voice_client.resume()
-            
+        await bot.get_command('pause').callback(ctx)
 
 
 @bot.command()
 async def skip(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    if voice_client and music_queues[guild]:
-        print('Skipped')
-        music_queues[guild].pop(0)
-        music_queue = music_queues[guild]
-        if music_queue:
-            def next_song(error):
-                music_queues[guild].pop(0)
-                mq = music_queues[guild]
-                if mq:
-                    # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
-                    voice_client.play(music_queue[0], after=next_song)
-            voice_client.stop()  # maybe change to voice_client.source = music_queue[0]
-            voice_client.play(music_queue[0], after=next_song)
-            # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
+    try:
+        music_queue = music_queues[guild]['music_queue']
+    except KeyError:
+        music_queues[guild] = {'music_queue': [], 'done_queue': []}
+        music_queue = music_queues[guild]['music_queue']
+    if voice_client and music_queue:
+        dq = music_queues[guild]['done_queue']
+        dq.append(music_queue.pop(0))
+
+        async def next_song(error):
+            dq.append(music_queue.pop(0))
+            if music_queue:
+                next_title = music_queue[0]
+                await bot.change_presence(activity=discord.Game(next_title ))
+                voice_client.play(FFmpegPCMAudio(f'Music/{next_title }.mp3', executable=ffmpeg_path), after=next_song)
+            else:
+                await bot.change_presence(activity=discord.Game('Prison Break'))
+
+        title = music_queue[0]
+        voice_client.stop()
+        voice_client.play(FFmpegPCMAudio(f'Music/{title}.mp3', executable=ffmpeg_path), after=next_song)
+        # voice_client.play(song, after=next_song)
+        await bot.change_presence(activity=discord.Game(title))
 
 
 @bot.command(aliases=['back'])
 async def previous(ctx):
-    pass
+    guild = ctx.guild
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    if voice_client:
+        music_queue: list = music_queues[guild]['music_queue']
+        dq = music_queues[guild]['done_queue']
+        if dq:
+            async def next_song(error):
+                dq.append(music_queue.pop(0))
+                if music_queue:
+                    next_title = music_queue[0]
+                    await bot.change_presence(activity=discord.Game(next_title))
+                    audio_source = FFmpegPCMAudio(f'Music/{next_title}.mp3', executable=ffmpeg_path)
+                    voice_client.play(audio_source, after=next_song)
+                else:
+                    await bot.change_presence(activity=discord.Game('Prison Break'))
+            title = dq.pop()
+            music_queue.insert(0, title)
+            if voice_client.is_playing():
+                voice_client.stop()
+            voice_client.play(FFmpegPCMAudio(f'Music/{title}.mp3', executable=ffmpeg_path), after=next_song)
+            await bot.change_presence(activity=discord.Game(title))
 
 
-@bot.command()
+@bot.command(aliases=['resume'])
 async def pause(ctx):
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    if voice_client.is_paused():
-        voice_client.resume()
-    else:
-        voice_client.pause()
-
-
-@bot.command()
-async def resume(ctx):
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice_client:
         if voice_client.is_paused():
@@ -448,26 +474,41 @@ async def resume(ctx):
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss'])
 async def leave(ctx):
-    # clear query
-    music_queues[ctx.guild] = []
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    # clear ques
+    guild = ctx.guild
+    music_queues[guild]['music_queue'] = []
+    # TODO: turn autoplay off
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client:
         await voice_client.disconnect()
 
 
 @bot.command()
 async def stop(ctx):
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    if voice_client:
-        if voice_client.is_playing():
-            guild = ctx.guild
-            music_queues[guild].pop(0)
-            voice_client.stop()
+    guild = ctx.guild
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    if voice_client and voice_client.is_playing():
+        dq = music_queues[guild]['done_queue']
+        music_queue = music_queues[guild]['music_queue']
+        dq.append(music_queue.pop(0))
+        voice_client.stop()
+        await bot.change_presence(activity=discord.Game('Prison Break'))
+
+
+@bot.command()
+async def fix(ctx):
+    guild = ctx.message.channel.guild
+    await bot.get_command('summon').callback(ctx)
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    await voice_client.disconnect()
+    await bot.get_command('summon').callback(ctx)
+    # await voice_client.connect()
 
 
 @bot.command()
 async def volume(ctx):
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    pass
+    # voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     # if voice_client:
     #     amount = ctx.message.content[8:]
     #     voice_client.volume

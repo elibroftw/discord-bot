@@ -63,12 +63,12 @@ def youtube_search(text):
     except ValueError:
         pass
     # region = 'Canada'
-    if kind == 'channel':
-        search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 20,
-                                                order='relevance').execute()
+    # if kind == 'channel':
+    #     search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 20,
+    #                                                 order='relevance').execute()
     search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 2,
-                                            order='relevance').execute()
-    videos, channels, playlists = [], [], []
+                                                order='relevance').execute()
+    videos, channels, play_lists = [], [], []
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
     # TODO: CHANNEL SEARCH DOES NOT WORK
@@ -83,7 +83,7 @@ def youtube_search(text):
         elif search_result['id']['kind'] == 'youtube#channel':
             channels.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["channelId"]}'])
         elif search_result['id']['kind'] == 'youtube#playlist':
-            playlists.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["playlistId"]}'])
+            play_lists.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["playlistId"]}'])
     title, video_id, desc = None, None, None
     channel_id = None
     playlist_id = None
@@ -104,7 +104,7 @@ def youtube_search(text):
     else:
         while result > 0:
             try:
-                playlist_id = playlists[result - 1][1]
+                playlist_id = play_lists[result - 1][1]
                 print(playlist_id)
                 break
             except IndexError:
@@ -122,7 +122,7 @@ def youtube_search(text):
     else:
         url = f'https://www.youtube.com/playlist?list={playlist_id}'
     return url
-    # image = f'https://img.youtube.com/vi/{video_id}/mqdefault.jpg'
+    # image = f'https://img.youtube.com/vi/{vid_id}/mqdefault.jpg'
     # desc = '`Click title to go to video`\n' + desc
     # embed = richembed(title, url, image, icon, desc)
     # return True, embed
@@ -135,7 +135,8 @@ ydl_opts = {
         'preferredcodec': 'mp3',
         'preferredquality': '192',
     }],
-    'outtmpl': 'Music/%(id)s.%(ext)s',
+    # 'outtmpl': 'Music/%(id)s.%(ext)s',
+    'outtmpl': 'Music/%(title)s.%(ext)s',
     'ffmpeg_location': 'ffmpeg/bin/'
 }
 
@@ -143,9 +144,11 @@ ydl_opts = {
 def youtube_download(url):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
+        info_dict = ydl.extract_info(url, download=False)
+        return info_dict
 
 
-def video_id(url):
+def get_video_id(url):
     """
     Examples:
     - http://youtu.be/SA2iWivDJiE
@@ -166,6 +169,11 @@ def video_id(url):
             return query.path.split('/')[2]
     # fail?
     return None
+
+
+def get_video_title(video_id):
+    response = youtube_API.videos().list(id=video_id, part='snippet').execute()
+    return response['items'][0]['snippet']['title']
 
 
 def check_networth(author: str):  # use a database
