@@ -8,7 +8,7 @@ from discord import opus
 import re
 import os
 from googleapiclient import discovery
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 import youtube_dl
 
 logger = logging.getLogger()
@@ -24,6 +24,8 @@ except KeyError:
     google_api_key = os.environ['google']
 youtube = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
 
+if not os.path.exists('Music'):
+    os.mkdir('Music')
 
 # twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
 # twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
@@ -41,6 +43,8 @@ youtube = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_di
 
 
 def youtube_search(text):
+    if text == 'maagnolia':
+        text = 'magnolia'
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
     p = re.compile('--[1-4][0-9]|--[1-2]')
     try:
@@ -131,12 +135,36 @@ ydl_opts = {
         'preferredcodec': 'mp3',
         'preferredquality': '192',
     }],
+    'outtmpl': 'Music/%(id)s.%(ext)s'
 }
 
 
 def youtube_download(url):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
+
+
+def video_id(url):
+    """
+    Examples:
+    - http://youtu.be/SA2iWivDJiE
+    - http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu
+    - http://www.youtube.com/embed/SA2iWivDJiE
+    - http://www.youtube.com/v/SA2iWivDJiE?version=3&amp;hl=en_US
+    """
+    query = urlparse(url)
+    if query.hostname == 'youtu.be':
+        return query.path[1:]
+    if query.hostname in ('www.youtube.com', 'youtube.com'):
+        if query.path == '/watch':
+            p = parse_qs(query.query)
+            return p['v'][0]
+        if query.path[:7] == '/embed/':
+            return query.path.split('/')[2]
+        if query.path[:3] == '/v/':
+            return query.path.split('/')[2]
+    # fail?
+    return None
 
 
 def check_networth(author: str):  # use a database
@@ -236,24 +264,3 @@ def send_email(recipient, name=''):  # TODO: for later
     s.send_message(msg)
     s.quit()
 
-
-def video_id(url):
-    """
-    Examples:
-    - http://youtu.be/SA2iWivDJiE
-    - http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu
-    - http://www.youtube.com/embed/SA2iWivDJiE
-    - http://www.youtube.com/v/SA2iWivDJiE?version=3&amp;hl=en_US
-    """
-    o = urlparse(url)
-    if o.netloc == 'youtu.be':
-        return o.path[1:]
-    elif o.netloc in ('www.youtube.com', 'youtube.com'):
-        if o.path == '/watch':
-            id_index = o.query.index('v=')
-            return o.query[id_index + 2:id_index + 13]
-        elif o.path[:7] == '/embed/':
-            return o.path.split('/')[2]
-        elif o.path[:3] == '/v/':
-            return o.path.split('/')[2]
-    return None  # fail?
