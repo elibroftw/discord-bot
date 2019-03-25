@@ -1,3 +1,4 @@
+simplejson
 youtube_dl
 environs
 requests
