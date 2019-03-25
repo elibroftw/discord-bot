@@ -3,7 +3,6 @@ from datetime import datetime
 import discord
 from discord.ext import commands
 from funcs import *
-from keep_alive import keep_alive
 import tictactoe
 import asyncio
 
@@ -83,27 +82,32 @@ async def balance(ctx):
 
 @bot.command(aliases=['createrole'])
 async def create_role(ctx):
-    if str(ctx.message.author.top_role) == 'Admin':
-        server = ctx.message.server
-        role_name = ctx.message.content[13:]
-        guild: discord.guild = ctx.guild
-        await guild.create_role(server, name=role_name)
-        await ctx.send(f'Role {role_name} created')
-        print(f'{ctx.message.author} created role {role_name}')
+    m = ctx.message
+    if str(m.author.top_role) == 'Admin':
+        role_name = m.content.split(' ')
+        if len(role_name) > 1:
+            role_name = ' '.join(role_name[1:])
+            guild: discord.guild = ctx.guild
+            await guild.create_role(server, name=role_name)
+            await ctx.send(f'Role {role_name} created')
+            print(f'{m.author} created role {role_name}')
 
 
 # TODO: delete_role
 @bot.command()
 async def add_role(ctx):
-    if str(ctx.message.author.top_role) == 'Admin':
-        mark = ctx.message.content.index(' ')
+    m = ctx.message
+    if str(m.author.top_role) == 'Admin':
+        mark = m.content.index(' ')
         guild = ctx.guild
-        role_name = ctx.message.content[mark + 2:]
-        role = discord.utils.get(guild.roles, name=role_name)
-        member = ctx.message.content[12:mark - 1]
-        member = guild.get_member(member)
-        await guild.add_roles(member, role)
-        print(f'{ctx.message.author} gave {member} role {role_name}')
+        role_name = m.content.split(' ')
+        if len(role_name) > 1:
+            role_name = ' '.join(role_name[1:])
+            role = discord.utils.get(guild.roles, name=role_name)
+            member = ctx.message.content[12:mark - 1]
+            member = guild.get_member(member)
+            await guild.add_roles(member, role)
+            print(f'{ctx.message.author} gave {member} role {role_name}')
 
 
 @bot.command()
@@ -299,18 +303,33 @@ async def shift(ctx):
     await ctx.send('https://elibroftw.itch.io/shift')
 
 
+@bot.command(aliases=['create_date'])
+async def created_at(ctx):
+    args = ctx.message.content.split(' ')
+    if len(args) > 1:
+        user = discord.utils.get(ctx.guild.members, name=' '.join(args[1:]))
+    else:
+        user = ctx.author
+    await ctx.send(user.created_at)
+
+
 @bot.command()
 async def summon(ctx):
     guild = ctx.message.channel.guild
     author: discord.Member = ctx.message.author
     if not author.voice:
-        channel = discord.utils.get(guild.channels, name='music', type=discord.VoiceChannel)
+        await discord.utils.get(guild.voice_channels, name='music').connect()
     else:
+        voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
         channel: discord.VoiceChannel = author.voice.channel
-    await channel.connect()
+        if not voice_client:
+            await channel.connect()
+        elif voice_client.channel != channel:
+            # TODO: add a role lock?
+            await voice_client.move_to(channel)
+            
 
-
-@bot.command(aliases=['paly', 'queue', 'que'])
+@bot.command(aliases=['paly', 'queue', 'que', 'p'])
 async def play(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
@@ -318,7 +337,9 @@ async def play(ctx):
         command = bot.get_command('summon')
         await command.callback(ctx)
         voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    url_or_query = ctx.message.content[5:]
+    url_or_query = ctx.message.content.split(' ')
+    if len(url_or_query) > 1:
+        url_or_query = ' '.join(url_or_query[1:])
     if url_or_query:
         # get url
         if url_or_query.startswith('https://'):
@@ -327,21 +348,20 @@ async def play(ctx):
             url = youtube_search(url_or_query)
         music_file = f'Music/{video_id(url)}.mp3'
         # download if it does not exist
-        # use db to determine which files get constantly used
+        # use a db to determine which files get constantly used
         if not os.path.exists(music_file):
             m = await ctx.message.channel.send(f'Downloading song...')
             youtube_download(url)
             await m.delete()
 
-        # voice_client.play(discord.AudioSource())
         # playing time
-        audio_source = discord.FFmpegPCMAudio(music_file)
-        try:
+        audio_source = discord.FFmpegPCMAudio(music_file, executable='ffmpeg/bin/ffmpeg')
+        if guild in music_queues:
             music_queues[guild].append(audio_source)
-        except KeyError:
+        else:
             music_queues[guild] = [audio_source]
         music_queue = music_queues[guild]
-        print('added song to queue')
+        # print('added song to queue')
 
         def next_song(error):
             music_queues[guild].pop(0)
@@ -349,10 +369,16 @@ async def play(ctx):
             if mq:
                 # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
                 voice_client.play(music_queue[0], after=next_song)
+            else:
+                # await bot.change_presence(activity=discord.Game('Prison Break'))
 
         if not voice_client.is_playing():
             # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
             voice_client.play(audio_source, after=next_song)
+    else:
+        if voice_client.is_paused():
+            voice_client.resume()
+            
 
 
 @bot.command()
@@ -370,9 +396,14 @@ async def skip(ctx):
                 if mq:
                     # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
                     voice_client.play(music_queue[0], after=next_song)
-            voice_client.stop()
+            voice_client.stop()  # maybe change to voice_client.source = music_queue[0]
             voice_client.play(music_queue[0], after=next_song)
             # await bot.change_presence(activity=discord.Game('NAME OF VIDEO'))
+
+
+@bot.command(aliases=['back'])
+async def previous(ctx):
+    pass
 
 
 @bot.command()
@@ -415,9 +446,14 @@ async def stop(ctx):
 
 @bot.command()
 async def volume(ctx):
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if voice_client:
+        amount = ctx.message.content[8:]
+        voice_client.volume
+
     # discord.PCMVolumeTransformer
     # https://discordpy.readthedocs.io/en/rewrite/api.html#discord.PCMVolumeTransformer
     pass
 
-keep_alive()
+
 bot.run(os.environ['discord'])
