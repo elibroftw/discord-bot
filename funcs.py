@@ -135,7 +135,8 @@ ydl_opts = {
         'preferredcodec': 'mp3',
         'preferredquality': '192',
     }],
-    'outtmpl': 'Music/%(id)s.%(ext)s'
+    'outtmpl': 'Music/%(id)s.%(ext)s',
+    'ffmpeg_location': 'ffmpeg/bin/'
 }
 
 
