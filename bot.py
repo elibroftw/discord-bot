@@ -18,9 +18,9 @@ ttt_round = 0
 players_in_game = []
 tic_tac_toe_data: dict = {}
 timers = [['[Beta]Tic-Tac-Toe(!ttt)', 0]]
-ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 # timers_2 = {'[Beta]Tic-Tac-Toe(!ttt)': 0, '[Alpha]Shift(!shift)': 0}
-music_queues = {}
+ffmpeg_path = 'ffmpeg/bin/ffmpeg'
+mqs = music_queues = {}
 Song = namedtuple('Song', ('title', 'id'))
 with open('help.txt') as f: help_message = f.read()
 
@@ -243,8 +243,7 @@ async def games(ctx):
 async def ttt(ctx):
     global ttt_round, players_in_game, tic_tac_toe_data, timers
     author = str(ctx.message.author)
-    # TODO: Make tic tac toe lobby's so that when a player starts a game in a lobby,
-    #  only they are allowed to send messages to the channel
+    # TODO: turn into DM game
     # print(message.author.top_role.is_everyone) checks if role is @everyone
     if time.time() - timers[0][1] < 120:
         await ctx.send('There is another tic-tac-toe game in progress')
@@ -361,7 +360,7 @@ async def play_file(ctx, voice_client):
     def play_next(error):
         # TODO: account for auto play and repeat=True
         # TODO: send message that something else is playing
-        done_queue.append(music_queue.pop(0))
+        done_queue.insert(0, music_queue.pop(0))
         if music_queue:
             next_song = music_queue[0]
             next_title = next_song.title
@@ -387,6 +386,8 @@ async def play_file(ctx, voice_client):
 # TODO: Sigh sound
 @bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q'])
 async def play(ctx):
+    # TODO: rename done queue to recently played
+    # TODO: rename music_queue to next up
     # TODO: add auto play option
     # TODO: add repeat play option
     # TODO: (not for play) account for errors that may arise (order of commands)
@@ -460,11 +461,13 @@ async def skip(ctx):
         music_queue = music_queues[guild]['music_queue']
     if voice_client and music_queue:
         dq = music_queues[guild]['done_queue']
-        dq.append(music_queue.pop(0))
+        dq.insert(0, music_queue.pop(0))
 
         if voice_client.is_playing(): voice_client.stop()
         if music_queue:
             await play_file(ctx, voice_client)
+        else:
+            voice_client.stop()
 
 
 # TODO: fast forward
@@ -481,7 +484,7 @@ async def previous(ctx):
         music_queue: list = music_queues[guild]['music_queue']
         done_queue = music_queues[guild]['done_queue']
         if done_queue :
-            music_queue.insert(0, done_queue.pop())
+            music_queue.insert(0, done_queue.pop(0))
             if voice_client.is_playing():  voice_client.stop()
             await play_file(ctx, voice_client)
 
@@ -515,30 +518,39 @@ async def stop(ctx):
         await bot.change_presence(activity=discord.Game('Prison Break'))
 
 
-@bot.command(name='music_queue', aliases=['mq'])
-async def _music_queue(ctx):
+@bot.command(aliases=['music_queue', 'mq', 'nu'])
+async def next_up(ctx):
+    # TODO: maybe rich embed?
     guild = ctx.guild
-    music_queue = music_queues[guild]['music_queue']
-    msg = ''
-    for i, song in enumerate(music_queue):
-        msg += f'{i + 1}. '
-        msg += song.title
-        msg += '\n'
-    msg = msg[:-1]
-    await ctx.send(msg)
+    try:
+        music_queue = music_queues[guild]['music_queue']
+        if music_queue:
+            msg = '`MUSIC QUEUE`'
+            for i, song in enumerate(music_queue):
+                if i == 10:
+                    msg += '\n...'
+                    break
+                msg += f'\n{i + 1}. {song.title}'
+            await ctx.send(msg)
+    except KeyError:
+        music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
 
-@bot.command(name='done_queue', aliases=['dq'])
-async def _done_queue(ctx):
+@bot.command(aliases=['done_queue', 'dq', 'rp'])
+async def recently_played(ctx):
     guild = ctx.guild
-    done_queue = music_queues[guild]['donee_queue']
-    msg = ''
-    for i, song in enumerate(done_queue):
-        msg += f'{i + 1}. '
-        msg += song.title
-        msg += '\n'
-    msg = msg[:-1]
-    await ctx.send(msg)
+    try:
+        done_queue = music_queues[guild]['done_queue']
+        if done_queue:
+            msg = '`RECENTLY PLAYED`'
+            for i, song in enumerate(done_queue):
+                if i == 10:
+                    msg += '\n...'
+                    break
+                msg += f'\n{i + 1}. {song.title}'
+            await ctx.send(msg)
+    except KeyError:
+        music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
 
 @bot.command()
