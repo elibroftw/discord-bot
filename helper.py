@@ -43,8 +43,8 @@ if not os.path.exists('Music'):
 
 
 def youtube_search(text, return_info=False):
-    if text == 'maagnolia':
-        text = 'magnolia'
+    if text in ('maagnolia', 'magnolia') and return_info:
+        text = 'magnolia (Audio)'
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
     p = re.compile('--[1-4][0-9]|--[1-2]')
     try:
