@@ -427,7 +427,7 @@ async def play(ctx):
             await play_file(ctx, voice_client)
 
 
-@bot.command()
+@bot.command(aliases=['next'])
 async def skip(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
