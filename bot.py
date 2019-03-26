@@ -615,7 +615,7 @@ async def next_up(ctx):
                 if i == 10:
                     msg += '\n...'
                     break
-                msg += f'\n{i + 1}. {song.title}'
+                msg += f'\n{i}. {song.title}'
             if auto_play_dict.get(guild, False):
                 msg += '\nAUTO PLAY ENABLED'
             await ctx.send(msg)
