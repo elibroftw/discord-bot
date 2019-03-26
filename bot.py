@@ -385,13 +385,11 @@ async def play_file(ctx, voice_client):
         done_queue.insert(0, song)
         setting = auto_play_dict.get(guild, False)
         if music_queue or setting and len(voice_client.channel.members) > 1:
-            if setting:
-                url, title, video_id = get_related_video(song.video_id)
+            if setting and len(music_queue) == 1:
+                url, title, video_id = get_related_video(music_queue[0].video_id)
                 youtube_download(url)
-                next_song = Song(title, video_id)
-                music_queue.append(next_song)
-            else:
-                next_song = music_queue[0]
+                music_queue.append(Song(title, video_id))
+            next_song = music_queue[0]
             next_title = next_song.title
             next_music_filepath = f'Music/{next_title} - {next_song.video_id}.mp3'
             voice_client.play(FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path), after=play_next)
@@ -504,6 +502,11 @@ async def auto_play(ctx):
             mq.append(Song(title, video_id))
             voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
             await play_file(ctx, voice_client)
+        if len(mq) == 1:
+            song_id = mq[0].video_id
+            url, title, video_id, = get_related_video(song_id)
+            youtube_download(url)
+            mq.append(Song(title, video_id))
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
