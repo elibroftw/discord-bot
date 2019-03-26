@@ -13,6 +13,7 @@ A discord bot (called El Chapo) I made using the discord.py module and is hosted
 - - Previous song (!previous, !back)
 - - Pause/Resume (!pause, !p, !resume)
 - - Stop (!stop)
+- - Leave (!leave, !disconnect, !unsummon, !desummon, dismiss)
 - - 
 - Twitter search (going to rework this)
 - Virtual currency (not done yet)

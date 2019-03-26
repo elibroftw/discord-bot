@@ -444,7 +444,7 @@ async def skip(ctx):
         if music_queue:
             await play_file(ctx, voice_client)
 
-
+!
 @bot.command(aliases=['back'])
 async def previous(ctx):
     guild = ctx.guild
