@@ -358,18 +358,22 @@ async def play_file(ctx, voice_client):
     dq = music_queues[guild]['done_queue']
 
     # noinspection PyUnusedLocal
-    async def play_next(error):
+    def play_next(error):
         # TODO: account for auto play and repeat=True
         dq.append(music_queue.pop(0))
+        print(music_queue, dq)
         if music_queue:
             next_song = music_queue[0]
-            next_title = song.title
+            next_title = next_song.title
             next_music_filepath = f'Music/{next_title} - {next_song.id}.mp3'
-
-            await bot.change_presence(activity=discord.Game(next_title))
             voice_client.play(FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path), after=play_next)
+            coro = bot.change_presence(activity=discord.Game(next_title))
+            fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+            fut.result()
         else:
-            await bot.change_presence(activity=discord.Game('Prison Break'))
+            coro = bot.change_presence(activity=discord.Game('Prison Break'))
+            fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+            fut.result()
 
     song = music_queue[0]
     title = song.title
@@ -427,7 +431,15 @@ async def play(ctx):
             await play_file(ctx, voice_client)
 
 
-@bot.command(aliases=['next'])
+@bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
+async def clear_queue(ctx):
+    guild = ctx.guild
+    moderator = discord.utils.get(guild.roles, name='Moderator')
+    if ctx.author.top_role >= moderator:
+        music_queues[guild]['music_queues'].clear()
+
+
+@bot.command(aliases=['next', 'n', 'sk'])
 async def skip(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
@@ -444,8 +456,14 @@ async def skip(ctx):
         if music_queue:
             await play_file(ctx, voice_client)
 
-!
-@bot.command(aliases=['back'])
+
+# TODO: fast forward
+@bot.command(aliases=['ff', 'fast-forward', 'fast forward', 'fast'])
+async def fast_forward(ctx):
+    raise NotImplementedError
+
+
+@bot.command(aliases=['back', 'b', 'prev'])
 async def previous(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
@@ -466,7 +484,7 @@ async def pause(ctx):
         else: voice_client.pause()
 
 
-@bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss'])
+@bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'l', 'd'])
 async def leave(ctx):
     # clear queues
     guild = ctx.guild
@@ -478,13 +496,26 @@ async def leave(ctx):
         await voice_client.disconnect()
 
 
-@bot.command()
+@bot.command(aliases=['s'])
 async def stop(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client and voice_client.is_playing():
         voice_client.stop()
         await bot.change_presence(activity=discord.Game('Prison Break'))
+
+
+@bot.command(name='music_queue')
+async def _music_queue(ctx):
+    guild = ctx.guild
+    music_queue = music_queues[guild]['music_queue']
+    msg = ''
+    for i, song in enumerate(music_queue):
+        msg += f'{i}. '
+        msg += song
+        msg += '\n'
+    msg = msg[:-1]
+    ctx.send(msg)
 
 
 @bot.command()
