@@ -634,7 +634,7 @@ async def recently_played(ctx):
                 if i == 10:
                     msg += '\n...'
                     break
-                msg += f'\n{i + 1}. {song.title}'
+                msg += f'\n-{i + 1}. {song.title}'
             await ctx.send(msg)
     except KeyError:
         music_queues[guild] = {'music_queue': [], 'done_queue': []}
