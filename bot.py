@@ -384,7 +384,7 @@ async def play_file(ctx, voice_client):
         song = music_queue.pop(0)
         done_queue.insert(0, song)
         setting = auto_play_dict.get(guild, False)
-        if music_queue or setting:
+        if music_queue or setting and len(voice_client.channel.members) > 1:
             if setting:
                 url, title, video_id = get_related_video(song.video_id)
                 youtube_download(url)
@@ -394,13 +394,13 @@ async def play_file(ctx, voice_client):
                 next_song = music_queue[0]
             next_title = next_song.title
             next_music_filepath = f'Music/{next_title} - {next_song.video_id}.mp3'
-            voice_client.play(FFmpegPCMAudio(
-                next_music_filepath, executable=ffmpeg_path), after=play_next)
+            voice_client.play(FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path), after=play_next)
             coro = bot.change_presence(activity=discord.Game(next_title))  
             fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
             fut.result()
         else:            
             coro = bot.change_presence(activity=discord.Game('Prison Break'))
+            voice_client.disconnect()
             fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
             fut.result()
 
@@ -495,12 +495,11 @@ async def auto_play(ctx):
         mq = music_queues[guild]['music_queue']
         dq = music_queues[guild]['done_queue']
         if not mq and dq:
-            song_id = dq[0].id
+            song_id = dq[0].video_id
             url, title, video_id, = get_related_video(song_id)
             youtube_download(url)
             mq.append(Song(title, video_id))
-            voice_client: discord.VoiceClient = discord.utils.get(
-                bot.voice_clients, guild=guild)
+            voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
             await play_file(ctx, voice_client)
 
 
