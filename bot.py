@@ -370,6 +370,9 @@ async def summon(ctx):
 
 
 async def play_file(ctx, voice_client):
+    '''
+    Plays first (index=0) song in music queue
+    '''
     guild = ctx.guild
     music_queue = music_queues[guild]['music_queue']
     done_queue = music_queues[guild]['done_queue']
@@ -421,15 +424,25 @@ async def play_file(ctx, voice_client):
         title = song.title
         video_id = song.video_id
         music_filepath = f'Music/{title} - {video_id}.mp3'
+        # take care of downloading here
+        if not os.path.exists(music_filepath):
+            m: discord.Message = await ctx.message.channel.send(f'Downloading `{title}`')
+            url = f'https://www.youtube.com/watch?v={video_id}'
+            youtube_download(url)
+        else:
+            m = None
         audio_source = FFmpegPCMAudio(music_filepath, executable=ffmpeg_path)
         voice_client.play(audio_source, after=play_next)
-        await ctx.send(f'now playing: `{title}`')
+        msg_content = f'Now playing `{title}`'
+        if m: await m.edit(content=msg_content)
+        else: await ctx.send(msg_content)
         await bot.change_presence(activity=discord.Game(title))
 
 
 # TODO: Sigh sound
 @bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q', 'pap'])
 async def play(ctx):
+    # TODO: make one function take care of the downloading!
     # TODO: rename done queue to recently played
     # TODO: rename music_queue to next up
     # TODO: add auto play option
@@ -471,25 +484,20 @@ async def play(ctx):
             m = None
 
         # adding to queue
-        if guild in music_queues:
-            music_queues[guild]['music_queue'].append(song)
-        else:
-            music_queues[guild] = {'music_queue': [song], 'done_queue': []}
+        if guild in music_queues: music_queues[guild]['music_queue'].append(song)
+        else: music_queues[guild] = {'music_queue': [song], 'done_queue': []}
 
         # play song if nothing is playing
-        if voice_client.is_playing():
-            m_content = f'added `{title}` to the queue'
-            
+        if voice_client.is_playing(): m_content = f'Added `{title}` to the queue'
         else:
             await play_file(ctx, voice_client)
-            m_content = f'now playing: `{title}`'
+            m_content = f'Now playing `{title}`'
+
         if m: await m.edit(content=m_content)
         else: await ctx.send(m_content)
     else:
-        if voice_client.is_playing() or voice_client.is_paused():
-            await bot.get_command('pause').callback(ctx)
-        else:
-            await play_file(ctx, voice_client)
+        if voice_client.is_playing() or voice_client.is_paused(): await bot.get_command('pause').callback(ctx)
+        else: await play_file(ctx, voice_client)
 
 
 @bot.command(aliases=['ap', 'autoplay'])
@@ -528,25 +536,39 @@ async def clear_queue(ctx):
 @bot.command(aliases=['next', 'n', 'sk'])
 async def skip(ctx):
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(
-        bot.voice_clients, guild=guild)
-    # TODO: send messag that bot is skipping
-    if guild not in music_queues:
-        music_queues[guild] = {'music_queue': [], 'done_queue': []}
-
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    if guild not in music_queues: music_queues[guild] = {'music_queue': [], 'done_queue': []}
     mq = music_queues[guild]['music_queue']
-
-    if voice_client and mq:
+    dq = music_queues[guild]['done_queue']
+    if voice_client:
         if voice_client.is_playing(): voice_client.stop()
-        await play_file(ctx, voice_client)
+        if mq:
+            song = mq.pop(0)
+            dq.append(song)
+            await play_file(ctx, voice_client)
 
         if auto_play_dict.get(guild, False) and len(mq) <= 1:
-            url, title, video_id, = get_related_video(mq[0].video_id)
-            msg_content = f'Downloading `{title}`'
-            m: discord.Message = await ctx.message.channel.send(msg_content)
-            youtube_download(url)
-            mq.append(Song(title, video_id))
-            if voice_client.is_playing(): voice_client.stop()
+            if mq:
+                url, title, video_id, = get_related_video(mq[0].video_id)
+                music_filepath = f'Music/{title} - {video_id}.mp3'
+                # take care of downloading here
+                if not os.path.exists(music_filepath):
+                    m: discord.Message = await ctx.channel.send(f'Downloading `{title}`')
+                    url = f'https://www.youtube.com/watch?v={video_id}'
+                    youtube_download(url)
+                else: m = None
+                mq.append(Song(title, video_id))
+                msg_content = f'Added `{title}` to the queue'
+                if m: await m.edit(content=msg_content)
+                else: await ctx.channel.send(msg_content)
+            else:  # if music queue is empty
+                url, title, video_id, = get_related_video(dq[0].video_id)
+                mq.append(Song(title, video_id))
+                await play_file(ctx, voice_client)  # will take care of downloading
+        
+        
+        
+        
 
 
 # TODO: fast forward
@@ -572,13 +594,10 @@ async def previous(ctx):
 
 @bot.command(aliases=['resume'])
 async def pause(ctx):
-    voice_client: discord.VoiceClient = discord.utils.get(
-        bot.voice_clients, guild=ctx.guild)
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice_client:
-        if voice_client.is_paused():
-            voice_client.resume()
-        else:
-            voice_client.pause()
+        if voice_client.is_paused(): voice_client.resume()
+        else: voice_client.pause()
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'l', 'd'])

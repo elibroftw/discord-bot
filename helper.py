@@ -14,11 +14,9 @@ import youtube_dl
 logger = logging.getLogger()
 logger.setLevel(logging.ERROR)
 
-try:
-    google_api_key = os.environ['google']
+try: google_api_key = os.environ['google']
 except KeyError:
     from environs import Env
-
     env = Env()
     env.read_env()
     google_api_key = os.environ['google']
