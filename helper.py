@@ -66,8 +66,9 @@ def youtube_search(text, return_info=False):
     # if kind == 'channel':
     #     search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 20,
     #                                                 order='relevance').execute()
+    #pylint: disable=no-member
     search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 2,
-                                                order='relevance').execute()
+                                                order='relevance', type=kind).execute()
     videos, channels, play_lists = [], [], []
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
@@ -176,8 +177,20 @@ def get_video_id(url):
 
 
 def get_video_title(video_id):
+    #pylint: disable=no-member
     response = youtube_API.videos().list(id=video_id, part='snippet').execute()
     return response['items'][0]['snippet']['title'].replace('&quot;', '').replace('&amp;', '&').replace('/', '_')
+
+
+def get_related_video(video_id):
+    #pylint: disable=no-member
+    search_response = youtube_API.search().list(relatedToVideoId=video_id, type='video', part="id,snippet", maxResults=2,
+                                                order='relevance').execute()
+    search_result = search_response['items'][0]
+    title = search_result['snippet']['title']
+    video_id = search_result['id']['videoId']
+    url = f'https://www.youtube.com/watch?v={video_id}'
+    return url, title, video_id 
 
 
 def check_networth(author: str):  # use a database
@@ -277,3 +290,6 @@ def send_email(recipient, name=''):  # TODO: for later
     s.send_message(msg)
     s.quit()
 
+if __name__ == "__main__":
+    print(get_related_video('PczuoZJ-PtM'))
+    print(youtube_search('new patek'))
