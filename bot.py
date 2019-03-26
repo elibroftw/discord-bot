@@ -400,7 +400,9 @@ async def play_file(ctx, voice_client):
             fut.result()
         else:            
             coro = bot.change_presence(activity=discord.Game('Prison Break'))
-            voice_client.disconnect()
+            fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+            fut.result()
+            coro = voice_client.disconnect()
             fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
             fut.result()
 
@@ -492,6 +494,7 @@ async def auto_play(ctx):
     auto_play_dict[guild] = setting
     await ctx.send(f'Auto play set to {setting}')
     if setting:
+        # TODO: if argument given add to queue
         mq = music_queues[guild]['music_queue']
         dq = music_queues[guild]['done_queue']
         if not mq and dq:
