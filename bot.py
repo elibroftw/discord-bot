@@ -356,6 +356,8 @@ async def play_file(ctx, voice_client):
     music_queue = music_queues[guild]['music_queue']
     done_queue = music_queues[guild]['done_queue']
 
+    # TODO: use a db to determine which files get constantly used
+
     # noinspection PyUnusedLocal
     def play_next(error):
         # TODO: account for auto play and repeat=True
@@ -415,7 +417,7 @@ async def play(ctx):
         music_file = f'Music/{title} - {vid_id}.mp3'
 
         # download if it does not exist
-        # TODO: use a db to determine which files get constantly used
+
         if not os.path.exists(music_file):
             m: discord.Message = await ctx.message.channel.send(f'Downloading `{title}`')
             youtube_download(url)
