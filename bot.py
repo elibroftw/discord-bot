@@ -415,7 +415,7 @@ async def play_file(ctx, voice_client):
 
 
 # TODO: Sigh sound
-@bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q'])
+@bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q', 'pap'])
 async def play(ctx):
     # TODO: rename done queue to recently played
     # TODO: rename music_queue to next up
@@ -426,8 +426,9 @@ async def play(ctx):
     # TODO: make a max amount of time the video can be
     # TODO: block live stream download
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(
-        bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    if ctx.message.content.startswith('!pap'):
+        auto_play_dict[guild] = True
     if voice_client is None:
         await bot.get_command('summon').callback(ctx)
         voice_client: discord.VoiceClient = discord.utils.get(
@@ -526,18 +527,21 @@ async def skip(ctx):
     if voice_client and mq:
         song = mq.pop(0)
         dq.insert(0, song)
-        if voice_client.is_playing():
-            voice_client.stop()
 
         if mq:
+            if voice_client.is_playing(): voice_client.stop()
             await play_file(ctx, voice_client)
+            await ctx.send(f'now playing: {mq[0].title}')
         elif auto_play_dict.get(guild, False):
             url, title, video_id, = get_related_video(song.video_id)
+            msg_content = f'Downloading `{title}`'
+            m: discord.Message = await ctx.message.channel.send(msg_content)
+            # await bot.change_presence(activity=discord.Game(msg_content))
             youtube_download(url)
             mq.append(Song(title, video_id))
-            voice_client: discord.VoiceClient = discord.utils.get(
-                bot.voice_clients, guild=guild)
+            if voice_client.is_playing(): voice_client.stop()
             await play_file(ctx, voice_client)
+            await m.edit(content=f'now playing: {title}')
 
 
 # TODO: fast forward
