@@ -355,12 +355,13 @@ async def summon(ctx):
 async def play_file(ctx, voice_client):
     guild = ctx.guild
     music_queue = music_queues[guild]['music_queue']
-    dq = music_queues[guild]['done_queue']
+    done_queue = music_queues[guild]['done_queue']
 
     # noinspection PyUnusedLocal
     def play_next(error):
         # TODO: account for auto play and repeat=True
-        dq.append(music_queue.pop(0))
+        # TODO: send message that something else is playing
+        done_queue.append(music_queue.pop(0))
         if music_queue:
             next_song = music_queue[0]
             next_title = next_song.title
@@ -388,6 +389,9 @@ async def play(ctx):
     # TODO: add auto play option
     # TODO: add repeat play option
     # TODO: (not for play) account for errors that may arise (order of commands)
+    # TODO: make a separate chat for music
+    # TODO: make a max amount of time the video can be
+    # TODO: block live stream download
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client is None:
@@ -399,20 +403,19 @@ async def play(ctx):
     else:
         url_or_query = ''
     if url_or_query:
-        # get url
         if url_or_query.startswith('https://'):
             url = url_or_query
             vid_id = get_video_id(url)
             title = get_video_title(vid_id)
-        else:
+        else:  # get url
             url, title, vid_id = youtube_search(url_or_query, return_info=True)
         song = Song(title, vid_id)
         music_file = f'Music/{title} - {vid_id}.mp3'
 
         # download if it does not exist
-        # use a db to determine which files get constantly used
+        # TODO: use a db to determine which files get constantly used
         if not os.path.exists(music_file):
-            m: discord.Message = await ctx.message.channel.send(f'Downloading song...')
+            m: discord.Message = await ctx.message.channel.send(f'Downloading `{title}`')
             youtube_download(url)
         else: m = None
 
@@ -475,9 +478,9 @@ async def previous(ctx):
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client:
         music_queue: list = music_queues[guild]['music_queue']
-        dq = music_queues[guild]['done_queue']
-        if dq:
-            music_queue.insert(0, dq.pop())
+        done_queue = music_queues[guild]['done_queue']
+        if done_queue :
+            music_queue.insert(0, done_queue.pop())
             if voice_client.is_playing():  voice_client.stop()
             await play_file(ctx, voice_client)
 
@@ -511,17 +514,30 @@ async def stop(ctx):
         await bot.change_presence(activity=discord.Game('Prison Break'))
 
 
-@bot.command(name='music_queue')
+@bot.command(name='music_queue', aliases=['mq'])
 async def _music_queue(ctx):
     guild = ctx.guild
     music_queue = music_queues[guild]['music_queue']
     msg = ''
     for i, song in enumerate(music_queue):
-        msg += f'{i}. '
-        msg += song
+        msg += f'{i + 1}. '
+        msg += song.title
         msg += '\n'
     msg = msg[:-1]
-    ctx.send(msg)
+    await ctx.send(msg)
+
+
+@bot.command(name='done_queue', aliases=['dq'])
+async def _done_queue(ctx):
+    guild = ctx.guild
+    done_queue = music_queues[guild]['donee_queue']
+    msg = ''
+    for i, song in enumerate(done_queue):
+        msg += f'{i + 1}. '
+        msg += song.title
+        msg += '\n'
+    msg = msg[:-1]
+    await ctx.send(msg)
 
 
 @bot.command()

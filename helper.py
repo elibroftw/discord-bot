@@ -122,7 +122,7 @@ def youtube_search(text, return_info=False):
     else:
         url = f'https://www.youtube.com/playlist?list={playlist_id}'
     if return_info:
-        return url, title.replace('&quot;', '\''), video_id
+        return url, title.replace('&quot;', '\'').replace('&amp;', '&').replace('/', '_'), video_id
     else:
         return url
     # image = f'https://img.youtube.com/vi/{vid_id}/mqdefault.jpg'
@@ -177,7 +177,7 @@ def get_video_id(url):
 
 def get_video_title(video_id):
     response = youtube_API.videos().list(id=video_id, part='snippet').execute()
-    return response['items'][0]['snippet']['title'].replace('&quot;', '"')
+    return response['items'][0]['snippet']['title'].replace('&quot;', '').replace('&amp;', '&').replace('/', '_')
 
 
 def check_networth(author: str):  # use a database
