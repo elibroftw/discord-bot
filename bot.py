@@ -6,7 +6,7 @@ from collections import namedtuple
 from datetime import datetime
 from discord import FFmpegPCMAudio
 from discord.ext import commands
-from funcs import *
+from helper import *
 from subprocess import run
 
 bot = commands.Bot(command_prefix='!')
