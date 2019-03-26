@@ -384,6 +384,7 @@ async def play_file(ctx, voice_client):
     await bot.change_presence(activity=discord.Game(title))
 
 
+# TODO: Sigh sound
 @bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q'])
 async def play(ctx):
     # TODO: add auto play option
