@@ -361,7 +361,6 @@ async def play_file(ctx, voice_client):
     def play_next(error):
         # TODO: account for auto play and repeat=True
         dq.append(music_queue.pop(0))
-        print(music_queue, dq)
         if music_queue:
             next_song = music_queue[0]
             next_title = next_song.title
@@ -413,9 +412,9 @@ async def play(ctx):
         # download if it does not exist
         # use a db to determine which files get constantly used
         if not os.path.exists(music_file):
-            m = await ctx.message.channel.send(f'Downloading song...')
+            m: discord.Message = await ctx.message.channel.send(f'Downloading song...')
             youtube_download(url)
-            await m.delete()
+        else: m = None
 
         # adding to queue
         if guild in music_queues: music_queues[guild]['music_queue'].append(song)
@@ -424,6 +423,13 @@ async def play(ctx):
         # play song if nothing is playing
         if not voice_client.is_playing():
             await play_file(ctx, voice_client)
+            m_content = f'now playing: `{title}`'
+            if m: await m.edit(content=m_content)
+            else: await ctx.send(m_content)
+        else:
+            m_content = f'added `{title}` to the queue'
+            if m: await m.edit(content=m_content)
+            else: await ctx.send(m_content)
     else:
         if voice_client.is_playing() or voice_client.is_paused():
             await bot.get_command('pause').callback(ctx)
@@ -526,6 +532,10 @@ async def fix(ctx):
     await voice_client.disconnect()
     await bot.get_command('summon').callback(ctx)
 
+
+@bot.command()
+async def source(ctx):
+    await ctx.send('https://github.com/elibroftw/discord-bot')
 
 # @bot.command()
 # async def volume(ctx):
