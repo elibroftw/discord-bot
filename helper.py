@@ -289,5 +289,6 @@ def send_email(recipient, name=''):  # TODO: for later
     s.quit()
 
 if __name__ == "__main__":
-    print(get_related_video('PczuoZJ-PtM'))
-    print(youtube_search('new patek'))
+    # print(get_related_video('PczuoZJ-PtM'))
+    print(youtube_search('euan ellis u.f.o'))
+    print(get_video_title('tjRFBaPmWwM'))
