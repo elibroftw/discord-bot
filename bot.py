@@ -687,12 +687,11 @@ async def next_up(ctx):
                 if i == 10:
                     msg += '\n...'
                     break
-                msg += f'\n`{i}.` {song.title}'
+                msg += f'\n`{i}` {song.title}'
             if auto_play_dict.get(guild, False):
                 msg += '\nAUTO PLAY ENABLED'
             await ctx.send(msg)
-    except KeyError:
-        music_queues[guild] = {'music_queue': [], 'done_queue': []}
+    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
 
 @bot.command(aliases=['done_queue', 'dq', 'rp'])
@@ -707,10 +706,9 @@ async def recently_played(ctx):
                 if i == 10:
                     msg += '\n...'
                     break
-                msg += f'\n`-{i + 1}.` {song.title}'
+                msg += f'\n`-{i + 1}` {song.title}'
             await ctx.send(msg)
-    except KeyError:
-        music_queues[guild] = {'music_queue': [], 'done_queue': []}
+    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
 
 @bot.command()
@@ -727,7 +725,7 @@ async def fix(ctx):
 async def source(ctx):
     await ctx.send('https://github.com/elibroftw/discord-bot')
 
-# @bot.command()
+# @bot.command(aliases=['set_volume', 'sv')
 # async def volume(ctx):
 #     pass
     # voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
