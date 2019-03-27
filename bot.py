@@ -388,12 +388,14 @@ async def play_file(ctx, voice_client):
         done_queue.insert(0, song)
         setting = auto_play_dict.get(guild, False)
         if music_queue or setting and len(voice_client.channel.members) > 1:
-            m = None
             if setting and not music_queue:
                 url, title, video_id = get_related_video(done_queue[0].video_id)
-                # ctx.send downloading
+                coro = ctx.channel.send(f'Downloading `{title}`')
+                fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+                m = fut.result()
                 youtube_download(url)
                 music_queue.append(Song(title, video_id))
+            else: m = None
                 
             next_song = music_queue[0]
             next_title = next_song.title
@@ -402,15 +404,21 @@ async def play_file(ctx, voice_client):
             coro = bot.change_presence(activity=discord.Game(next_title))  
             fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
             fut.result()
-            # if m:
-            # edit m to be now playing 
-            # else send now playing
+            msg_content = f'Now playing `{title}`'
+            if m:
+                coro = m.edit(content=msg_content)
+                fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+                fut.result()
             if setting and len(music_queue) == 1:
                 url, title, video_id = get_related_video(music_queue[0].video_id)
-                # ctx.send downloading
+                coro = ctx.channel.send(f'Downloading `{title}`')
+                fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+                m = fut.result()
                 youtube_download(url)
                 music_queue.append(Song(title, video_id))
-                # update to added to que
+                coro = m.edit(content=msg_content)
+                fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+                fut.result()
         else:            
             coro = bot.change_presence(activity=discord.Game('Prison Break'))
             fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
@@ -424,18 +432,15 @@ async def play_file(ctx, voice_client):
         title = song.title
         video_id = song.video_id
         music_filepath = f'Music/{title} - {video_id}.mp3'
-        # take care of downloading here
         if not os.path.exists(music_filepath):
             m: discord.Message = await ctx.message.channel.send(f'Downloading `{title}`')
             url = f'https://www.youtube.com/watch?v={video_id}'
+            m = await ctx.channel.send(f'Downloading `{title}`')
             youtube_download(url)
-        else:
-            m = None
+        else: m = None
         audio_source = FFmpegPCMAudio(music_filepath, executable=ffmpeg_path)
         voice_client.play(audio_source, after=play_next)
-        msg_content = f'Now playing `{title}`'
-        if m: await m.edit(content=msg_content)
-        else: await ctx.send(msg_content)
+        if m: await m.edit(content=f'Now playing `{title}`')
         await bot.change_presence(activity=discord.Game(title))
 
 
@@ -514,15 +519,19 @@ async def auto_play(ctx):
         if not mq and dq:
             song_id = dq[0].video_id
             url, title, video_id, = get_related_video(song_id)
-            youtube_download(url)
+            # m: discord.Message = await ctx.message.channel.send(f'Downloading `{title}`')
+            # youtube_download(url)
             mq.append(Song(title, video_id))
             voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
             await play_file(ctx, voice_client)
         if len(mq) == 1:
             song_id = mq[0].video_id
             url, title, video_id, = get_related_video(song_id)
+            # do on seperate thread
+            m: discord.Message = await ctx.message.channel.send(f'Downloading `{title}`')
             youtube_download(url)
             mq.append(Song(title, video_id))
+            await m.edit(content=f'Added `{title}` to the queue')
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
@@ -544,7 +553,7 @@ async def skip(ctx):
         if voice_client.is_playing(): voice_client.stop()
         if mq:
             song = mq.pop(0)
-            dq.append(song)
+            dq.insert(0, song)
             await play_file(ctx, voice_client)
 
         if auto_play_dict.get(guild, False) and len(mq) <= 1:
@@ -566,10 +575,6 @@ async def skip(ctx):
                 mq.append(Song(title, video_id))
                 await play_file(ctx, voice_client)  # will take care of downloading
         
-        
-        
-        
-
 
 # TODO: fast forward
 @bot.command(aliases=['ff', 'fast-forward', 'fast forward', 'fast'])
