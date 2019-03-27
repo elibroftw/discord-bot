@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 from discord.ext import commands
-from helper import *
+from helpers import *
 from keep_alive import keep_alive
 import tictactoe
 import asyncio

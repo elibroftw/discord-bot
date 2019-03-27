@@ -1,29 +1,39 @@
 from __future__ import unicode_literals
 import smtplib
+import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import logging
+
+import requests
 from discord import opus
 # import tweepy
 import re
 import os
-from googleapiclient import discovery
+import json
+# noinspection PyPackageRequirements
+from googleapiclient.discovery import build
 from urllib.parse import urlparse, parse_qs
 import youtube_dl
 
 logger = logging.getLogger()
 logger.setLevel(logging.ERROR)
 
-try: google_api_key = os.environ['google']
+try:
+    google_api_key = os.environ['google']
 except KeyError:
     from environs import Env
+
     env = Env()
     env.read_env()
     google_api_key = os.environ['google']
-youtube_API = discovery.build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
+
+
+youtube_API = build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
 
 if not os.path.exists('Music'):
     os.mkdir('Music')
+
 
 # twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
 # twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
@@ -39,7 +49,7 @@ if not os.path.exists('Music'):
 #     if author != '': embed.set_author(name=author, url=url, icon_url=author_icon)
 #     return embed
 
-
+# TODO CONVERT ALL YOUTUBE STUFF TO REQUESTS.GET SHIT
 def youtube_search(text, return_info=False):
     if text in ('maagnolia', 'magnolia') and return_info:
         text = 'magnolia (Audio)'
@@ -64,9 +74,15 @@ def youtube_search(text, return_info=False):
     # if kind == 'channel':
     #     search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 20,
     #                                                 order='relevance').execute()
-    #pylint: disable=no-member
-    search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 2,
+    # pylint: disable=no-member
+    try:
+        search_response = youtube_API.search().list(q=text, part='id,snippet', maxResults=result + 2,
                                                 order='relevance', type=kind).execute()
+    except (ssl.SSLError, AttributeError):
+        print('error with youtube service')
+        api_url = 'https://www.googleapis.com/youtube/v3/'
+        r = requests.get(f'{api_url}search?part=id,snippet&q={text}&type={kind}&order=relevance&maxResults={result + 2}&key={google_api_key}')
+        search_response = json.loads(r.text)
     videos, channels, play_lists = [], [], []
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
@@ -83,9 +99,7 @@ def youtube_search(text, return_info=False):
             channels.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["channelId"]}'])
         elif search_result['id']['kind'] == 'youtube#playlist':
             play_lists.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["playlistId"]}'])
-    title, video_id, desc = None, None, None
-    channel_id = None
-    playlist_id = None
+    title = video_id = desc = channel_id = playlist_id =  None
     if kind == 'video':
         while result > 0:
             try:
@@ -104,22 +118,14 @@ def youtube_search(text, return_info=False):
         while result > 0:
             try:
                 playlist_id = play_lists[result - 1][1]
-                print(playlist_id)
                 break
             except IndexError:
                 result -= 1
-    if kind == 'video' and title is None:
-        url = f'No {kind} found'
-    elif kind == 'video':
-        url = f'https://www.youtube.com/watch?v={video_id}'
-    elif kind == 'channel' and channel_id is None:
-        url = f'No {kind} found'
-    elif kind == 'channel':
-        url = f'https://www.youtube.com/channel/{channel_id}'
-    elif kind == 'playlist' and playlist_id is None:
-        url = f'No {kind} found'
-    else:
-        url = f'https://www.youtube.com/playlist?list={playlist_id}'
+    url_dict = {'video': f'https://www.youtube.com/watch?v={video_id}',
+                'channel': f'https://www.youtube.com/channel/{channel_id}',
+                'playlist': f'https://www.youtube.com/playlist?list={playlist_id}'}
+    url = url_dict[kind]
+    if 'None' in url: url = f'No {kind} found'
     if return_info:
         return url, title.replace('&quot;', '\'').replace('&amp;', '&').replace('/', '_'), video_id
     else:
@@ -175,23 +181,30 @@ def get_video_id(url):
 
 
 def get_video_title(video_id):
-    #pylint: disable=no-member
+    # pylint: disable=no-member
     response = youtube_API.videos().list(id=video_id, part='snippet').execute()
     return response['items'][0]['snippet']['title'].replace('&quot;', '').replace('&amp;', '&').replace('/', '_')
 
 
-def get_related_video(video_id):
-    #pylint: disable=no-member
-    search_response = youtube_API.search().list(relatedToVideoId=video_id, type='video', part="id,snippet", maxResults=2,
-                                                order='relevance').execute()
+def get_related_video(video_id, done_queue=None):
+    # TODO: check if not in recent 10
+    # pylint: disable=no-member
+    try:
+        search_response = youtube_API.search().list(relatedToVideoId=video_id, part='id,snippet', maxResults=2,
+                                                    order='relevance', type='video').execute()
+    except (ssl.SSLError, AttributeError):
+        print('error with youtube service, line 196')
+        api_url = 'https://www.googleapis.com/youtube/v3/'
+        r = requests.get(f'{api_url}search?part=id,snippet&relatedToVideoId={video_id}&type=video&order=relevance&maxResults=3&key={google_api_key}')
+        search_response = json.loads(r.text)
     search_result = search_response['items'][0]
     title = search_result['snippet']['title']
     video_id = search_result['id']['videoId']
     url = f'https://www.youtube.com/watch?v={video_id}'
-    return url, title, video_id 
+    return url, title, video_id
 
 
-def check_networth(author: str):  # use a database
+async def check_net_worth(author: str):  # use a database
     return f'You have ${os.environ[author]}\nNot as rich as me'
 
 
@@ -205,6 +218,7 @@ def update_net_worth(author: str):
 OPUS_LIBS = ['libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib']
 
 
+# noinspection PyDefaultArgument
 def load_opus_lib(opus_libs=OPUS_LIBS):
     if opus.is_loaded():
         return True
@@ -217,6 +231,8 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
             pass
 
         raise RuntimeError('Could not load an opus lib. Tried %s' % (', '.join(opus_libs)))
+
+
 # TODO: TURN GET TWEET INTO ONE FUNCTION
 
 # def discord_search_twitter_user(text, redirect=False):
@@ -288,7 +304,10 @@ def send_email(recipient, name=''):  # TODO: for later
     s.send_message(msg)
     s.quit()
 
+
 if __name__ == "__main__":
     # print(get_related_video('PczuoZJ-PtM'))
-    print(youtube_search('euan ellis u.f.o'))
-    print(get_video_title('tjRFBaPmWwM'))
+    video_id = 'tjRFBaPmWwM'
+    # print(youtube_search('euan ellis u.f.o'))
+    # print(get_video_title(video_id))
+
