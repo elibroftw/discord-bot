@@ -50,6 +50,10 @@ if not os.path.exists('Music'):
 #     return embed
 
 # TODO CONVERT ALL YOUTUBE STUFF TO REQUESTS.GET SHIT
+def fix_youtube_title(title):
+    return title.replace('&quot;', '\'').replace('&amp;', '&').replace('/', '_')
+
+
 def youtube_search(text, return_info=False):
     if text in ('maagnolia', 'magnolia') and return_info:
         text = 'magnolia (Audio)'
@@ -127,7 +131,7 @@ def youtube_search(text, return_info=False):
     url = url_dict[kind]
     if 'None' in url: url = f'No {kind} found'
     if return_info:
-        return url, title.replace('&quot;', '\'').replace('&amp;', '&').replace('/', '_'), video_id
+        return url, fix_youtube_title(title), video_id
     else:
         return url
     # image = f'https://img.youtube.com/vi/{vid_id}/mqdefault.jpg'
@@ -158,24 +162,17 @@ def youtube_download(url):
 
 
 def get_video_id(url):
-    """
-    Examples:
-    - http://youtu.be/SA2iWivDJiE
-    - http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu
-    - http://www.youtube.com/embed/SA2iWivDJiE
-    - http://www.youtube.com/v/SA2iWivDJiE?version=3&amp;hl=en_US
-    """
+    # Examples:
+    # - http://youtu.be/SA2iWivDJiE
+    # - http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu
+    # - http://www.youtube.com/embed/SA2iWivDJiE
+    # - http://www.youtube.com/v/SA2iWivDJiE?version=3&amp;hl=en_US
     query = urlparse(url)
-    if query.hostname == 'youtu.be':
-        return query.path[1:]
+    if query.hostname == 'youtu.be': return query.path[1:]
     if query.hostname in ('www.youtube.com', 'youtube.com'):
-        if query.path == '/watch':
-            p = parse_qs(query.query)
-            return p['v'][0]
-        if query.path[:7] == '/embed/':
-            return query.path.split('/')[2]
-        if query.path[:3] == '/v/':
-            return query.path.split('/')[2]
+        if query.path == '/watch': return parse_qs(query.query)['v'][0]
+        if query.path[:7] == '/embed/': return query.path.split('/')[2]
+        if query.path[:3] == '/v/': return query.path.split('/')[2]
     # fail?
     return None
 
@@ -183,7 +180,8 @@ def get_video_id(url):
 def get_video_title(video_id):
     # pylint: disable=no-member
     response = youtube_API.videos().list(id=video_id, part='snippet').execute()
-    return response['items'][0]['snippet']['title'].replace('&quot;', '').replace('&amp;', '&').replace('/', '_')
+    title = response['items'][0]['snippet']['title']
+    return fix_youtube_title(title)
 
 
 def get_related_video(video_id, done_queue=None):
@@ -201,7 +199,7 @@ def get_related_video(video_id, done_queue=None):
     title = search_result['snippet']['title']
     video_id = search_result['id']['videoId']
     url = f'https://www.youtube.com/watch?v={video_id}'
-    return url, title, video_id
+    return url, fix_youtube_title(title), video_id
 
 
 async def check_net_worth(author: str):  # use a database
