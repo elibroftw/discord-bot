@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 import smtplib
+import socket
 import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -81,16 +82,15 @@ def youtube_search(text, return_info=False):
     # pylint: disable=no-member
     try:
         search_response = youtube_API.search().list(q=text, part='id,snippet', maxResults=result + 2,
-                                                order='relevance', type=kind).execute()
-    except (ssl.SSLError, AttributeError):
-        print('error with youtube service')
+                                                    order='relevance', type=kind).execute()
+    except (ssl.SSLError, AttributeError, socket.timeout):
+        print('error with youtube service, line 87')
         api_url = 'https://www.googleapis.com/youtube/v3/'
         r = requests.get(f'{api_url}search?part=id,snippet&q={text}&type={kind}&order=relevance&maxResults={result + 2}&key={google_api_key}')
         search_response = json.loads(r.text)
     videos, channels, play_lists = [], [], []
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
-    # TODO: CHANNEL SEARCH DOES NOT WORK
     for search_result in search_response.get('items', []):
         # print(search_result['id']['kind'])
         if search_result['id']['kind'] == 'youtube#video':
@@ -190,8 +190,8 @@ def get_related_video(video_id, done_queue=None):
     try:
         search_response = youtube_API.search().list(relatedToVideoId=video_id, part='id,snippet', maxResults=2,
                                                     order='relevance', type='video').execute()
-    except (ssl.SSLError, AttributeError):
-        print('error with youtube service, line 196')
+    except (ssl.SSLError, AttributeError, socket.timeout):
+        print('error with youtube service, line 194')
         api_url = 'https://www.googleapis.com/youtube/v3/'
         r = requests.get(f'{api_url}search?part=id,snippet&relatedToVideoId={video_id}&type=video&order=relevance&maxResults=3&key={google_api_key}')
         search_response = json.loads(r.text)
