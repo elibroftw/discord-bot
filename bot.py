@@ -658,6 +658,7 @@ async def leave(ctx):
 
 @bot.command(aliases=['s'])
 async def stop(ctx):
+    # TODO: auto play glitched out here
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(
         bot.voice_clients, guild=guild)
