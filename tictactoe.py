@@ -230,10 +230,8 @@ def move_four(data: dict):
     comp_symbol = data['comp_symbol']
     user_move4 = data['user_moves'][-1]
     if start:
-        if user_move4 == 2:
-            board[2] = comp_symbol
-        else:
-            board[1] = comp_symbol
+        if user_move4 == 2: board[2] = comp_symbol
+        else: board[1] = comp_symbol
         data['game_over'] = True
         return print_board(board) + endgame(False), data
     else:

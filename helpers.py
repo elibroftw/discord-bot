@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 import smtplib
 import socket
 import ssl
+from collections import namedtuple
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import logging
@@ -19,9 +20,9 @@ import youtube_dl
 
 logger = logging.getLogger()
 logger.setLevel(logging.ERROR)
+Song = namedtuple('Song', ('title', 'video_id'))
 
-try:
-    google_api_key = os.environ['google']
+try: google_api_key = os.environ['google']
 except KeyError:
     from environs import Env
 
@@ -186,18 +187,24 @@ def get_video_title(video_id):
 
 def get_related_video(video_id, done_queue=None):
     # TODO: check if not in recent 10
+    length = len(done_queue)
     # pylint: disable=no-member
     try:
-        search_response = youtube_API.search().list(relatedToVideoId=video_id, part='id,snippet', maxResults=2,
+        search_response = youtube_API.search().list(relatedToVideoId=video_id, part='id,snippet', maxResults=2 + length,
                                                     order='relevance', type='video').execute()
     except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
         print('error with youtube service, line 194')
         api_url = 'https://www.googleapis.com/youtube/v3/'
         r = requests.get(f'{api_url}search?part=id,snippet&relatedToVideoId={video_id}&type=video&order=relevance&maxResults=3&key={google_api_key}')
         search_response = json.loads(r.text)
-    search_result = search_response['items'][0]
-    title = search_result['snippet']['title']
-    video_id = search_result['id']['videoId']
+    related_song = done_queue[0]
+    i = 0
+    while related_song in done_queue:
+        search_result = search_response['items'][i]
+        title = search_result['snippet']['title']
+        video_id = search_result['id']['videoId']
+        related_song = Song(title, video_id)
+        i += 1
     url = f'https://www.youtube.com/watch?v={video_id}'
     return url, fix_youtube_title(title), video_id
 
