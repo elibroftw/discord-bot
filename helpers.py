@@ -52,7 +52,7 @@ if not os.path.exists('Music'):
 
 # TODO CONVERT ALL YOUTUBE STUFF TO REQUESTS.GET SHIT
 def fix_youtube_title(title):
-    return title.replace('&quot;', '\'').replace('&amp;', '&').replace('/', '_')
+    return title.replace('&quot;', '\'').replace('&amp;', '&').replace('/', '_').replace('?', '')
 
 
 def youtube_search(text, return_info=False):
