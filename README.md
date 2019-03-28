@@ -14,7 +14,7 @@ A discord bot (called El Chapo) I made using the discord.py module and is hosted
 - - Pause/Resume (!pause, !p, !resume)
 - - Stop (!stop)
 - - Autoplay (!pap query (always turns it on),!auto_play,!ap)
-- - Leave (!leave, !disconnect, !unsummon, !desummon,!dismiss)
+- - Leave (!leave, !disconnect, !unsummon, !desummon, !dismiss)
 
 - Twitter search (going to rework this)
 - Virtual currency (not done yet)
