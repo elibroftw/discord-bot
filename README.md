@@ -13,8 +13,9 @@ A discord bot (called El Chapo) I made using the discord.py module and is hosted
 - - Previous song (!previous, !back)
 - - Pause/Resume (!pause, !p, !resume)
 - - Stop (!stop)
-- - Leave (!leave, !disconnect, !unsummon, !desummon, dismiss)
-- - 
+- - Autoplay (!pap query (always turns it on),!auto_play,!ap)
+- - Leave (!leave, !disconnect, !unsummon, !desummon,!dismiss)
+
 - Twitter search (going to rework this)
 - Virtual currency (not done yet)
 - Admin uses
@@ -26,7 +27,7 @@ A discord bot (called El Chapo) I made using the discord.py module and is hosted
 # Future
 - Set and get invite codes (currently only gets my invite code)
 - banning (not implemented, but !ban)
-- auto play for music
+
 - repeat mode for music
 
 Add it to your server by clicking [here](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8)
