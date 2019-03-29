@@ -6,6 +6,7 @@ from collections import namedtuple
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import logging
+from pprint import pprint
 
 import requests
 from discord import opus
@@ -15,7 +16,7 @@ import os
 import json
 # noinspection PyPackageRequirements
 from googleapiclient.discovery import build
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode
 import youtube_dl
 
 logger = logging.getLogger()
@@ -37,6 +38,31 @@ if not os.path.exists('Music'):
     os.mkdir('Music')
 
 
+def yt_time(duration="P1W2DT6H21M32S"):
+    """
+    Converts YouTube duration (ISO 8061)
+    into Seconds
+
+    see http://en.wikipedia.org/wiki/ISO_8601#Durations
+    """
+    iso_8601 = re.compile(
+        'P'  # designates a period
+        '(?:(?P<years>\d+)Y)?'  # years
+        '(?:(?P<months>\d+)M)?'  # months
+        '(?:(?P<weeks>\d+)W)?'  # weeks
+        '(?:(?P<days>\d+)D)?'  # days
+        '(?:T'  # time part must begin with a T
+        '(?:(?P<hours>\d+)H)?'  # hours
+        '(?:(?P<minutes>\d+)M)?'  # minutes
+        '(?:(?P<seconds>\d+)S)?'  # seconds
+        ')?')  # end of time part
+    # Convert regex matches into a short list of time units
+    units = list(iso_8601.match(duration).groups()[-3:])
+    # Put list in ascending order & remove 'None' types
+    units = list(reversed([int(x) if x is not None else 0 for x in units]))
+    # Do the maths
+    return sum([x * 60 ** units.index(x) for x in units])
+
 # twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
 # twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
 #
@@ -56,7 +82,7 @@ def fix_youtube_title(title):
     return title.replace('&quot;', '\'').replace('&amp;', '&').replace('/', '_').replace('?', '')
 
 
-def youtube_search(text, return_info=False):
+def youtube_search(text, return_info=False, limit_duration=False, duration_limit=600):
     if text in ('maagnolia', 'magnolia') and return_info:
         text = 'magnolia (Audio)'
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
@@ -64,68 +90,75 @@ def youtube_search(text, return_info=False):
     try:
         re_result = p.search(text)
         result = int(re_result.group()[2:])
-    except AttributeError:
-        result = 1
+    except AttributeError: result = 1
     p = re.compile('--channel|--playlist')  # defaults to video so I removed --video
     try:
         re_result = p.search(text)
         kind = re_result.group()[2:]
-    except AttributeError:
-        kind = 'video'
-    try:
-        text = text[text.index(' '):text.index('--')]
-    except ValueError:
-        pass
+    except AttributeError: kind = 'video'
+    try: text = text[text.index(' '):text.index('--')]
+    except ValueError: pass
     # region = 'Canada'
     # if kind == 'channel':
     #     search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 20,
     #                                                 order='relevance').execute()
     # pylint: disable=no-member
-    try:
-        search_response = youtube_API.search().list(q=text, part='id,snippet', maxResults=result + 2,
-                                                    order='relevance', type=kind).execute()
+    try: search_response = youtube_API.search().list(q=text, part='id,snippet', maxResults=result + 2,
+                                                     order='relevance', type=kind).execute()
     except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
         print('error with youtube service, line 87')
         api_url = 'https://www.googleapis.com/youtube/v3/'
-        r = requests.get(f'{api_url}search?part=id,snippet&q={text}&type={kind}&order=relevance&maxResults={result + 2}&key={google_api_key}')
+        f = {'part': 'id,snippet', 'q': text, 'type': kind, 'order': 'relevance', 'maxResults': result + 2,
+             'key': google_api_key}
+        query_string = urlencode(f)
+        r = requests.get(f'{api_url}search?{query_string}')
         search_response = json.loads(r.text)
-    videos, channels, play_lists = [], [], []
+    videos, channels, play_lists, videos_list = {}, [], [], []
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
     for search_result in search_response.get('items', []):
         # print(search_result['id']['kind'])
-        if search_result['id']['kind'] == 'youtube#video':
+        if search_result['id']['kind'] == 'youtube#video' and (
+                not return_info or search_result['snippet']['liveBroadcastContent'] == 'none'):
             title = search_result['snippet']['title']
             video_id = search_result['id']['videoId']
             desc = search_result['snippet']['description'][:160]
-            videos.append([title, video_id, desc])
+            videos[video_id] = [title, desc]
+            videos_list.append(video_id)
             # videos.append([title, id, desc])
         elif search_result['id']['kind'] == 'youtube#channel':
             channels.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["channelId"]}'])
         elif search_result['id']['kind'] == 'youtube#playlist':
             play_lists.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["playlistId"]}'])
-    title = video_id = desc = channel_id = playlist_id =  None
+    title = video_id = desc = channel_id = playlist_id = an_id = None
+    if limit_duration:
+        # parse by
+        video_ids = ','.join(videos.keys())
+        url = f'https://www.googleapis.com/youtube/v3/videos?id={video_ids}&part=contentDetails&key={google_api_key}'
+        r = requests.get(url)
+        search_response = json.loads(r.text)
+        for item in search_response.get('items', []):
+            duration = yt_time(item['contentDetails']['duration'])
+            if duration > duration_limit:
+                video_id = item['id']
+                videos.pop(video_id)
+                videos_list.remove(video_id)
+
     if kind == 'video':
         while result > 0:
             try:
-                title, video_id, desc = videos[result - 1]
+                video_id = videos_list[result - 1]
+                title, desc = videos[video_id]
                 break
-            except IndexError:
-                result -= 1
-    elif kind == 'channel':
-        while result > 0:
-            try:
-                channel_id = channels[result - 1][1]
-                break
-            except IndexError:
-                result -= 1
+            except IndexError: result -= 1
     else:
+        a = channels if kind == 'channel' else play_lists
         while result > 0:
             try:
-                playlist_id = play_lists[result - 1][1]
+                an_id = a[result - 1][1]
                 break
-            except IndexError:
-                result -= 1
+            except IndexError: result -= 1
+        playlist_id = channel_id = an_id
     url_dict = {'video': f'https://www.youtube.com/watch?v={video_id}',
                 'channel': f'https://www.youtube.com/channel/{channel_id}',
                 'playlist': f'https://www.youtube.com/playlist?list={playlist_id}'}
@@ -153,6 +186,15 @@ ydl_opts = {
     'ffmpeg_location': 'ffmpeg/bin/',
     'quiet': True
 }
+
+
+def get_video_duration(video_id):
+    url = f'https://www.googleapis.com/youtube/v3/videos?id={video_id}&part=contentDetails,snippet&key={google_api_key}'
+    r = requests.get(url)
+    search_response = json.loads(r.text)
+    item = search_response.get('items', [])[0]
+    is_live = item['snippet']['liveBroadcastContent'] == 'live'
+    return 2088000 if is_live else yt_time(item['contentDetails']['duration'])
 
 
 def youtube_download(url):
@@ -186,26 +228,31 @@ def get_video_title(video_id):
 
 
 def get_related_video(video_id, done_queue):
-    # TODO: check if not in recent 10
-    length = len(done_queue)
+    dq = done_queue[:10]
+    length = len(dq)
     # pylint: disable=no-member
     try:
-        search_response = youtube_API.search().list(relatedToVideoId=video_id, part='id,snippet', maxResults=2 + length,
+        search_response = youtube_API.search().list(relatedToVideoId=video_id, part='id,snippet', maxResults=5 + length,
                                                     order='relevance', type='video').execute()
     except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
         print('error with youtube service, line 194')
         api_url = 'https://www.googleapis.com/youtube/v3/'
-        r = requests.get(f'{api_url}search?part=id,snippet&relatedToVideoId={video_id}&type=video&order=relevance&maxResults=3&key={google_api_key}')
+        f = {'part': 'id,snippet', 'relatedToVideoId': video_id, 'type': 'video', 'order': 'relevance',
+             'maxResults': 2 + length,
+             'key': google_api_key}
+        query_string = urlencode(f)
+        r = requests.get(f'{api_url}search?{query_string}')
         search_response = json.loads(r.text)
-    related_song = done_queue[0] if done_queue else Song('', '')
+    related_song = dq[0] if dq else Song('', '')
     i = 0
-    while related_song in done_queue or related_song == Song('', ''):
+    while related_song in dq or related_song == Song('', '') or get_video_duration(related_song.video_id) > 600:
         search_result = search_response['items'][i]
         title = search_result['snippet']['title']
         video_id = search_result['id']['videoId']
         related_song = Song(title, video_id)
         i += 1
     url = f'https://www.youtube.com/watch?v={video_id}'
+    # noinspection PyUnboundLocalVariable
     return url, fix_youtube_title(title), video_id
 
 
@@ -312,7 +359,8 @@ def send_email(recipient, name=''):  # TODO: for later
 
 if __name__ == "__main__":
     # print(get_related_video('PczuoZJ-PtM'))
-    video_id = 'tjRFBaPmWwM'
-    # print(youtube_search('euan ellis u.f.o'))
-    # print(get_video_title(video_id))
+    # vid_id = 'tjRFBaPmWwM'
+    print(youtube_search('euan ellis u.f.o'))
+    # print(youtube_search('the grand sound livestream'))
+    # print(get_video_title(vid_id))
 
