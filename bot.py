@@ -20,7 +20,6 @@ ttt_round = 0
 players_in_game = []
 tic_tac_toe_data: dict = {}
 ttt_games = {}
-# timers_2 = {'[Beta]Tic-Tac-Toe(!ttt)': 0, '[Alpha]Shift(!shift)': 0}
 ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 mqs = music_queues = {}
 auto_play_dict = {}
@@ -230,14 +229,12 @@ async def games(ctx):
 
 @bot.command()
 async def ttt(ctx):
-    global ttt_round, players_in_game, tic_tac_toe_data, timers
+    global ttt_round, players_in_game, tic_tac_toe_data
     author: discord.User = ctx.message.author
     # TODO: turn into DM game
     # print(message.author.top_role.is_everyone) checks if role is @everyone
     if ttt_games.get(author, False):
         await author.send('You are already in a game. To end a game do !end')
-    # if time.time() - timers[0][1] < 120:
-    #     await ctx.send('There is another tic-tac-toe game in progress')
     else:
         msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
