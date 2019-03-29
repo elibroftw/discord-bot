@@ -113,6 +113,7 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
         query_string = urlencode(f)
         r = requests.get(f'{api_url}search?{query_string}')
         search_response = json.loads(r.text)
+    # TODO: USE ORDERED DICT
     videos, channels, play_lists, videos_list = {}, [], [], []
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
