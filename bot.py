@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import os
 from datetime import datetime
 from pprint import pprint
@@ -413,7 +414,6 @@ async def play_file(ctx):
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     music_queue = music_queues[guild]['music_queue']
     done_queue = music_queues[guild]['done_queue']
-
     # TODO: use a db to determine which files get constantly used
 
     # noinspection PyUnusedLocal
@@ -463,11 +463,12 @@ async def play_file(ctx):
         msg_content = f'Now playing `{title}`'
         if m: await m.edit(content=msg_content)
         else:
-            temp = music_queues[guild].copy()
-            pprint(temp)
+            temp_mq = copy.deepcopy(music_queue)
+            temp_dq = copy.deepcopy(done_queue)
             await ctx.send(msg_content)
-            pprint(temp)
-            music_queues[guild] = temp.copy()
+            if temp_mq != music_queue:
+                music_queue = music_queues[guild]['music_queue'] = copy.deepcopy(temp_mq)
+                done_queue = music_queues[guild]['done_queue'] = copy.deepcopy(temp_dq)
         await bot.change_presence(activity=discord.Game(title))
 
 
