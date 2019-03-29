@@ -1,6 +1,5 @@
 import asyncio
 import os
-import time
 from datetime import datetime
 from subprocess import run
 
@@ -10,7 +9,7 @@ from discord.ext import commands
 
 import tictactoe
 from helpers import youtube_download, youtube_search, get_related_video, get_video_id, get_video_title, load_opus_lib, \
-    update_net_worth, check_net_worth, Song
+    update_net_worth, check_net_worth, Song, get_video_duration
 
 bot = commands.Bot(command_prefix='!')
 bot.command()
@@ -21,7 +20,6 @@ ttt_round = 0
 players_in_game = []
 tic_tac_toe_data: dict = {}
 ttt_games = {}
-timers = [['[Beta]Tic-Tac-Toe(!ttt)', 0]]
 # timers_2 = {'[Beta]Tic-Tac-Toe(!ttt)': 0, '[Alpha]Shift(!shift)': 0}
 ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 mqs = music_queues = {}
@@ -69,9 +67,11 @@ async def hi(ctx):
 
 
 @bot.command()
-async def test(ctx):
-    if str(ctx.message.channel) == 'bot_testing':
-        await ctx.send('TEST\nI DID SOMETHING')
+async def test(ctx, say_something=False):
+    if say_something:
+        await ctx.send('yoooo')
+    else:
+        await ctx.send('broo')
 
 
 @bot.command()
@@ -139,35 +139,24 @@ async def delete_channel(ctx):
 
 
 @bot.command(aliases=['yt'])
-async def youtube(ctx):
-    try:
-        text = ctx.message.content[ctx.message.content.index(' ') + 1:]
-        await ctx.send(youtube_search(text))
-    except ValueError:
-        await ctx.send('ERROR: No search parameter given')
+async def youtube(ctx, query=None):
+    if query: await ctx.send(youtube_search(query))
+    # else: await ctx.send('ERROR: No search parameter given')
 
 
 @bot.command(name='exit', aliases=['quit'])
 async def _exit(ctx):
-    guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(
-        bot.voice_clients, guild=guild)
-    if voice_client:
-        await voice_client.disconnect()
-    moderator = discord.utils.get(guild.roles, name='Moderator')
-    if ctx.author.top_role >= moderator:
+    if str(ctx.author) == 'eli#4591':
+        voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+        if voice_client: await voice_client.disconnect()
         quit()
 
 
 @bot.command()
 async def restart(ctx):
-    guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(
-        bot.voice_clients, guild=guild)
-    if voice_client:
-        await voice_client.disconnect()
-    moderator = discord.utils.get(guild.roles, name='Moderator')
-    if ctx.author.top_role >= moderator:
+    if str(ctx.author) == 'eli#4591':
+        voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+        if voice_client: await voice_client.disconnect()
         print('Restarting')
         run('python bot.py')
         quit()
@@ -186,25 +175,19 @@ async def restart(ctx):
 #     text = ctx.message.content[ctx.message.content.index(' ') + 1:]  # TODO: except ValueError
 #     bot_message = discord_search_twitter_user(text)
 #     await ctx.send(bot_message)
-
-
 # search_users()
 
 
 @bot.command()
 async def thank(ctx):
-    await ctx.send(f"You're welcome {ctx.message.author.mention}")
+    await ctx.send(f"You're welcome {ctx.author.mention}")
 
 
 @bot.command()
 async def clear(ctx):
     try:
-        channel: discord.TextChannel = ctx.message.channel
-        guild = channel.guild
-        moderator = discord.utils.get(guild.roles, name='Moderator')
-        ctx.message.author.top_role: discord.Role  # .top_role is Admin
-        # print(ctx.message.author.top_role.position)  # printed 4
-        if ctx.message.author.top_role >= moderator:
+        channel: discord.TextChannel = ctx.channel
+        if ctx.message.author.permissions_in(ctx.channel).manage_messages:
             # await ctx.send('Clearing messages...')
             await bot.change_presence(activity=discord.Game('Clearing messages...'))
             number = 3
@@ -227,32 +210,22 @@ async def clear(ctx):
         pass
 
 
-# TODO: 'shop', 'math', 'ban', 'remove_role', 'delete_role'
-
-
 @bot.command(aliases=['eval'])
 async def _eval(ctx):
-    if str(ctx.message.author.top_role) == 'Admin':
+    if str(ctx.author) == 'eli#4591':
         await ctx.send(str(eval(ctx.message.content[6:])))
         print(f'{ctx.message.author} used eval')
 
 
 @bot.command(aliases=['invite', 'invitecode', 'invite_link', 'invitelink'])
-async def invite_code(ctx):  # Todo: maybe get rid of channel=
+async def invite_code(ctx):
     # await ctx.send(discord.Invite(channel=ctx.message.channel, code=invitation_code).url)
     await ctx.send(f'https://discord.gg/{invitation_code}')
 
 
 @bot.command()
 async def games(ctx):
-    msg = 'We have:'
-    for timer in timers:
-        t = round(time.time() - timer[1])
-        if t > 120:
-            msg += f'\n{timer[0]}  `open`'
-        else:
-            msg += f'\n{timer[0]}  `{120 - t} seconds until free`'
-    await ctx.send(msg)
+    await ctx.send('We have: Tic-Tac-Toe (!ttt) and Shift (!shift)')
 
 
 @bot.command()
@@ -339,17 +312,19 @@ async def shift(ctx):
     await ctx.send('https://elibroftw.itch.io/shift')
 
 
-@bot.command(aliases=['create_date'])
+@bot.command(aliases=['create_date', 'createdat', 'createdate'])
 async def created_at(ctx):
     args = ctx.message.content.split(' ')
     if len(args) > 1:
-        user = discord.utils.get(ctx.guild.members, name=' '.join(args[1:]))
+        name = ' '.join(args[1:])
+        print(name)
+        user = discord.utils.get(ctx.guild.members, nick=name)
+        if not user:
+            user = discord.utils.get(ctx.guild.members, name=name)
     else:
         user = ctx.author
-    try:
-        await ctx.send(user.created_at)
-    except AttributeError:
-        await ctx.send(f'could not find that user in the server')
+    try: await ctx.send(user.created_at)
+    except AttributeError: await ctx.send(f'could not find that user in the server')
 
 
 @bot.command()
@@ -391,12 +366,12 @@ async def download_if_not_exists(ctx, title, video_id):
 
 # TODO: Sigh sound
 @bot.command()
-async def sigh(ctx):
+async def sigh():
     raise NotImplementedError
 
 
 @bot.command()
-async def set_music_chat(ctx):
+async def set_music_chat():
     raise NotImplementedError
 
 
@@ -461,19 +436,12 @@ async def play_file(ctx):
 
 @bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q', 'pap', 'pn', 'play_next', 'playnext'])
 async def play(ctx):
-    # TODO: make one function take care of the downloading!
     # TODO: rename done queue to recently played
     # TODO: rename music_queue to next up
     # TODO: add repeat play option
-    # TODO: play_next command that inserts at i=0
-    # TODO: add a max length of time for the video can be
-    # TODO: block live stream download
-    #   create check_if_livestream in helpers.py
     # TODO: playlist support
-    # TODO: add DM support
     # TODO: time remaining command + song length command
-    # TODO: make a dict representing the text chat for music commands
-    # TODO: go_back <int> command
+    # TODO: make a dict of guild keys with values being text channels for the music-commands???
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     ctx_msg_content = ctx.message.content
@@ -484,24 +452,21 @@ async def play(ctx):
     url_or_query = ctx.message.content.split(' ')
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
-    else:
-        url_or_query = ''
     if url_or_query:
         if url_or_query.startswith('https://'):
             url = url_or_query
             video_id = get_video_id(url)
             title = get_video_title(video_id)
+            if get_video_duration(video_id) > 600:
+                await ctx.send('That song is too long! (> 10 minutes)')
+                return
         else:  # get url
-            url, title, video_id = youtube_search(url_or_query, return_info=True)
+            url, title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)
         song = Song(title, video_id)
         # music_file = f'Music/{title} - {video_id}.mp3'
 
         # download if it does not exist
         m = await download_if_not_exists(ctx, title, video_id)
-        # if not os.path.exists(music_file):
-        #     m = await ctx.send(f'Downloading `{title}`')
-        #     youtube_download(url)
-        # else: m = None
 
         # adding to queue
         if guild in music_queues:
@@ -511,7 +476,9 @@ async def play(ctx):
         else: music_queues[guild] = {'music_queue': [song], 'done_queue': []}
 
         # play song if nothing is playing
-        if voice_client.is_playing(): m_content = f'Added `{title}` to the queue'
+        if voice_client.is_playing():
+            m_content = f'Added `{title}` to the queue'
+            if not m: await ctx.send(m_content)
         else:
             await play_file(ctx)
             m_content = f'Now playing `{title}`'
@@ -523,6 +490,14 @@ async def play(ctx):
         else: await play_file(ctx)
     if ctx_msg_content.startswith('!pap'):
         await bot.get_command('auto_play').callback(ctx)
+
+
+@bot.command(aliases=['resume'])
+async def pause(ctx):
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if voice_client:
+        if voice_client.is_paused(): voice_client.resume()
+        else: voice_client.pause()
 
 
 @bot.command(aliases=['ap', 'autoplay'])
@@ -552,14 +527,6 @@ async def auto_play(ctx):
             else: await ctx.send(msg_content)
 
 
-@bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
-async def clear_queue(ctx):
-    guild = ctx.guild
-    moderator = discord.utils.get(guild.roles, name='Moderator')
-    if ctx.author.top_role >= moderator:
-        music_queues[guild]['music_queue'].clear()
-
-
 @bot.command(aliases=['next', 'n', 'sk'])
 async def skip(ctx):
     # TODO: fix this, it might be broken
@@ -575,21 +542,19 @@ async def skip(ctx):
             await play_file(ctx)
 
 
-# TODO: fast forward
-@bot.command(aliases=['ff', 'fast-forward', 'fast'])
-async def fast_forward(ctx):
-    raise NotImplementedError
-
-
-@bot.command(aliases=['back', 'b', 'prev'])
-async def previous(ctx):
+@bot.command(aliases=['back', 'b', 'prev', 'go_back', 'gb'])
+async def previous(ctx, times=1):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client:
+
         music_queue: list = music_queues[guild]['music_queue']
         done_queue = music_queues[guild]['done_queue']
         if done_queue:
-            music_queue.insert(0, done_queue.pop(0))
+            try:
+                for i in range(times):
+                    music_queue.insert(0, done_queue.pop(0))
+            except IndexError: pass
             if voice_client.is_playing():
                 is_stopped[guild] = True
                 voice_client.stop()
@@ -597,12 +562,62 @@ async def previous(ctx):
             await play_file(ctx)
 
 
-@bot.command(aliases=['resume'])
-async def pause(ctx):
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    if voice_client:
-        if voice_client.is_paused(): voice_client.resume()
-        else: voice_client.pause()
+@bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
+async def clear_queue(ctx):
+    guild = ctx.guild
+    moderator = discord.utils.get(guild.roles, name='Moderator')
+    if ctx.author.top_role >= moderator:
+        music_queues[guild]['music_queue'].clear()
+
+
+# TODO: fast forward
+@bot.command(aliases=['ff', 'fast-forward', 'fast'])
+async def fast_forward(ctx):
+    raise NotImplementedError
+
+
+@bot.command(aliases=['np', 'currently_playing', 'cp'])
+async def now_playing(ctx):
+    guild = ctx.guild
+    try:
+        music_queue = music_queues[guild]['music_queue']
+        await ctx.send(f'Currently playing `{music_queue[0].title}`')
+    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
+
+
+@bot.command(aliases=['music_queue', 'mq', 'nu'])
+async def next_up(ctx):
+    # TODO: rich embed?
+    guild = ctx.guild
+    try:
+        music_queue = music_queues[guild]['music_queue']
+        if music_queue:
+            msg = 'MUSIC QUEUE | AUTO PLAY ENABLED' if auto_play_dict.get(guild, False) \
+                else 'MUSIC QUEUE | AUTO PLAY DISABLED'
+            for i, song in enumerate(music_queue):
+                if i == 10:
+                    msg += '\n...'
+                    break
+                msg += f'\n{i} `{song.title}`' if i > 0 else f'\nCurrently Playing `{song.title}`'
+            await ctx.send(msg)
+    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
+
+
+@bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
+async def _recently_played(ctx):
+    # TODO: rich embed?
+    guild = ctx.guild
+    try:
+        done_queue = music_queues[guild]['done_queue']
+        if done_queue:
+            msg = 'RECENTLY PLAYED'
+            for i, song in enumerate(done_queue):
+                if i == 10:
+                    msg += '\n...'
+                    break
+                msg += f'\n-{i + 1} `{song.title}`'
+            await ctx.send(msg)
+    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'l', 'd'])
@@ -625,50 +640,6 @@ async def stop(ctx):
     await ctx.send('Stopped playing music, music que has been emptied')
 
 
-@bot.command(aliases=['np'])
-async def now_playing(ctx):
-    guild = ctx.guild
-    try:
-        music_queue = music_queues[guild]['music_queue']
-        await ctx.send(f'Currently playing `{music_queue[0].title}`')
-    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
-
-
-@bot.command(aliases=['music_queue', 'mq', 'nu'])
-async def next_up(ctx):
-    # TODO: rich embed?
-    guild = ctx.guild
-    try:
-        music_queue = music_queues[guild]['music_queue']
-        if music_queue:
-            msg = 'MUSIC QUEUE | AUTO PLAY ENABLED' if auto_play_dict.get(guild, False) \
-                else 'MUSIC QUEUE | AUTO PLAY DISABLED'
-            for i, song in enumerate(music_queue):
-                if i == 10:
-                    msg += '\n...'
-                    break
-                msg += f'\n{i} `{song.title}`' if i > 0 else f'\nPlaying: `{song.title}`'
-            await ctx.send(msg)
-    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
-
-
-@bot.command(aliases=['done_queue', 'dq', 'rp'])
-async def recently_played(ctx):
-    # TODO: rich embed?
-    guild = ctx.guild
-    try:
-        done_queue = music_queues[guild]['done_queue']
-        if done_queue:
-            msg = 'RECENTLY PLAYED'
-            for i, song in enumerate(done_queue):
-                if i == 10:
-                    msg += '\n...'
-                    break
-                msg += f'\n-{i + 1} `{song.title}`'
-            await ctx.send(msg)
-    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
-
-
 @bot.command()
 async def fix(ctx):
     guild = ctx.message.channel.guild
@@ -683,6 +654,12 @@ async def fix(ctx):
 async def source(ctx):
     await ctx.send('https://github.com/elibroftw/discord-bot')
 
+
+@bot.command()
+async def ban(ctx):
+    if ctx.author.guild_permissions.ban_members:
+        quit()
+
 # @bot.command(aliases=['set_volume', 'sv')
 # async def volume(ctx):
 #     pass
@@ -695,4 +672,10 @@ async def source(ctx):
     # https://discordpy.readthedocs.io/en/rewrite/api.html#discord.PCMVolumeTransformer
 
 
+@bot.command()
+async def about(ctx):
+    ctx.author.send('Hi there. Thank you for wanting to know more about me. I was made by Elijah Lopez.\n'
+                    'For more information visit https://github.com/elibroftw/discord-bot')
 bot.run(os.environ['discord'])
+
+# TODO: 'shop', 'math', 'ban', 'remove_role', 'delete_role'
