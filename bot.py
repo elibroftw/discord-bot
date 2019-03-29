@@ -314,7 +314,6 @@ async def created_at(ctx):
     args = ctx.message.content.split(' ')
     if len(args) > 1:
         name = ' '.join(args[1:])
-        print(name)
         user = discord.utils.get(ctx.guild.members, nick=name)
         if not user:
             user = discord.utils.get(ctx.guild.members, name=name)
@@ -370,6 +369,41 @@ async def sigh():
 @bot.command()
 async def set_music_chat():
     raise NotImplementedError
+
+
+@bot.command(aliases=['music_queue', 'mq', 'nu'])
+async def next_up(ctx):
+    # TODO: rich embed?
+    guild = ctx.guild
+    try:
+        music_queue = music_queues[guild]['music_queue']
+        if music_queue:
+            msg = 'MUSIC QUEUE | AUTO PLAY ENABLED' if auto_play_dict.get(guild, False) \
+                else 'MUSIC QUEUE | AUTO PLAY DISABLED'
+            for i, song in enumerate(music_queue):
+                if i == 10:
+                    msg += '\n...'
+                    break
+                msg += f'\n{i} `{song.title}`' if i > 0 else f'\nCurrently Playing `{song.title}`'
+            await ctx.send(msg)
+    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
+
+
+@bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
+async def _recently_played(ctx):
+    # TODO: rich embed?
+    guild = ctx.guild
+    try:
+        done_queue = music_queues[guild]['done_queue']
+        if done_queue:
+            msg = 'RECENTLY PLAYED'
+            for i, song in enumerate(done_queue):
+                if i == 10:
+                    msg += '\n...'
+                    break
+                msg += f'\n-{i + 1} `{song.title}`'
+            await ctx.send(msg)
+    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
 
 async def play_file(ctx):
@@ -526,7 +560,6 @@ async def auto_play(ctx):
 
 @bot.command(aliases=['next', 'n', 'sk'])
 async def skip(ctx):
-    # TODO: fix this, it might be broken
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if guild not in music_queues: music_queues[guild] = {'music_queue': [], 'done_queue': []}
@@ -550,7 +583,8 @@ async def previous(ctx, times=1):
         if done_queue:
             try:
                 for i in range(times):
-                    music_queue.insert(0, done_queue.pop(0))
+                    song = done_queue.pop(0)
+                    music_queue.insert(0, song)
             except IndexError: pass
             if voice_client.is_playing():
                 is_stopped[guild] = True
@@ -582,41 +616,6 @@ async def now_playing(ctx):
     except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
 
-@bot.command(aliases=['music_queue', 'mq', 'nu'])
-async def next_up(ctx):
-    # TODO: rich embed?
-    guild = ctx.guild
-    try:
-        music_queue = music_queues[guild]['music_queue']
-        if music_queue:
-            msg = 'MUSIC QUEUE | AUTO PLAY ENABLED' if auto_play_dict.get(guild, False) \
-                else 'MUSIC QUEUE | AUTO PLAY DISABLED'
-            for i, song in enumerate(music_queue):
-                if i == 10:
-                    msg += '\n...'
-                    break
-                msg += f'\n{i} `{song.title}`' if i > 0 else f'\nCurrently Playing `{song.title}`'
-            await ctx.send(msg)
-    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
-
-
-@bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
-async def _recently_played(ctx):
-    # TODO: rich embed?
-    guild = ctx.guild
-    try:
-        done_queue = music_queues[guild]['done_queue']
-        if done_queue:
-            msg = 'RECENTLY PLAYED'
-            for i, song in enumerate(done_queue):
-                if i == 10:
-                    msg += '\n...'
-                    break
-                msg += f'\n-{i + 1} `{song.title}`'
-            await ctx.send(msg)
-    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
-
-
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'l', 'd'])
 async def leave(ctx):
     # clear music queue
@@ -628,7 +627,7 @@ async def leave(ctx):
     if voice_client: await voice_client.disconnect()
 
 
-@bot.command(aliases=['s'])
+@bot.command(aliases=['end'])
 async def stop(ctx):
     guild = ctx.guild
     is_stopped[guild] = True
@@ -654,8 +653,15 @@ async def source(ctx):
 
 @bot.command()
 async def ban(ctx):
+
     if ctx.author.guild_permissions.ban_members:
-        quit()
+        args = ctx.message.content.split(' ')
+        if len(args) > 1:
+            name = ' '.join(args[1:])
+            user = discord.utils.get(ctx.guild.members, nick=name)
+            if not user:
+                user = discord.utils.get(ctx.guild.members, name=name)
+            await ctx.guild.ban(user)
 
 # @bot.command(aliases=['set_volume', 'sv')
 # async def volume(ctx):
@@ -671,8 +677,9 @@ async def ban(ctx):
 
 @bot.command()
 async def about(ctx):
-    ctx.author.send('Hi there. Thank you for wanting to know more about me. I was made by Elijah Lopez.\n'
-                    'For more information visit https://github.com/elibroftw/discord-bot')
+    ctx.author.send(f'Hi there. Thank you for wanting to know more about me. I was made by Elijah Lopez.\n'
+                    'For more information visit https://github.com/elibroftw/discord-bot.\n'
+                    'Join my server at https://discord.gg/{invitation_code})')
 bot.run(os.environ['discord'])
 
 # TODO: 'shop', 'math', 'ban', 'remove_role', 'delete_role'
