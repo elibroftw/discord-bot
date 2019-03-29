@@ -185,7 +185,7 @@ def get_video_title(video_id):
     return fix_youtube_title(title)
 
 
-def get_related_video(video_id, done_queue=None):
+def get_related_video(video_id, done_queue):
     # TODO: check if not in recent 10
     length = len(done_queue)
     # pylint: disable=no-member
@@ -197,9 +197,9 @@ def get_related_video(video_id, done_queue=None):
         api_url = 'https://www.googleapis.com/youtube/v3/'
         r = requests.get(f'{api_url}search?part=id,snippet&relatedToVideoId={video_id}&type=video&order=relevance&maxResults=3&key={google_api_key}')
         search_response = json.loads(r.text)
-    related_song = done_queue[0]
+    related_song = done_queue[0] if done_queue else Song('', '')
     i = 0
-    while related_song in done_queue:
+    while related_song in done_queue or related_song == Song('', ''):
         search_result = search_response['items'][i]
         title = search_result['snippet']['title']
         video_id = search_result['id']['videoId']
