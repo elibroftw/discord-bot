@@ -1,6 +1,7 @@
 import asyncio
 import os
 from datetime import datetime
+from pprint import pprint
 from subprocess import run
 
 import discord
@@ -457,11 +458,16 @@ async def play_file(ctx):
         video_id = song.video_id
         music_filepath = f'Music/{title} - {video_id}.mp3'
         m = await download_if_not_exists(ctx, title, video_id)
-        voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
         is_stopped[guild] = False
+        voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
         msg_content = f'Now playing `{title}`'
         if m: await m.edit(content=msg_content)
-        else: await ctx.send(msg_content)
+        else:
+            temp = music_queues[guild].copy()
+            pprint(temp)
+            await ctx.send(msg_content)
+            pprint(temp)
+            music_queues[guild] = temp.copy()
         await bot.change_presence(activity=discord.Game(title))
 
 
@@ -483,7 +489,7 @@ async def play(ctx):
     url_or_query = ctx.message.content.split(' ')
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
-    if url_or_query:
+    if url_or_query and type(url_or_query) != list:
         if url_or_query.startswith('https://'):
             url = url_or_query
             video_id = get_video_id(url)
@@ -625,6 +631,7 @@ async def leave(ctx):
     auto_play_dict[guild] = False
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client: await voice_client.disconnect()
+    await ctx.send('Stopped playing music, music que has been emptied')
 
 
 @bot.command(aliases=['end'])
@@ -633,7 +640,6 @@ async def stop(ctx):
     is_stopped[guild] = True
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client and voice_client.is_playing(): voice_client.stop()
-    await ctx.send('Stopped playing music, music que has been emptied')
 
 
 @bot.command()
