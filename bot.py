@@ -389,6 +389,17 @@ async def download_if_not_exists(ctx, title, video_id):
     return None
 
 
+# TODO: Sigh sound
+@bot.command()
+async def sigh(ctx):
+    raise NotImplementedError
+
+
+@bot.command()
+async def set_music_chat(ctx):
+    raise NotImplementedError
+
+
 async def play_file(ctx):
     """Plays first (index=0) song in music queue"""
     guild = ctx.guild
@@ -421,7 +432,7 @@ async def play_file(ctx):
 
                 msg_content = f'Now playing `{next_title}`'
                 if m: run_coro(m.edit(content=msg_content))
-                else: run_coro(ctx.send(msg_content)); print('test')
+                else: run_coro(ctx.send(msg_content))
 
                 if setting and len(music_queue) == 1:
                     url, title, video_id = get_related_video(music_queue[0].video_id, done_queue)
@@ -441,16 +452,11 @@ async def play_file(ctx):
         music_filepath = f'Music/{title} - {video_id}.mp3'
         m = await download_if_not_exists(ctx, title, video_id)
         voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
+        is_stopped[guild] = False
         msg_content = f'Now playing `{title}`'
         if m: await m.edit(content=msg_content)
         else: await ctx.send(msg_content)
         await bot.change_presence(activity=discord.Game(title))
-
-
-# TODO: Sigh sound
-@bot.command()
-async def sigh(ctx):
-    raise NotImplementedError
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q', 'pap', 'pn', 'play_next', 'playnext'])
@@ -471,7 +477,6 @@ async def play(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     ctx_msg_content = ctx.message.content
-    is_stopped[guild] = False
     play_next = any([cmd in ctx_msg_content for cmd in ('pn', 'play_next', 'playnext')])
     if voice_client is None:
         await bot.get_command('summon').callback(ctx)
@@ -557,6 +562,7 @@ async def clear_queue(ctx):
 
 @bot.command(aliases=['next', 'n', 'sk'])
 async def skip(ctx):
+    # TODO: fix this, it might be broken
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if guild not in music_queues: music_queues[guild] = {'music_queue': [], 'done_queue': []}
@@ -566,26 +572,7 @@ async def skip(ctx):
         if voice_client.is_playing(): voice_client.stop()  # after_play runs
         elif mq:
             dq.insert(0, mq.pop(0))
-            if mq:
-                song = mq[0]
-                title = song.title
-                video_id = song.video_id
-                await download_if_not_exists(ctx, title, video_id)
-                audio_source = FFmpegPCMAudio(source=f'Music/{title} - {video_id}.mp3')
-                voice_client.source = audio_source
-
-        # if auto_play_dict.get(guild, False) and len(mq) <= 1:
-        #     if mq:
-        #         url, title, video_id, = get_related_video(mq[0].video_id, dq)
-        #         m = await download_if_not_exists(ctx, title, video_id)
-        #         mq.append(Song(title, video_id))
-        #         msg_content = f'Added `{title}` to the queue'
-        #         if m: await m.edit(content=msg_content)
-        #         else: await ctx.channel.send(msg_content)
-        #     else:  # if music queue is empty use recently played list and then play the related song/video
-        #         url, title, video_id, = get_related_video(dq[0].video_id, dq)
-        #         mq.append(Song(title, video_id))
-        #         await play_file(ctx)  # will take care of downloading
+            await play_file(ctx)
 
 
 # TODO: fast forward
@@ -597,15 +584,16 @@ async def fast_forward(ctx):
 @bot.command(aliases=['back', 'b', 'prev'])
 async def previous(ctx):
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(
-        bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client:
         music_queue: list = music_queues[guild]['music_queue']
         done_queue = music_queues[guild]['done_queue']
         if done_queue:
             music_queue.insert(0, done_queue.pop(0))
             if voice_client.is_playing():
+                is_stopped[guild] = True
                 voice_client.stop()
+                is_stopped[guild] = False
             await play_file(ctx)
 
 
@@ -634,6 +622,7 @@ async def stop(ctx):
     is_stopped[guild] = True
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client and voice_client.is_playing(): voice_client.stop()
+    await ctx.send('Stopped playing music, music que has been emptied')
 
 
 @bot.command(aliases=['np'])
@@ -652,14 +641,13 @@ async def next_up(ctx):
     try:
         music_queue = music_queues[guild]['music_queue']
         if music_queue:
-            msg = '`MUSIC QUEUE`'
+            msg = 'MUSIC QUEUE | AUTO PLAY ENABLED' if auto_play_dict.get(guild, False) \
+                else 'MUSIC QUEUE | AUTO PLAY DISABLED'
             for i, song in enumerate(music_queue):
                 if i == 10:
                     msg += '\n...'
                     break
-                msg += f'\n`{i}` {song.title}'
-            if auto_play_dict.get(guild, False):
-                msg += '\nAUTO PLAY ENABLED'
+                msg += f'\n{i} `{song.title}`' if i > 0 else f'\nPlaying: `{song.title}`'
             await ctx.send(msg)
     except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
@@ -671,12 +659,12 @@ async def recently_played(ctx):
     try:
         done_queue = music_queues[guild]['done_queue']
         if done_queue:
-            msg = '`RECENTLY PLAYED`'
+            msg = 'RECENTLY PLAYED'
             for i, song in enumerate(done_queue):
                 if i == 10:
                     msg += '\n...'
                     break
-                msg += f'\n`-{i + 1}` {song.title}'
+                msg += f'\n-{i + 1} `{song.title}`'
             await ctx.send(msg)
     except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
