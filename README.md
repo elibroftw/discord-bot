@@ -28,8 +28,6 @@ A discord bot (called El Chapo) I made using the discord.py module and is hosted
 
 # Future
 - Set and get invite codes (currently only gets my invite code)
-- 
-
 - repeat mode for music
 
 Invitation [url](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
