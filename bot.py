@@ -492,6 +492,7 @@ async def play(ctx):
         else: await play_file(ctx)
 
     else:
+        # TODO: change bot presence
         if (voice_client.is_playing() or voice_client.is_paused()) and not play_next:
             await bot.get_command('pause').callback(ctx)
         else: await play_file(ctx)
