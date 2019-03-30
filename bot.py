@@ -106,7 +106,6 @@ async def create_role(ctx):
             print(f'{m.author} created role {role_name}')
 
 
-# TODO: delete_role
 @bot.command()
 async def add_role(ctx):
     m = ctx.message
@@ -121,6 +120,11 @@ async def add_role(ctx):
             member = guild.get_member(member)
             await guild.add_roles(member, role)
             print(f'{ctx.message.author} gave {member} role {role_name}')
+
+
+@bot.command()
+async def delete_role(ctx):  # TODO
+    raise NotImplementedError
 
 
 @bot.command()
@@ -242,25 +246,25 @@ async def ttt(ctx):
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
         await author.send(msg)
         ttt_round = 0
-        # TODO: remove username from dict
+        # TODO: do I really need username in dict??
         # TODO: replace game_over with in_game
         tic_tac_toe_data[author] = {'username': str(author), 'comp_moves': [], 'user_moves': [], 'danger': None,
                                     'danger2': None, 'game_over': False}
         user_msg, game_channel = True, author.dm_channel
         if not game_channel:
             await author.create_dm()
-        # TODO: Change the parameter name??
 
-        def check_yn(m):
-            correct_prereqs = m.channel == game_channel and author == m.author
-            m = m.content.lower()
-            bool_value = m in ('y', 'yes', 'no', 'n', '!end')
+        # TODO: Change the parameter name??
+        def check_yn(waited_msg):
+            correct_prereqs = waited_msg.channel == game_channel and author == waited_msg.author
+            waited_msg = waited_msg.content.lower()
+            bool_value = waited_msg in ('y', 'yes', 'no', 'n') or 'end' in waited_msg
             return bool_value and correct_prereqs
 
-        def check_digit(m):
-            correct_prereqs = m.channel == game_channel and ctx.message.author == m.author
-            m = m.content
-            return (m.isdigit() or m.lower() == '!end') and correct_prereqs
+        def check_digit(waited_msg):
+            correct_prereqs = waited_msg.channel == game_channel and ctx.message.author == waited_msg.author
+            m = waited_msg.content
+            return (waited_msg.isdigit() or 'end' in waited_msg.lower()) and correct_prereqs
 
         while user_msg is None and not tic_tac_toe_data[author]['game_over']:
             try:
@@ -268,7 +272,7 @@ async def ttt(ctx):
 
                 if user_msg is not None:
                     user_msg = user_msg.content.lower()
-                    if user_msg == '!end':
+                    if 'end' in user_msg:
                         tic_tac_toe_data[author]['game_over'] = True
                         await ctx.send_message(game_channel, 'You have ended your tic-tac-toe game')
                     else:
@@ -281,7 +285,7 @@ async def ttt(ctx):
             try:
                 user_msg = await bot.wait_for('message', timeout=120, check=check_digit)
                 if user_msg is not None:
-                    if user_msg.content.lower() == '!end':
+                    if 'end' in user_msg.content.lower():
                         tic_tac_toe_data[author]['game_over'] = True
                         await game_channel.send_message('You have ended your tic-tac-toe game')
                         continue
@@ -371,41 +375,6 @@ async def sigh():
 @bot.command()
 async def set_music_chat():
     raise NotImplementedError
-
-
-@bot.command(aliases=['music_queue', 'mq', 'nu'])
-async def next_up(ctx):
-    # TODO: rich embed?
-    guild = ctx.guild
-    try:
-        music_queue = music_queues[guild]['music_queue']
-        if music_queue:
-            msg = 'MUSIC QUEUE | AUTO PLAY ENABLED' if auto_play_dict.get(guild, False) \
-                else 'MUSIC QUEUE | AUTO PLAY DISABLED'
-            for i, song in enumerate(music_queue):
-                if i == 10:
-                    msg += '\n...'
-                    break
-                msg += f'\n{i} `{song.title}`' if i > 0 else f'\nCurrently Playing `{song.title}`'
-            await ctx.send(msg)
-    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
-
-
-@bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
-async def _recently_played(ctx):
-    # TODO: rich embed?
-    guild = ctx.guild
-    try:
-        done_queue = music_queues[guild]['done_queue']
-        if done_queue:
-            msg = 'RECENTLY PLAYED'
-            for i, song in enumerate(done_queue):
-                if i == 10:
-                    msg += '\n...'
-                    break
-                msg += f'\n-{i + 1} `{song.title}`'
-            await ctx.send(msg)
-    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
 
 async def play_file(ctx):
@@ -499,12 +468,12 @@ async def play(ctx):
                 await ctx.send('That song is too long! (> 10 minutes)')
                 return
         else:  # get url
-            url, title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)
+            try:
+                url, title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)
+            except ValueError:
+                await ctx.send(f'No valid video found with query `{url_or_query}`')
+                return
         song = Song(title, video_id)
-        # music_file = f'Music/{title} - {video_id}.mp3'
-
-        # download if it does not exist
-        m = await download_if_not_exists(ctx, title, video_id)
 
         # adding to queue
         if guild in music_queues:
@@ -514,14 +483,14 @@ async def play(ctx):
         else: music_queues[guild] = {'music_queue': [song], 'done_queue': []}
 
         # play song if nothing is playing
-        if voice_client.is_playing():
+        if voice_client.is_playing() or voice_client.is_paused():
+            # download if you need to add it to queue
+            m = await download_if_not_exists(ctx, title, video_id)
             m_content = f'Added `{title}` to the queue'
             if not m: await ctx.send(m_content)
-        else:
-            await play_file(ctx)
-            m_content = f'Now playing `{title}`'
+            else: await m.edit(content=m_content)
+        else: await play_file(ctx)
 
-        if m: await m.edit(content=m_content)
     else:
         if (voice_client.is_playing() or voice_client.is_paused()) and not play_next:
             await bot.get_command('pause').callback(ctx)
@@ -600,6 +569,41 @@ async def previous(ctx, times=1):
             await play_file(ctx)
 
 
+@bot.command(aliases=['music_queue', 'mq', 'nu'])
+async def next_up(ctx):
+    # TODO: rich embed?
+    guild = ctx.guild
+    try:
+        music_queue = music_queues[guild]['music_queue']
+        if music_queue:
+            msg = 'MUSIC QUEUE | AUTO PLAY ENABLED' if auto_play_dict.get(guild, False) \
+                else 'MUSIC QUEUE | AUTO PLAY DISABLED'
+            for i, song in enumerate(music_queue):
+                if i == 10:
+                    msg += '\n...'
+                    break
+                msg += f'\n{i} `{song.title}`' if i > 0 else f'\nCurrently Playing `{song.title}`'
+            await ctx.send(msg)
+    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
+
+
+@bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
+async def _recently_played(ctx):
+    # TODO: rich embed?
+    guild = ctx.guild
+    try:
+        done_queue = music_queues[guild]['done_queue']
+        if done_queue:
+            msg = 'RECENTLY PLAYED'
+            for i, song in enumerate(done_queue):
+                if i == 10:
+                    msg += '\n...'
+                    break
+                msg += f'\n-{i + 1} `{song.title}`'
+            await ctx.send(msg)
+    except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
+
+
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
 async def clear_queue(ctx):
     guild = ctx.guild
@@ -608,9 +612,8 @@ async def clear_queue(ctx):
         music_queues[guild]['music_queue'].clear()
 
 
-# TODO: fast forward
 @bot.command(aliases=['ff', 'fast-forward', 'fast'])
-async def fast_forward(ctx):
+async def fast_forward(ctx):  # TODO
     raise NotImplementedError
 
 
@@ -660,7 +663,7 @@ async def source(ctx):
 
 @bot.command()
 async def ban(ctx):
-
+    # TODO: add are you sure
     if ctx.author.guild_permissions.ban_members:
         args = ctx.message.content.split(' ')
         if len(args) > 1:

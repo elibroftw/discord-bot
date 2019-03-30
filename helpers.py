@@ -103,35 +103,33 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
     #     search_response = youtube_API.search().list(q=text, part="id,snippet", maxResults=result + 20,
     #                                                 order='relevance').execute()
     # pylint: disable=no-member
-    try: search_response = youtube_API.search().list(q=text, part='id,snippet', maxResults=result + 2,
+    try: search_response = youtube_API.search().list(q=text, part='id,snippet', maxResults=result + 5,
                                                      order='relevance', type=kind).execute()
     except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
         print('error with youtube service, line 87')
         api_url = 'https://www.googleapis.com/youtube/v3/'
-        f = {'part': 'id,snippet', 'q': text, 'type': kind, 'order': 'relevance', 'maxResults': result + 2,
+        f = {'part': 'id,snippet', 'q': text, 'type': kind, 'order': 'relevance', 'maxResults': result + 5,
              'key': google_api_key}
         query_string = urlencode(f)
         r = requests.get(f'{api_url}search?{query_string}')
         search_response = json.loads(r.text)
-    # TODO: USE ORDERED DICT
-    videos, channels, play_lists, videos_list = {}, [], [], []
+    videos, channels, play_lists = {}, [], []  # if python version is < 3.6 use ordered dict
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
     for search_result in search_response.get('items', []):
         # print(search_result['id']['kind'])
         if search_result['id']['kind'] == 'youtube#video' and (
-                not return_info or search_result['snippet']['liveBroadcastContent'] == 'none'):
+                search_result['snippet']['liveBroadcastContent'] == 'none' or not return_info):
             title = search_result['snippet']['title']
             video_id = search_result['id']['videoId']
             desc = search_result['snippet']['description'][:160]
             videos[video_id] = [title, desc]
-            videos_list.append(video_id)
-            # videos.append([title, id, desc])
+            # videos[video_id] = [title, id, desc]
         elif search_result['id']['kind'] == 'youtube#channel':
             channels.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["channelId"]}'])
         elif search_result['id']['kind'] == 'youtube#playlist':
             play_lists.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["playlistId"]}'])
-    title = video_id = desc = channel_id = playlist_id = an_id = None
+    title, video_id, desc, channel_id, playlist_id, an_id = None, None, None, None, None, None
     if limit_duration:
         # parse by
         video_ids = ','.join(videos.keys())
@@ -140,16 +138,14 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
         search_response = json.loads(r.text)
         for item in search_response.get('items', []):
             duration = yt_time(item['contentDetails']['duration'])
-            if duration > duration_limit:
-                video_id = item['id']
-                videos.pop(video_id)
-                videos_list.remove(video_id)
+            if duration > duration_limit: videos.pop(item['id'])
 
     if kind == 'video':
         while result > 0:
             try:
-                video_id = videos_list[result - 1]
-                title, desc = videos[video_id]
+                video_id = list(videos.items())[result - 1][0]
+                # video_id = videos_list[result - 1]
+                # title, desc = videos[video_id]
                 break
             except IndexError: result -= 1
     else:
@@ -165,7 +161,8 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
                 'playlist': f'https://www.youtube.com/playlist?list={playlist_id}'}
     url = url_dict[kind]
     if 'None' in url: url = f'No {kind} found'
-    if return_info:
+    if return_info and url != f'No {kind} found':
+        title = videos[video_id][0]
         return url, fix_youtube_title(title), video_id
     else:
         return url
@@ -206,6 +203,7 @@ def youtube_download(url):
 
 
 def get_video_id(url):
+    # This was taken from StackOverflow
     # Examples:
     # - http://youtu.be/SA2iWivDJiE
     # - http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu
@@ -361,7 +359,6 @@ def send_email(recipient, name=''):  # TODO: for later
 if __name__ == "__main__":
     # print(get_related_video('PczuoZJ-PtM'))
     # vid_id = 'tjRFBaPmWwM'
-    print(youtube_search('euan ellis u.f.o'))
-    # print(youtube_search('the grand sound livestream'))
+    a, b, c = youtube_search('The grand sound livestream', return_info=True, limit_duration=True)
     # print(get_video_title(vid_id))
 
