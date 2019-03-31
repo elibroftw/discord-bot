@@ -196,7 +196,8 @@ def remove_silence(input_file, output_file):
     os.remove(input_file)
 
 
-ydl_opts = {
+def youtube_download(url_or_video_id):
+    ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
@@ -211,13 +212,6 @@ ydl_opts = {
         'audio-quality': 0
     }
 
-
-async def youtube_download_a(url_or_video_id):
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url_or_video_id])
-
-
-def youtube_download(url_or_video_id):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url_or_video_id])
         # TODO: detect then remove silence
