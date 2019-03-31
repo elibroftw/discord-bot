@@ -368,6 +368,11 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
     If it doesn't exist, download it
     returns None if it exists, or discord.Message object of the downloading title if it doesn't
     """
+
+    def callback():
+        await m.edit(content=msg_content)
+        download_queues[ctx.guild].pop(video_id)
+
     title = fix_youtube_title(title)
     music_filepath = f'Music/{title} - {video_id}.mp3'
     m = None
@@ -376,7 +381,7 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
         if in_background:
             result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
             msg_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the play queue'
-            result.add_done_callback(lambda: await m.edit(content=msg_content))
+            result.add_done_callback(callback)
             try: download_queues[ctx.guild][video_id] = (result, m)
             except KeyError: download_queues[ctx.guild] = {video_id: (result, m)}
         else: youtube_download(video_id)
@@ -435,8 +440,8 @@ async def play_file(ctx):
                             download_queues[guild] = {}
                         if next_result:
                             get_yield(next_result)
-                        else:
-                            next_m = await download_if_not_exists(ctx, title, video_id, in_background=False)
+                            download_queues[guild].pop(next_result)
+                        else: next_m = await download_if_not_exists(ctx, title, video_id, in_background=False)
                         next_m = None
                     next_song = mq[0]
                     next_title = next_song.title
@@ -467,7 +472,9 @@ async def play_file(ctx):
         except KeyError:
             result, m = None, None
             download_queues[guild] = {}
-        if result: get_yield(result)
+        if result:
+            get_yield(result)
+            download_queues[guild].pop(video_id)
         else: m = await download_if_not_exists(ctx, title, video_id, in_background=False)
         is_stopped_dict[guild] = False
         voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
