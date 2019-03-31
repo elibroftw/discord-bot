@@ -428,7 +428,7 @@ async def play_file(ctx):
                         url, next_title, next_video_id = get_related_video(mq[0].video_id, dq)
                         next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id))
                         mq.append(Song(next_title, next_video_id))
-                        next_msg_content = f'Added `{next_title}` to the queue'
+                        next_msg_content = f'Added `{next_title}` to the play queue'
                         if next_m: run_coro(next_m.edit(content=next_msg_content))
                         else: run_coro(ctx.send(next_msg_content))
 
@@ -501,7 +501,7 @@ async def play(ctx):
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
             m = await download_if_not_exists(ctx, title, video_id)
-            m_content = f'Added `{title}` to the queue'
+            m_content = f'Added {title} to next up' if play_next else f'Added `{title}` to the play queue'
             if not m: await ctx.send(m_content)
             else: await m.edit(content=m_content)
         else: await play_file(ctx)  # download if need to and then play the song
@@ -545,7 +545,7 @@ async def _auto_play(ctx, setting: bool = None):
             # do on separate thread ???s
             m = await download_if_not_exists(ctx, title, video_id)
             mq.append(Song(title, video_id))
-            msg_content = f'Added `{title}` to the queue'
+            msg_content = f'Added `{title}` to the play queue'
             if m: await m.edit(content=msg_content)
             else: await ctx.send(msg_content)
 
