@@ -89,7 +89,6 @@ async def create_role(ctx):
         print(f'{ctx.message.author} created role {role_name}')
 
 
-# TODO: delete_role
 @bot.command(pass_context=True)
 async def add_role(ctx):
     if str(ctx.message.author.top_role) == 'Admin':
@@ -129,18 +128,8 @@ async def youtube(ctx):
         await bot.say('ERROR: No search parameter given')
 
 
-# @bot.command(pass_context=True, aliases=['gettweet', 'get_tweet'])
-# async def twitter(ctx):
-#     # TODO: add --integer to define how many statuses, use regex
-#     # TODO: add a clamp (3 for this 10 for the next) so nobody can abuse the system
-#     msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])  # TODO: execpt ValueError
-
-
 @bot.command(pass_context=True, aliases=['gettweet', 'get_tweet'])
 async def twitter(ctx):
-    # TODO: add --integer to define how many statuses, use regex
-    # TODO: add a clamp (3 for this 10 for the next) so nobody can abuse the system
-    # msg = discord_get_tweet_from()  # TODO: except ValueError
     text = ctx.message.content[ctx.message.content.index(' ') + 1:]
     redirect = False
     msg = '\n[Name | Screen name]```'
@@ -155,7 +144,7 @@ async def twitter(ctx):
 
 @bot.command(pass_context=True, aliases=['searchuser' 'search_user'])
 async def search_twitter_user(ctx):
-    text = ctx.message.content[ctx.message.content.index(' ') + 1:]  # TODO: except ValueError
+    text = ctx.message.content[ctx.message.content.index(' ') + 1:]  # except ValueError
     bot_message = discord_search_twitter_user(text)
     await bot.say(bot_message)
 
@@ -193,7 +182,7 @@ async def clear(ctx):
 
 
 @bot.command(aliases=['shop', 'math', 'ban', 'remove_role', 'delete_role'])
-async def todo():  # TODO
+async def todo():
     await bot.say('This command still needs to be implemented!')
 
 
@@ -202,11 +191,6 @@ async def _eval(ctx):
     if str(ctx.message.author.top_role) == 'Admin':
         await bot.say(str(eval(ctx.message.content[6:])))
         print(f'{ctx.message.author} used eval')
-
-
-@bot.command(pass_context=True, aliases=['invite', 'invitecode', 'invite_link', 'invitelink'])
-async def invite_code(ctx):  # Todo: maybe get rid of channel=
-    await bot.say(discord.Invite(channel=ctx.message.channel, code=invitation_code).url)
 
 
 @bot.command()
@@ -225,9 +209,6 @@ async def games():
 async def ttt(ctx):
     global ttt_round, players_in_game, tic_tac_toe_data, timers
     author = str(ctx.message.author)
-    # TODO: Make tic tac toe lobby's so that when a player starts a game in a lobby,
-    #  only they are allowed to send messages to the channel
-    # print(message.author.top_role.is_everyone) checks if role is @everyone
     if time.time() - timers[0][1] < 120:
         await bot.say('There is another tic-tac-toe game in progress')
     else:
@@ -235,14 +216,13 @@ async def ttt(ctx):
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
         await bot.say(msg)
         ttt_round = 0
-        players_in_game.clear()  # TODO: DELETE ANY DICTIONARY ENTRIES OF PLAYERS THAT AREN'T IN GAME
+        players_in_game.clear()
         tic_tac_toe_data[author] = {'username': author, 'comp_moves': [], 'user_moves': [], 'danger': None,
                                     'danger2': None, 'game_over': False}
         players_in_game.append(author)
         timers[0][1] = time.time()
         user_msg, in_game, game_channel = None, True, ctx.message.channel
 
-        # TODO: Change the parameter name
         def check_yn(response_msg):
             correct_channel = response_msg.channel == game_channel
             response_msg = response_msg.content.lower()
@@ -288,14 +268,13 @@ async def ttt(ctx):
                     tempt, win = tictactoe.tic_tac_toe_move(ttt_round, tic_tac_toe_data[author])
                     if tic_tac_toe_data[author]['game_over']:
                         timers[0][1] = 0
-                        # TODO: CLEAN ALL OF THIS UP
                         players_in_game.remove(author)
                         in_game = False
                         if ttt_round == 5:
                             await bot.say(f'Your Move{temp_msg+tempt}')
                         else:
                             await bot.say(f'Your Move{temp_msg}My Move{tempt}')
-                    else:  # TODO: rich embed???
+                    else:
                         await bot.say(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
                         timers[0][1] = time.time()
                     ttt_round += 1
