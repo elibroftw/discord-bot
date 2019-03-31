@@ -2,7 +2,6 @@ from __future__ import unicode_literals
 import smtplib
 import socket
 import ssl
-import time
 from collections import namedtuple, OrderedDict
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -131,7 +130,6 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
     title, video_id, desc, channel_id, playlist_id, an_id = None, None, None, None, None, None
     if limit_duration:
         duration_dict = get_video_durations(videos.keys())
-        pprint(duration_dict)
         for video_id, duration in duration_dict.items():
             if duration > duration_limit: videos.pop(video_id)
 
@@ -175,6 +173,14 @@ def get_video_durations(video_ids):
     return return_dict
 
 
+def remove_silence(input_file, output_file):
+    if input_file == output_file:
+        return False
+    args = f'-i "{input_file}" -af silenceremove=start_periods=1:stop_periods=1:detection=peak "{output_file}"'
+    os.system(r'ffmpeg\bin\ffmpeg -loglevel quiet ' + args)
+    os.remove(input_file)
+
+
 def youtube_download(url):
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -183,17 +189,22 @@ def youtube_download(url):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'postprocessor_args': None,
-        'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
-        'ffmpeg_location': 'ffmpeg/bin/',
+        # 'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
+        'outtmpl': 'Music/%(id)s.%(ext)s',
+        # 'verbose': True,
         'quiet': True,
         'audio-quality': 0
     }
     # TODO: use a download accelerator
     # TODO: remove silence from beginning and end of file
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-        # info_dict = ydl.extract_info(url, download=False)
+        # ydl.download([url])
+        info_dict = ydl.extract_info(url, download=True)
+        title = info_dict['title']
+        video_id = info_dict['display_id']
+        input_file = f'Music/{video_id}.mp3'
+        output_file = f'Music/{title} - {video_id}.mp3'
+        remove_silence(input_file, output_file)
         # return info_dict
 
 
@@ -356,5 +367,6 @@ if __name__ == "__main__":
     # print(get_related_video('PczuoZJ-PtM'))
     # vid_id = 'tjRFBaPmWwM'
     # a, b, c = youtube_search('The grand sound livestream', return_info=True, limit_duration=True)
-    print(youtube_search('slow'))
+    # print(youtube_search('slow'))
+    youtube_download(youtube_search('Slow'))
     # print(get_video_title(vid_id))

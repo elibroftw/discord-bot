@@ -497,14 +497,14 @@ async def play(ctx):
             else: mq.append(song)
         else: music_queues[guild] = {'music_queue': [song], 'done_queue': []}
 
-        # play song if nothing is playing
+        # download the song if something is already being played
         if voice_client.is_playing() or voice_client.is_paused():
-            # download if you need to add it to queue
+            # download if your not going to play the file
             m = await download_if_not_exists(ctx, title, video_id)
             m_content = f'Added `{title}` to the queue'
             if not m: await ctx.send(m_content)
             else: await m.edit(content=m_content)
-        else: await play_file(ctx)
+        else: await play_file(ctx)  # download if need to and then play the song
 
     else:
         # TODO: change bot presence
