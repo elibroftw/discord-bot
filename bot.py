@@ -1,6 +1,9 @@
 import asyncio
+import time
 from copy import deepcopy
 from datetime import datetime
+
+import concurrent.futures
 import discord
 from discord import FFmpegPCMAudio
 from discord.ext import commands
@@ -351,7 +354,7 @@ async def summon(ctx):
             await voice_client.move_to(channel)
 
 
-def run_coro(coro):
+def run_coro(coro: asyncio.coroutine):
     # e.g. coro = bot.change_presence(activity=discord.Game('Prison Break (!)'))
     fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
     return fut.result()
@@ -369,19 +372,27 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
     returns None if it exists, or discord.Message object of the downloading title if it doesn't
     """
 
-    def callback():
-        await m.edit(content=msg_content)
-        download_queues[ctx.guild].pop(video_id)
-
     title = fix_youtube_title(title)
     music_filepath = f'Music/{title} - {video_id}.mp3'
     m = None
     if not os.path.exists(music_filepath):
         m = await ctx.channel.send(f'Downloading `{title}`')
+
         if in_background:
-            result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
-            msg_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the play queue'
-            result.add_done_callback(callback)
+            async def callback():
+                youtube_download(video_id)
+                msg_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
+                await m.edit(content=msg_content)
+                download_queues[ctx.guild].pop(video_id)
+            result = bot.loop.create_task(callback())
+            # with concurrent.futures.ThreadPoolExecutor() as pool:
+            #     result: asyncio.Future = bot.loop.run_in_executor(pool, youtube_download, video_id)
+            #     result.add_done_callback(callback)
+            # result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
+            # result.add_done_callback(callback)
+            # temp_coro = asyncio.coroutine(youtube_download)
+
+            # I got a `TypeError: a coroutine was expected, got <Future pending`
             try: download_queues[ctx.guild][video_id] = (result, m)
             except KeyError: download_queues[ctx.guild] = {video_id: (result, m)}
         else: youtube_download(video_id)
@@ -433,15 +444,14 @@ async def play_file(ctx):
                         next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
                         mq.append(Song(next_title, next_video_id))
                     else:  # NOTE: was here last
-                        try:
-                            next_result, next_m = download_queues[guild].get(video_id, (None, None))
+                        try: next_result, next_m = download_queues[guild].get(video_id, (None, None))
                         except KeyError:
                             next_result, next_m = None, None
                             download_queues[guild] = {}
                         if next_result:
                             get_yield(next_result)
                             download_queues[guild].pop(next_result)
-                        else: next_m = await download_if_not_exists(ctx, title, video_id, in_background=False)
+                        else: next_m = run_coro(download_if_not_exists(ctx, title, video_id, in_background=False))
                         next_m = None
                     next_song = mq[0]
                     next_title = next_song.title
@@ -454,9 +464,10 @@ async def play_file(ctx):
 
                     if setting and len(mq) == 1:
                         url, next_title, next_video_id = get_related_video(mq[0].video_id, dq)
-                        run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=True))
+                        next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=True))
                         mq.append(Song(next_title, next_video_id))
-                        # if next_m: run_coro(next_m.edit(content=next_msg_content))
+                        next_msg_content = f'Added `{next_title}` to the playing queue'
+                        if not next_m: run_coro(next_m.edit(content=next_msg_content))
                         # else: run_coro(ctx.send(next_msg_content))
 
             else:
@@ -534,7 +545,7 @@ async def play(ctx):
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
             await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
-            # m_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the play queue'
+            # m_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
             # if not m: await ctx.send(m_content)
             # else: await m.edit(content=m_content)
         else: await play_file(ctx)  # download if need to and then play the song
@@ -575,11 +586,11 @@ async def _auto_play(ctx, setting: bool = None):
         if len(mq) == 1:
             song_id = mq[0].video_id
             url, title, video_id, = get_related_video(song_id, dq)
-            await download_if_not_exists(ctx, title, video_id, in_background=True)
             mq.append(Song(title, video_id))
-            # msg_content = f'Added `{title}` to the play queue'
-            # if m: await m.edit(content=msg_content)
-            # else: await ctx.send(msg_content)
+            m = await download_if_not_exists(ctx, title, video_id, in_background=True)
+            msg_content = f'Added `{title}` to the playing queue'
+            if not m: await ctx.send(msg_content)
+            # else: await m.edit(content=msg_content)
 
 
 @bot.command(name='repeat', aliases=['r'])
