@@ -365,7 +365,7 @@ async def download_if_not_exists(ctx, title, video_id):
     music_filepath = f'Music/{title} - {video_id}.mp3'
     if not os.path.exists(music_filepath):
         m: discord.Message = await ctx.channel.send(f'Downloading `{title}`')
-        youtube_download(f'https://www.youtube.com/watch?v={video_id}')
+        youtube_download(video_id)
         return m
     return None
 

@@ -183,7 +183,7 @@ def remove_silence(input_file, output_file):
     os.remove(input_file)
 
 
-def youtube_download(url):
+def youtube_download(url_or_video_id):
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -199,8 +199,8 @@ def youtube_download(url):
     }
     # TODO: use a download accelerator
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        # ydl.download([url])
-        info_dict = ydl.extract_info(url, download=True)
+        # ydl.download([url_or_video_id])
+        info_dict = ydl.extract_info(url_or_video_id, download=True)
         title = info_dict['title']
         video_id = info_dict['display_id']
         input_file = f'Music/{video_id}.mp3'
@@ -366,8 +366,9 @@ def send_email(recipient, name='', subject=''):  # NOTE: for later
 
 if __name__ == "__main__":
     # print(get_related_video('PczuoZJ-PtM'))
-    # vid_id = 'tjRFBaPmWwM'
+    vid_id = 'tjRFBaPmWwM'
+    # youtube_download(vid_id)
     # a, b, c = youtube_search('The grand sound livestream', return_info=True, limit_duration=True)
     # print(youtube_search('slow'))
-    youtube_download(youtube_search('Slow'))
+    # youtube_download(youtube_search('Slow'))
     # print(get_video_title(vid_id))
