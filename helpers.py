@@ -1,7 +1,10 @@
 from __future__ import unicode_literals
+
+import glob
 import smtplib
 import socket
 import ssl
+import sys
 from collections import namedtuple, OrderedDict
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -80,7 +83,7 @@ def yt_time(duration="P1W2DT6H21M32S"):
 def fix_youtube_title(title):
     # !p you think i aint worth a dollar
     return title.replace('&quot;', '\'').replace('&amp;', '&').replace(
-        '/', '_').replace('?', '').replace(':', ' -').replace('&#39;', "'")
+        '/', '_').replace('?', '').replace(':', ' -').replace('&#39;', "'").replace(' || ', '_')
 
 
 def youtube_search(text, return_info=False, limit_duration=False, duration_limit=600):
@@ -175,37 +178,55 @@ def get_video_durations(video_ids):
     return return_dict
 
 
+def detect_silence(input_file):
+    # https://stackoverflow.com/a/42509904/7732434
+    ffmpeg_location = r'ffmpeg\bin\ffmpeg'
+    args_1 = f'{ffmpeg_location} -i {input_file} -af silencedetect=d=0.2 -f null - 2>&1 -loglevel quiet'
+    yes_or_no = os.system(args_1)
+    # yes_or_no = yes_or_no.split('\n')
+    return yes_or_no
+
+
 def remove_silence(input_file, output_file):
     if input_file == output_file:
         return False
+    ffmpeg_location = r'ffmpeg\bin\ffmpeg'
     args = f'-i "{input_file}" -af silenceremove=start_periods=1:stop_periods=1:detection=peak "{output_file}"'
-    os.system(r'ffmpeg\bin\ffmpeg -loglevel quiet ' + args)
+    os.system(f'{ffmpeg_location} -loglevel quiet ' + args)
     os.remove(input_file)
 
 
-def youtube_download(url_or_video_id):
-    ydl_opts = {
+ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        # 'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
-        'outtmpl': 'Music/%(id)s.%(ext)s',
+        'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
+        # 'outtmpl': 'Music/%(id)s.%(ext)s',
+        'external-downloader': 'aria2c',
         # 'verbose': True,
         'quiet': True,
         'audio-quality': 0
     }
-    # TODO: use a download accelerator
+
+
+async def youtube_download_a(url_or_video_id):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        # ydl.download([url_or_video_id])
-        info_dict = ydl.extract_info(url_or_video_id, download=True)
-        title = info_dict['title']
-        video_id = info_dict['display_id']
-        input_file = f'Music/{video_id}.mp3'
-        output_file = f'Music/{title} - {video_id}.mp3'
-        remove_silence(input_file, output_file)
+        ydl.download([url_or_video_id])
+
+
+def youtube_download(url_or_video_id):
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url_or_video_id])
+        # TODO: detect then remove silence
+        # info_dict = ydl.extract_info(url_or_video_id, download=True)
+        # title = info_dict['title']
+        # video_id = info_dict['display_id']
+        # input_file = f'Music/{video_id}.mp3'
+        # output_file = f'Music/{fix_youtube_title(title)} - {video_id}.mp3'
+        # remove_silence(input_file, output_file)
         # return info_dict
 
 
@@ -364,10 +385,19 @@ def send_email(recipient, name='', subject=''):  # NOTE: for later
     s.quit()
 
 
+def search_for(directory, contains):
+    contains_list = []
+    for file in glob.glob(f'{directory}/*'):
+        if contains in file:
+            contains_list.append(file)
+    return contains_list
+
+
 if __name__ == "__main__":
     # print(get_related_video('PczuoZJ-PtM'))
-    vid_id = 'tjRFBaPmWwM'
-    # youtube_download(vid_id)
+    # vid_id = 'QnccxyatrD0'
+    vid_id = get_video_id(youtube_search('Suge'))
+    youtube_download(vid_id)
     # a, b, c = youtube_search('The grand sound livestream', return_info=True, limit_duration=True)
     # print(youtube_search('slow'))
     # youtube_download(youtube_search('Slow'))
