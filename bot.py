@@ -44,10 +44,10 @@ async def on_ready():
 
 @bot.event
 async def on_member_join(member):
-    server = member.server
-    msg = f'Welcome inmate {member.mention} to the {server.name} server!\n'
-    # await bot.send_message(server, msg)
-    msg += 'Use !help for my functions'
+    guild = member.guild
+    msg = f'Welcome inmate {member.mention} to the {guild} server!\n'
+    # await bot.send_message(guild, msg)
+    msg = 'Use !help for my functions'
     await member.send_message(member, msg)  # untested
 
 

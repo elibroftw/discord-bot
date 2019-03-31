@@ -78,7 +78,9 @@ def yt_time(duration="P1W2DT6H21M32S"):
 #     return embed
 
 def fix_youtube_title(title):
-    return title.replace('&quot;', '\'').replace('&amp;', '&').replace('/', '_').replace('?', '').replace(':', ' -')
+    # !p you think i aint worth a dollar
+    return title.replace('&quot;', '\'').replace('&amp;', '&').replace(
+        '/', '_').replace('?', '').replace(':', ' -').replace('&#39;', "'")
 
 
 def youtube_search(text, return_info=False, limit_duration=False, duration_limit=600):
@@ -196,7 +198,6 @@ def youtube_download(url):
         'audio-quality': 0
     }
     # TODO: use a download accelerator
-    # TODO: remove silence from beginning and end of file
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         # ydl.download([url])
         info_dict = ydl.extract_info(url, download=True)
