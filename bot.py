@@ -1,6 +1,9 @@
 import asyncio
+# noinspection PyUnresolvedReferences
+import time
 from copy import deepcopy
 from datetime import datetime
+
 import discord
 from discord import FFmpegPCMAudio
 from discord.ext import commands
@@ -11,7 +14,7 @@ from subprocess import run
 
 import tictactoe
 from helpers import youtube_download, youtube_search, get_related_video, get_video_id, get_video_title, load_opus_lib, \
-    update_net_worth, check_net_worth, Song, get_video_duration
+    update_net_worth, check_net_worth, Song, get_video_duration, fix_youtube_title
 
 # TODO: make a website
 bot = commands.Bot(command_prefix='!')
@@ -31,6 +34,8 @@ play_next_dict = {}
 is_stopped_dict = {}
 repeat_dict = {}
 repeat_all_dict = {}
+download_queues = {}
+# TODO: {guild: {'music', 'done', 'play_next', 'is_stopped', 'repeat', 'repeat_all', 'download_queues'}}
 
 with open('help.txt') as f:
     help_message = f.read()
@@ -45,10 +50,9 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
     guild = member.guild
-    msg = f'Welcome inmate {member.mention} to the {guild} server!\n'
-    # await bot.send_message(guild, msg)
-    msg = 'Use !help for my functions'
-    await member.send_message(member, msg)  # untested
+    msg = f'Welcome inmate {member.mention} to {guild}!\n'
+    msg += 'Use !help for my functions'
+    await member.send_message(member, msg)
 
 
 @bot.event
@@ -356,13 +360,19 @@ def run_coro(coro):
     return fut.result()
 
 
-async def download_if_not_exists(ctx, title, video_id):
+def get_yield(fut):
+    d = yield from fut
+    return d
+
+
+async def download_if_not_exists(ctx, title, video_id, in_background=False, play_next=False):
     """
     Checks if file corresponding to title and video_id exists
     If it doesn't exist, download it
     returns None if it exists, or discord.Message object of the downloading title if it doesn't
     """
     music_filepath = f'Music/{title} - {video_id}.mp3'
+    # music_filepath = f'Music/{video_id}.mp3'
     if not os.path.exists(music_filepath):
         m: discord.Message = await ctx.channel.send(f'Downloading `{title}`')
         youtube_download(video_id)
@@ -462,9 +472,8 @@ async def play(ctx):
     # TODO: rename done queue to recently played
     # TODO: rename music_queue to next up
     # TODO: add repeat play option
-    # TODO: playlist support
     # TODO: time remaining command + song length command
-    # TODO: make a dict of guild keys with values being text channels for the music-commands???
+    # TODO: download option
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     ctx_msg_content = ctx.message.content
@@ -477,6 +486,7 @@ async def play(ctx):
         url_or_query = ' '.join(url_or_query[1:])
     if url_or_query and type(url_or_query) != list:
         if url_or_query.startswith('https://'):
+            # TODO: playlist support
             url = url_or_query
             video_id = get_video_id(url)
             title = get_video_title(video_id)
@@ -500,14 +510,13 @@ async def play(ctx):
         # download the song if something is already being played
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
-            m = await download_if_not_exists(ctx, title, video_id)
-            m_content = f'Added {title} to next up' if play_next else f'Added `{title}` to the play queue'
+            m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
+            m_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
             if not m: await ctx.send(m_content)
             else: await m.edit(content=m_content)
         else: await play_file(ctx)  # download if need to and then play the song
 
     else:
-        # TODO: change bot presence
         if (voice_client.is_playing() or voice_client.is_paused()) and not play_next:
             await bot.get_command('pause').callback(ctx)
         else: await play_file(ctx)
@@ -519,7 +528,8 @@ async def play(ctx):
 async def pause(ctx):
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice_client:
-        if voice_client.is_paused(): voice_client.resume()
+        await bot.change_presence(activity=discord.Game('Prison Break (!)'))
+        if voice_client.is_paused(): voice_client.resume()  # TODO: change presence again
         else: voice_client.pause()
 
 
@@ -542,7 +552,6 @@ async def _auto_play(ctx, setting: bool = None):
         if len(mq) == 1:
             song_id = mq[0].video_id
             url, title, video_id, = get_related_video(song_id, dq)
-            # do on separate thread ???s
             m = await download_if_not_exists(ctx, title, video_id)
             mq.append(Song(title, video_id))
             msg_content = f'Added `{title}` to the play queue'
@@ -578,11 +587,11 @@ async def _repeat_all(ctx, setting: bool = None):
 
     if setting:
         await ctx.send('Repeating all set to True')
+        auto_play_dict[guild] = False
         if voice_client and not voice_client.is_playing() and not voice_client.is_paused():
             mq = music_queues[guild]['music_queue']
             dq = music_queues[guild]['done_queue']
             if not mq and dq:
-                auto_play_dict[guild] = False
                 music_queues[guild]['music_queue'] = dq[::-1]
                 dq.clear()
                 await play_file(ctx)
