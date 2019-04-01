@@ -52,7 +52,7 @@ async def on_member_join(member):
     guild = member.guild
     msg = f'Welcome inmate {member.mention} to {guild}!\n'
     msg += 'Use !help for my functions'
-    await member.send_message(member, msg)  # untested
+    await member.send_message(member, msg)
 
 
 @bot.event
