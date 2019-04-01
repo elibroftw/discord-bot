@@ -203,8 +203,8 @@ def youtube_download(url_or_video_id):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
-        # 'outtmpl': 'Music/%(id)s.%(ext)s',
+        # 'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
+        'outtmpl': 'Music/%(id)s.%(ext)s',
         'external-downloader': 'aria2c',
         # 'verbose': True,
         'quiet': True,
@@ -219,7 +219,7 @@ def youtube_download(url_or_video_id):
         # pprint(info_dict)
         # video_id = info_dict['display_id']
         # input_file = f'Music/{video_id}.mp3'
-        # output_file = f'Music/{fix_youtube_title(title)} - {video_id}.mp3'
+        # output_file = f'Music/{video_id}.mp3'
         # remove_silence(input_file, output_file)
         # return info_dict
 
@@ -245,7 +245,8 @@ def get_video_title(video_id):
     # pylint: disable=no-member
     response = youtube_API.videos().list(id=video_id, part='snippet').execute()
     title = response['items'][0]['snippet']['title']
-    return fix_youtube_title(title)
+    return title
+    # return fix_youtube_title(title)  # NOTE: file friendly title
 
 
 def get_related_video(video_id, done_queue):
