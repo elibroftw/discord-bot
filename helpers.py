@@ -81,7 +81,6 @@ def yt_time(duration="P1W2DT6H21M32S"):
 #     return embed
 
 def fix_youtube_title(title):
-    # !p you think i aint worth a dollar
     return title.replace('&quot;', '\'').replace('&amp;', '&').replace(
         '/', '_').replace('?', '').replace(':', ' -').replace('&#39;', "'").replace(' || ', '_')
 
