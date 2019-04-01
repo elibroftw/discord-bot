@@ -24,19 +24,10 @@ invitation_code = os.environ['INVITATION_CODE']
 load_opus_lib()
 ttt_round = 0
 players_in_game = []
-tic_tac_toe_data: dict = {}
+tic_tac_toe_data = {}
 ttt_games = {}
 ffmpeg_path = 'ffmpeg/bin/ffmpeg'
-
 data_dict = {'downloads': {}}
-# TODO: {guild: {'music', 'done', 'play_next', 'is_stopped', 'repeat', 'repeat_all', 'download_queues'}}
-# auto_play_dict = {}
-# play_next_dict = {}
-# is_stopped_dict = {}
-# repeat_dict = {}
-# repeat_all_dict = {}
-# download_queues = {}
-
 
 with open('help.txt') as f:
     help_message = f.read()
@@ -47,7 +38,6 @@ async def on_ready():
     for guild in bot.guilds:
         data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False,
                             'repeat': False, 'repeat_all': False, 'auto_play': False, 'downloads': {}}
-        # TODO: create guild dictionaries
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
@@ -182,7 +172,7 @@ async def restart(ctx):
 # async def twitter(ctx):
 #     # TODO: add --integer to define how many statuses, use regex
 #     # TODO: add a clamp (3 for this 10 for the next) so nobody can abuse the system
-#     msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])  # TODO: execpt ValueError
+#     msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])  # TODO: except ValueError
 #     await ctx.send(msg)
 #
 #
@@ -499,11 +489,7 @@ async def play(ctx):
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     ctx_msg_content = ctx.message.content
     play_next = any([cmd in ctx_msg_content for cmd in ('pn', 'play_next', 'playnext')])
-    try: guild_data = data_dict[guild]
-    except KeyError:
-        data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False,
-                            'repeat': False, 'repeat_all': False, 'auto_play': False, 'downloads': {}}
-        guild_data = data_dict[guild]
+    guild_data = data_dict[guild]
     mq = guild_data['music']
     if voice_client is None:
         await bot.get_command('summon').callback(ctx)
@@ -561,10 +547,7 @@ async def pause(ctx):
 async def _auto_play(ctx, setting: bool = None):
     """Turns auto play on or off"""
     guild = ctx.guild
-    try: guild_data = data_dict[guild]
-    except KeyError:
-        guild_data = data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'repeat': False,
-                                          'repeat_all': False, 'auto_play': False, 'downloads': {}}
+    guild_data = data_dict[guild]
     if setting is None: setting = not guild_data['auto_play']
     guild_data['auto_play'] = setting
 
@@ -591,10 +574,7 @@ async def _auto_play(ctx, setting: bool = None):
 async def _repeat(ctx, setting: bool = None):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    try: guild_data = data_dict[guild]
-    except KeyError:
-        guild_data = data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'repeat': False,
-                                         'repeat_all': False, 'auto_play': False, 'downloads': {}}
+    guild_data = data_dict[guild]
     if setting is None: setting = not guild_data['repeat']
     data_dict[guild]['repeat'] = setting
     if setting:
@@ -612,10 +592,7 @@ async def _repeat(ctx, setting: bool = None):
 async def _repeat_all(ctx, setting: bool = None):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    try: guild_data = data_dict[guild]
-    except KeyError:
-        guild_data = data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False,
-                                         'repeat': False, 'repeat_all': False, 'auto_play': False, 'downloads': {}}
+    guild_data = data_dict[guild]
     if setting is None:
         setting = not data_dict[guild]['repeat_all']
     data_dict[guild]['repeat_all'] = setting
@@ -639,9 +616,6 @@ async def skip(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     guild_data = data_dict[guild]
-    # except KeyError:
-    #     guild_data = data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'repeat': False,
-    #                                      'repeat_all': False, 'auto_play': False, 'downloads': {}}
     mq = guild_data['music']
     dq = guild_data['done']
     if voice_client:
@@ -656,10 +630,7 @@ async def previous(ctx, times=1):
     # TODO: make it a partial democracy but mods and admins can bypass it
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    try: guild_data = data_dict[guild]
-    except KeyError:
-        guild_data = data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'repeat': False,
-                                         'repeat_all': False, 'auto_play': False, 'downloads': {}}
+    guild_data = data_dict[guild]
     if voice_client:
         mq = guild_data['music']
         ph = guild_data['done']
@@ -680,21 +651,17 @@ async def previous(ctx, times=1):
 async def next_up(ctx):
     # TODO: rich embed?
     guild = ctx.guild
-    try:
-        mq = data_dict[guild]['music']
-        if mq:
-            if data_dict[guild]['auto_play']: msg = 'MUSIC QUEUE | AUTO PLAY ENABLED'
-            else: msg = 'MUSIC QUEUE | AUTO PLAY DISABLED'
-            for i, song in enumerate(mq):
-                if i == 10:
-                    msg += '\n...'
-                    break
-                msg += f'\n{i} `{song.title}`' if i > 0 else f'\nCurrently Playing `{song.title}`'
-            await ctx.send(msg)
-        else: await ctx.send('MUSIC QUEUE IS EMPTY')
-    except KeyError:
-        data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False,
-                            'repeat': False, 'repeat_all': False, 'auto_play': False, 'downloads': {}}
+    mq = data_dict[guild]['music']
+    if mq:
+        if data_dict[guild]['auto_play']: msg = 'MUSIC QUEUE | AUTO PLAY ENABLED'
+        else: msg = 'MUSIC QUEUE | AUTO PLAY DISABLED'
+        for i, song in enumerate(mq):
+            if i == 10:
+                msg += '\n...'
+                break
+            msg += f'\n{i} `{song.title}`' if i > 0 else f'\nCurrently Playing `{song.title}`'
+        await ctx.send(msg)
+    else: await ctx.send('MUSIC QUEUE IS EMPTY')
 
 
 @bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
@@ -702,20 +669,16 @@ async def _recently_played(ctx):
     # TODO: rich embed?
     # TODO: make a play_history list that never gets modified and takes in a parameter page_number
     guild = ctx.guild
-    try:
-        dq = data_dict[guild]['done']
-        if dq:
-            msg = 'RECENTLY PLAYED'
-            for i, song in enumerate(dq):
-                if i == 10:
-                    msg += '\n...'
-                    break
-                msg += f'\n-{i + 1} `{song.title}`'
-            await ctx.send(msg)
-        else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
-    except KeyError:
-        data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False,
-                            'repeat': False, 'repeat_all': False, 'auto_play': False, 'downloads': {}}
+    dq = data_dict[guild]['done']
+    if dq:
+        msg = 'RECENTLY PLAYED'
+        for i, song in enumerate(dq):
+            if i == 10:
+                msg += '\n...'
+                break
+            msg += f'\n-{i + 1} `{song.title}`'
+        await ctx.send(msg)
+    else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
@@ -734,26 +697,21 @@ async def fast_forward(ctx):  # TODO
 @bot.command(aliases=['np', 'currently_playing', 'cp'])
 async def now_playing(ctx):
     guild = ctx.guild
-    try:
-        mq = data_dict[guild]['music']
-        await ctx.send(f'Currently playing: https://www.youtube.com/watch?v={mq[0].video_id}')
-    except KeyError:
-        data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False,
-                            'repeat': False, 'repeat_all': False, 'auto_play': False}
+    mq = data_dict[guild]['music']
+    await ctx.send(f'Currently playing: https://www.youtube.com/watch?v={mq[0].video_id}')
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
 async def leave(ctx):
     # clear music queue
     guild = ctx.guild
-    try: data_dict[guild]['music'].clear()
-    except KeyError:
-        data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False,
-                            'repeat': False, 'repeat_all': False, 'auto_play': False}
-    data_dict[guild]['auto_play'] = False
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    if voice_client: await voice_client.disconnect()
-    await ctx.send('Stopped playing music, music que has been emptied')
+    if voice_client:
+        await voice_client.disconnect()
+        guild_data = data_dict[guild]
+        guild_data['music'].clear()
+        guild_data['auto_play'] = False
+        await ctx.send('Stopped playing music, music que has been emptied')
 
 
 @bot.command(aliases=['end'])
@@ -761,10 +719,7 @@ async def stop(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client and voice_client.is_playing():
-        try: data_dict[guild]['is_stopped'] = True
-        except KeyError: data_dict[guild] = {'music': [],
-                                             'done': [], 'is_stopped': True, 'repeat': False,
-                                             'repeat_all': False, 'auto_play': False}
+        data_dict[guild]['is_stopped'] = True
         voice_client.stop()
 
 
