@@ -722,7 +722,7 @@ async def now_playing(ctx):
     except KeyError: music_queues[guild] = {'music_queue': [], 'done_queue': []}
 
 
-@bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'l', 'd'])
+@bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
 async def leave(ctx):
     # clear music queue
     guild = ctx.guild
