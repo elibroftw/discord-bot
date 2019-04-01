@@ -82,7 +82,7 @@ def yt_time(duration="P1W2DT6H21M32S"):
 
 def fix_youtube_title(title):
     return title.replace('&quot;', '\'').replace('&amp;', '&').replace(
-        '/', '_').replace('?', '').replace(':', ' -').replace('&#39;', "'")
+        '/', '_').replace('?', '').replace(':', ' -').replace('&#39;', "'").replace(' || ', '_')
 
 
 def youtube_search(text, return_info=False, limit_duration=False, duration_limit=600):
@@ -213,11 +213,13 @@ def youtube_download(url_or_video_id):
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url_or_video_id])
-        # info_dict = ydl.extract_info(url_or_video_id, download=True)
-        # title = info_dict['title']
+        # TODO: detect then remove silence
+        # TODO: save files as video_id.mp3 cus fiend titles are a mess to deal with
+        # info_dict = ydl.extract_info(url_or_video_id, download=False)
+        # pprint(info_dict)
         # video_id = info_dict['display_id']
         # input_file = f'Music/{video_id}.mp3'
-        # output_file = f'Music/{title} - {video_id}.mp3'
+        # output_file = f'Music/{fix_youtube_title(title)} - {video_id}.mp3'
         # remove_silence(input_file, output_file)
         # return info_dict
 
@@ -388,8 +390,8 @@ def search_for(directory, contains):
 if __name__ == "__main__":
     # print(get_related_video('PczuoZJ-PtM'))
     # vid_id = 'QnccxyatrD0'
-    vid_id = get_video_id(youtube_search('Suge'))
-    youtube_download(vid_id)
+    # vid_id = get_video_id(youtube_search('Suge'))
+    youtube_download('tO_Qmip6Fb4')
     # a, b, c = youtube_search('The grand sound livestream', return_info=True, limit_duration=True)
     # print(youtube_search('slow'))
     # youtube_download(youtube_search('Slow'))
