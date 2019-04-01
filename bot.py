@@ -379,20 +379,13 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
         m = await ctx.channel.send(f'Downloading `{title}`')
 
         if in_background:
-            async def callback():
-                youtube_download(video_id)
+            def callback(_):
                 msg_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
-                await m.edit(content=msg_content)
+                bot.loop.create_task(m.edit(content=msg_content))
                 download_queues[ctx.guild].pop(video_id)
-            result = bot.loop.create_task(callback())
-            # with concurrent.futures.ThreadPoolExecutor() as pool:
-            #     result: asyncio.Future = bot.loop.run_in_executor(pool, youtube_download, video_id)
-            #     result.add_done_callback(callback)
-            # result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
-            # result.add_done_callback(callback)
-            # temp_coro = asyncio.coroutine(youtube_download)
+            result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
+            result.add_done_callback(callback)
 
-            # I got a `TypeError: a coroutine was expected, got <Future pending`
             try: download_queues[ctx.guild][video_id] = (result, m)
             except KeyError: download_queues[ctx.guild] = {video_id: (result, m)}
         else: youtube_download(video_id)
@@ -544,9 +537,9 @@ async def play(ctx):
         # download the song if something is already being played
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
-            await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
-            # m_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
-            # if not m: await ctx.send(m_content)
+            m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
+            m_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
+            if not m: await ctx.send(m_content)
             # else: await m.edit(content=m_content)
         else: await play_file(ctx)  # download if need to and then play the song
 
