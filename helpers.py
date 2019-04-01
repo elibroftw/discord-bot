@@ -215,8 +215,9 @@ def youtube_download(url_or_video_id):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url_or_video_id])
         # TODO: detect then remove silence
-        # info_dict = ydl.extract_info(url_or_video_id, download=True)
-        # title = info_dict['title']
+        # TODO: save files as video_id.mp3 cus fiend titles are a mess to deal with
+        # info_dict = ydl.extract_info(url_or_video_id, download=False)
+        # pprint(info_dict)
         # video_id = info_dict['display_id']
         # input_file = f'Music/{video_id}.mp3'
         # output_file = f'Music/{fix_youtube_title(title)} - {video_id}.mp3'
@@ -390,8 +391,8 @@ def search_for(directory, contains):
 if __name__ == "__main__":
     # print(get_related_video('PczuoZJ-PtM'))
     # vid_id = 'QnccxyatrD0'
-    vid_id = get_video_id(youtube_search('Suge'))
-    youtube_download(vid_id)
+    # vid_id = get_video_id(youtube_search('Suge'))
+    youtube_download('tO_Qmip6Fb4')
     # a, b, c = youtube_search('The grand sound livestream', return_info=True, limit_duration=True)
     # print(youtube_search('slow'))
     # youtube_download(youtube_search('Slow'))
