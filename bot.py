@@ -14,7 +14,7 @@ from subprocess import run
 
 import tictactoe
 from helpers import youtube_download, youtube_search, get_related_video, get_video_id, get_video_title, load_opus_lib, \
-    update_net_worth, check_net_worth, Song, get_video_duration, fix_youtube_title
+    update_net_worth, check_net_worth, Song, get_video_duration
 
 # TODO: make a website
 bot = commands.Bot(command_prefix='!')
@@ -372,10 +372,9 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
     returns None if it exists, or discord.Message object of the downloading title if it doesn't
     """
 
-    title = fix_youtube_title(title)
-    music_filepath = f'Music/{title} - {video_id}.mp3'
+    music_filepath = f'Music/{video_id}.mp3'
     m = None
-    if not os.path.exists(music_filepath):
+    if not os.path.exists(music_filepath):  # todo: check if its already being downloaded!!!
         m = await ctx.channel.send(f'Downloading `{title}`')
 
         if in_background:
@@ -383,6 +382,7 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
                 msg_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
                 bot.loop.create_task(m.edit(content=msg_content))
                 download_queues[ctx.guild].pop(video_id)
+
             result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
             result.add_done_callback(callback)
 
@@ -448,7 +448,7 @@ async def play_file(ctx):
                         # next_m = None
                     next_song = mq[0]
                     next_title = next_song.title
-                    next_music_filepath = f'Music/{next_title} - {next_song.video_id}.mp3'
+                    next_music_filepath = f'Music/{next_song.video_id}.mp3'
                     voice_client.play(FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path), after=after_play)
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
                     next_msg_content = f'Now playing `{next_title}`'
@@ -471,7 +471,7 @@ async def play_file(ctx):
         song = music_queue[0]
         title = song.title
         video_id = song.video_id
-        music_filepath = f'Music/{title} - {video_id}.mp3'
+        music_filepath = f'Music/{video_id}.mp3'
         try: result, m = download_queues[guild].get(video_id, (None, None))
         except KeyError:
             result, m = None, None
