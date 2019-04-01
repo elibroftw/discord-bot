@@ -1,9 +1,9 @@
 import asyncio
+# noinspection PyUnresolvedReferences
 import time
 from copy import deepcopy
 from datetime import datetime
 
-import concurrent.futures
 import discord
 from discord import FFmpegPCMAudio
 from discord.ext import commands
@@ -35,7 +35,7 @@ is_stopped_dict = {}
 repeat_dict = {}
 repeat_all_dict = {}
 download_queues = {}
-# todo make into one
+# TODO: {guild: {'music', 'done', 'play_next', 'is_stopped', 'repeat', 'repeat_all', 'download_queues'}}
 
 with open('help.txt') as f:
     help_message = f.read()
@@ -445,7 +445,7 @@ async def play_file(ctx):
                             get_yield(next_result)
                             download_queues[guild].pop(next_result)
                         else: next_m = run_coro(download_if_not_exists(ctx, title, video_id, in_background=False))
-                        next_m = None
+                        # next_m = None
                     next_song = mq[0]
                     next_title = next_song.title
                     next_music_filepath = f'Music/{next_title} - {next_song.video_id}.mp3'
@@ -614,11 +614,11 @@ async def _repeat_all(ctx, setting: bool = None):
 
     if setting:
         await ctx.send('Repeating all set to True')
+        auto_play_dict[guild] = False
         if voice_client and not voice_client.is_playing() and not voice_client.is_paused():
             mq = music_queues[guild]['music_queue']
             dq = music_queues[guild]['done_queue']
             if not mq and dq:
-                auto_play_dict[guild] = False
                 music_queues[guild]['music_queue'] = dq[::-1]
                 dq.clear()
                 await play_file(ctx)
