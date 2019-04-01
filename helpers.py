@@ -205,7 +205,8 @@ def youtube_download(url_or_video_id):
         }],
         # 'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
         'outtmpl': 'Music/%(id)s.%(ext)s',
-        'external-downloader': 'aria2c',
+        'external_downloader': 'aria2c',
+        'ffmpeg_location': 'ffmpeg\\bin',
         # 'verbose': True,
         'quiet': True,
         'audio-quality': 0
@@ -391,8 +392,8 @@ def search_for(directory, contains):
 if __name__ == "__main__":
     # print(get_related_video('PczuoZJ-PtM'))
     # vid_id = 'QnccxyatrD0'
-    # vid_id = get_video_id(youtube_search('Suge'))
-    youtube_download('tO_Qmip6Fb4')
+    vid_id = get_video_id(youtube_search('Adam K & Soha Twilight'))
+    youtube_download(vid_id)
     # a, b, c = youtube_search('The grand sound livestream', return_info=True, limit_duration=True)
     # print(youtube_search('slow'))
     # youtube_download(youtube_search('Slow'))
