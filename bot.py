@@ -383,11 +383,12 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
                     bot.loop.create_task(play_file(ctx, callback_msg=m))
                 else:
                     if play_next: msg_content = f'Added `{title}` to next up'
-                    else: msg_content = f'Added `{title}` to the playing queue'
+                    else: msg_content = f'Queued `{title}`'
                     bot.loop.create_task(m.edit(content=msg_content))
 
             if video_id in data_dict['downloads']:
-                m = await ctx.channel.send(f'Waiting for download of `{title}`')
+                if play_immediately: m = await ctx.channel.send(f'Downloading `{title}`')
+                else: m = await ctx.channel.send(f'`{title}` will be queued after download finishes')
                 result: asyncio.Future = bot.loop.run_in_executor(None, wait_for_download, video_id)
                 result.add_done_callback(callback)
             else:
