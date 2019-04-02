@@ -223,6 +223,7 @@ def youtube_download(url_or_video_id):
         # output_file = f'Music/{video_id}.mp3'
         # remove_silence(input_file, output_file)
         # return info_dict
+        return 'downloaded'
 
 
 def get_video_id(url):

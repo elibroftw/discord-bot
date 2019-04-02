@@ -357,21 +357,25 @@ def get_yield(fut):
     return d
 
 
+def wait_for_download(video_id):
+    music_filepath = f'Music/{video_id}.mp3'
+    while not os.path.exists(music_filepath): pass
+    return 'waited'
+
+
 async def download_if_not_exists(ctx, title, video_id, play_immediately=False, in_background=False, play_next=False):
     """
     Checks if file corresponding to title and video_id exists
     If it doesn't exist, download it
     returns None if it exists, or discord.Message object of the downloading title if it doesn't
     """
-
     music_filepath = f'Music/{video_id}.mp3'
     m = None
     guild = ctx.guild
     guild_data = data_dict[guild]
-    if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
-        m = await ctx.channel.send(f'Downloading `{title}`')
-
+    if not os.path.exists(music_filepath):
         if in_background or play_immediately:
+
             def callback(_):
                 data_dict['downloads'].pop(video_id)
                 if play_immediately and guild_data['music'][0].video_id == video_id:
@@ -381,8 +385,15 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
                     if play_next: msg_content = f'Added `{title}` to next up'
                     else: msg_content = f'Added `{title}` to the playing queue'
                     bot.loop.create_task(m.edit(content=msg_content))
-            result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
-            result.add_done_callback(callback)
+
+            if video_id in data_dict['downloads']:
+                m = await ctx.channel.send(f'Waiting for download of `{title}`')
+                result: asyncio.Future = bot.loop.run_in_executor(None, wait_for_download, video_id)
+                result.add_done_callback(callback)
+            else:
+                m = await ctx.channel.send(f'Downloading `{title}`')
+                result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
+                result.add_done_callback(callback)
 
             data_dict['downloads'][video_id] = (result, m, guild)  # todo: add guild to this
         else: youtube_download(video_id)
