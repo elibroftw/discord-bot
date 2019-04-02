@@ -374,7 +374,8 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
                 msg_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
                 bot.loop.create_task(m.edit(content=msg_content))
                 data_dict['downloads'].pop(video_id)
-
+                # todo: call play_file(ctx) if play_immediately and mq[0].title == title
+                #   the latter in case some guy decides to call skip
             result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
             result.add_done_callback(callback)
 
