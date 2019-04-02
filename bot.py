@@ -366,7 +366,7 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
 
     music_filepath = f'Music/{video_id}.mp3'
     m = None
-    if not os.path.exists(music_filepath):  # todo: check if its already being downloaded!!!
+    if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
 
         if in_background:
