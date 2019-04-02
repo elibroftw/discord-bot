@@ -371,7 +371,7 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
 
         if in_background:
             def callback(_):
-                msg_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
+                msg_content = f'Added `{title}` to next up' if play_next else f'Queued `{title}`'
                 bot.loop.create_task(m.edit(content=msg_content))
                 data_dict['downloads'].pop(video_id)
                 # todo: call play_file(ctx) if play_immediately and mq[0].title == title
@@ -448,7 +448,7 @@ async def play_file(ctx):
                         url, next_title, next_video_id = get_related_video(mq[0].video_id, ph)
                         next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=True))
                         mq.append(Song(next_title, next_video_id))
-                        next_msg_content = f'Added `{next_title}` to the playing queue'
+                        next_msg_content = f'Queued `{next_title}`'
                         if not next_m: run_coro(ctx.send(next_msg_content))
 
             else:
@@ -521,7 +521,7 @@ async def play(ctx):
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
             m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
-            m_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
+            m_content = f'Added `{title}` to next up' if play_next else f'Queued `{title}`'
             if not m: await ctx.send(m_content)
             # else: await m.edit(content=m_content)
         else: await play_file(ctx)  # download if need to and then play the song
@@ -566,7 +566,7 @@ async def _auto_play(ctx, setting: bool = None):
             url, title, video_id, = get_related_video(song_id, dq)
             mq.append(Song(title, video_id))
             m = await download_if_not_exists(ctx, title, video_id, in_background=True)
-            msg_content = f'Added `{title}` to the playing queue'
+            msg_content = f'Queued `{title}`'
             if not m: await ctx.send(msg_content)
 
 
