@@ -374,14 +374,12 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
             def callback(_):
                 data_dict['downloads'].pop(video_id)
                 if play_immediately and guild_data['music'][0].video_id == video_id:
-                    bot.loop.create_task(play_file(ctx))
+                    #   the latter in case some guy decided to call skip
+                    bot.loop.create_task(play_file(ctx, from_callback=True))
                     msg_content = f'Now playing {title}'
                 elif play_next: msg_content = f'Added `{title}` to next up'
                 else: msg_content = f'Added `{title}` to the playing queue'
                 bot.loop.create_task(m.edit(content=msg_content))
-
-                # todo: call play_file(ctx) if play_immediately and mq[0].title == title
-                #   the latter in case some guy decides to call skip
             result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
             result.add_done_callback(callback)
 
@@ -401,7 +399,7 @@ async def set_music_chat():
     raise NotImplementedError
 
 
-async def play_file(ctx):
+async def play_file(ctx, from_callback=False):
     """Plays first (index=0) song in the music queue"""
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
@@ -466,22 +464,19 @@ async def play_file(ctx):
         video_id = song.video_id
         result, m = data_dict['downloads'].get(video_id, (None, None))
         # if result:  # currently downloading so don't do anything
-        #     get_yield(result)
-        #     data_dict['downloads'].pop(video_id)
         if not result:  # not currently_downloading
             if not await download_if_not_exists(ctx, title, video_id, play_immediately=True):
                 # file already exists, good to play it. Else this function will be called again
                 guild_data['is_stopped'] = False
                 music_filepath = f'Music/{video_id}.mp3'
                 voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
-                msg_content = f'Now playing `{title}`'
                 temp_mq = deepcopy(upcoming_tracks)
                 temp_dq = deepcopy(play_history)
-                await ctx.send(msg_content)
+                if not from_callback: await ctx.send(f'Now playing `{title}`')
+                await bot.change_presence(activity=discord.Game(title))
                 if temp_mq != upcoming_tracks:
                     guild_data['music'] = deepcopy(temp_mq)
                     guild_data['done'] = deepcopy(temp_dq)
-                await bot.change_presence(activity=discord.Game(title))
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q', 'pap', 'pn', 'play_next', 'playnext'])
