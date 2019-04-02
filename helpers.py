@@ -108,7 +108,7 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
                                                     order='relevance', q=text, type=kind,
                                                     ).execute()
     except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
-        print('error with youtube service, line 87')
+        print('error with youtube service, line 111')
         api_url = 'https://www.googleapis.com/youtube/v3/'
         f = {'part': 'id,snippet', 'maxResults': min(results + 5, 50), 'order': 'relevance',
              'q': text, 'type': kind, 'key': google_api_key}
@@ -159,6 +159,7 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
 
 
 def get_video_duration(video_id):
+    # pylint: disable=no-member
     search_response = youtube_API.videos().list(part='contentDetails,snippet', id=video_id).execute()
     item = search_response.get('items', [])[0]
     is_live = item['snippet']['liveBroadcastContent'] == 'live'
@@ -167,6 +168,7 @@ def get_video_duration(video_id):
 
 def get_video_durations(video_ids):
     video_ids = ','.join(video_ids)
+    # pylint: disable=no-member
     search_response = youtube_API.videos().list(part='contentDetails', id=video_ids).execute()
     # url = f'https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id={video_ids}&key={google_api_key}'
     # r = requests.get(url)
@@ -245,14 +247,14 @@ def get_video_id(url):
 
 def get_video_title(video_id):
     # pylint: disable=no-member
-    response = youtube_API.videos().list(id=video_id, part='snippet').execute()
+    response = youtube_API.videos().list(part='snippet', id=video_id).execute()
     title = response['items'][0]['snippet']['title']
     return title
     # return fix_youtube_title(title)  # NOTE: file friendly title
 
 
 def get_related_video(video_id, done_queue):
-    dq = done_queue[:10]
+    dq = done_queue[:10]  # NOTE: safe to repeat after 10 songs?
     results = min(5 + len(dq), 50)
     # pylint: disable=no-member
     try:
@@ -260,11 +262,10 @@ def get_related_video(video_id, done_queue):
                                                     order='relevance', relatedToVideoId=video_id, type='video'
                                                     ).execute()
     except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
-        print('error with youtube service, line 194')
+        print('error with youtube service, line 262')
         api_url = 'https://www.googleapis.com/youtube/v3/'
-        f = {'part': 'id,snippet', 'relatedToVideoId': video_id, 'type': 'video', 'order': 'relevance',
-             'maxResults': results,
-             'key': google_api_key}
+        f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
+             'type': 'video', 'key': google_api_key}
         query_string = urlencode(f)
         r = requests.get(f'{api_url}search?{query_string}')
         search_response = json.loads(r.text)
