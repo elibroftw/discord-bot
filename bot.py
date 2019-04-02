@@ -610,9 +610,10 @@ async def _repeat_all(ctx, setting: bool = None):
 
 
 def no_after_play(guild_data, voice_client):
-    guild_data['is_stopped'] = True
-    voice_client.stop()
-    guild_data['is_stopped'] = False
+    if voice_client and voice_client.is_playing():
+        guild_data['is_stopped'] = True
+        voice_client.stop()
+        guild_data['is_stopped'] = False
 
 
 @bot.command(aliases=['next', 'n', 'sk'])
@@ -627,7 +628,7 @@ async def skip(ctx, times=1):
         if mq:
             with suppress(IndexError):
                 for _ in range(times): dq.insert(0, mq.pop(0))
-            if voice_client.is_playing(): no_after_play(guild_data, voice_client)
+            no_after_play(guild_data, voice_client)
             await play_file(ctx)
 
 
@@ -643,7 +644,7 @@ async def previous(ctx, times=1):
         if ph:
             with suppress(IndexError):
                 for _ in range(times): mq.insert(0, ph.pop(0))
-            if voice_client.is_playing(): no_after_play(guild_data, voice_client)
+            no_after_play(guild_data, voice_client)
             await play_file(ctx)
 
 
@@ -687,9 +688,14 @@ async def _remove(ctx, position):
     guild_data = data_dict[guild]
     mq = guild_data['music']
     dq = guild_data['done']
+    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     with suppress(IndexError):
-        if position < 0: dq.pop(-position)
-        else: mq.pop(position)
+        if position < 0: dq.pop(-position - 1)
+        elif position > 0: mq.pop(position)
+        else:
+            no_after_play(guild_data, voice_client)
+            mq.pop(0)
+            # remove current playing song
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
