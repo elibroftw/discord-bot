@@ -1,6 +1,7 @@
 import asyncio
 # noinspection PyUnresolvedReferences
 import time
+from contextlib import suppress
 from copy import deepcopy
 from datetime import datetime
 
@@ -191,7 +192,7 @@ async def thank(ctx):
 
 @bot.command()
 async def clear(ctx):
-    try:
+    with suppress(AttributeError):
         channel: discord.TextChannel = ctx.channel
         if ctx.message.author.permissions_in(ctx.channel).manage_messages:
             # await ctx.send('Clearing messages...')
@@ -212,7 +213,6 @@ async def clear(ctx):
             await channel.delete_messages(messages)
             print(f'{ctx.message.author} cleared {number - 2} message(s)')
         await bot.change_presence(activity=discord.Game('Prison Break (!)'))
-    except AttributeError: pass
 
 
 @bot.command(name='eval')
@@ -463,7 +463,6 @@ async def play_file(ctx):
         result, m = data_dict['downloads'].get(video_id, (None, None))
         if result:
             get_yield(result)
-            data_dict['downloads'].pop(video_id)
         else: m = await download_if_not_exists(ctx, title, video_id, in_background=False)
         guild_data['is_stopped'] = False
         voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
@@ -611,18 +610,25 @@ async def _repeat_all(ctx, setting: bool = None):
     else: await ctx.send('Repeating all set to False')
 
 
+def no_after_play(guild_data, voice_client):
+    guild_data['is_stopped'] = True
+    voice_client.stop()
+    guild_data['is_stopped'] = False
+
+
 @bot.command(aliases=['next', 'n', 'sk'])
-async def skip(ctx):
+async def skip(ctx, times=1):
     # TODO: make it a partial democracy but mods and admins can bypass it
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    guild_data = data_dict[guild]
-    mq = guild_data['music']
-    dq = guild_data['done']
     if voice_client:
-        if voice_client.is_playing(): voice_client.stop()  # after_play runs
-        elif mq:
-            if not guild_data['repeat']: dq.insert(0, mq.pop(0))
+        guild_data = data_dict[guild]
+        mq = guild_data['music']
+        dq = guild_data['done']
+        if mq:
+            with suppress(IndexError):
+                for _ in range(times): dq.insert(0, mq.pop(0))
+            if voice_client.is_playing(): no_after_play(guild_data, voice_client)
             await play_file(ctx)
 
 
@@ -631,20 +637,14 @@ async def previous(ctx, times=1):
     # TODO: make it a partial democracy but mods and admins can bypass it
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    guild_data = data_dict[guild]
     if voice_client:
+        guild_data = data_dict[guild]
         mq = guild_data['music']
         ph = guild_data['done']
         if ph:
-            try:
-                for i in range(times):
-                    song = ph.pop(0)
-                    mq.insert(0, song)
-            except IndexError: pass
-            if voice_client.is_playing():
-                guild_data['is_stopped'] = True
-                voice_client.stop()
-                guild_data['is_stopped'] = False
+            with suppress(IndexError):
+                for _ in range(times): mq.insert(0, ph.pop(0))
+            if voice_client.is_playing(): no_after_play(guild_data, voice_client)
             await play_file(ctx)
 
 
@@ -680,6 +680,17 @@ async def _recently_played(ctx):
             msg += f'\n-{i + 1} `{song.title}`'
         await ctx.send(msg)
     else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
+
+
+@bot.command(name='remove')
+async def _remove(ctx, position):
+    guild = ctx.guild
+    guild_data = data_dict[guild]
+    mq = guild_data['music']
+    dq = guild_data['done']
+    with suppress(IndexError):
+        if position < 0: dq.pop(-position)
+        else: mq.pop(position)
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
