@@ -495,10 +495,10 @@ async def play(ctx):
     if voice_client is None:
         await bot.get_command('summon').callback(ctx)
         voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    url_or_query = ctx.message.content.split(' ')
+    url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
-    if url_or_query and type(url_or_query) != list:
+    # if url_or_query and type(url_or_query) != list:
         if url_or_query.startswith('https://'):
             # TODO: playlist support
             url = url_or_query
