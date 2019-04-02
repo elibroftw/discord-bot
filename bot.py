@@ -463,6 +463,7 @@ async def play_file(ctx, callback_msg: discord.Message = None):
         title = song.title
         video_id = song.video_id
         result, m = data_dict['downloads'].get(video_id, (None, None))
+        print(result)
         # if result:  # currently downloading so don't do anything
         if not result:  # not currently_downloading
             if not await download_if_not_exists(ctx, title, video_id, play_immediately=True):
@@ -519,9 +520,8 @@ async def play(ctx):
         if mq and play_next: mq.insert(1, song)
         else: mq.append(song)
 
-        # download the song if something is already being played
-        if voice_client.is_playing() or voice_client.is_paused():
-            # download if your not going to play the file
+        if voice_client.is_playing() or voice_client.is_paused() or len(mq) > 1:
+            # download if file is not going to be played immediately
             m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
             m_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
             if not m: await ctx.send(m_content)
