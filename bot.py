@@ -432,7 +432,7 @@ async def play_file(ctx):
                     else:  # if mq, check if the song is downloading # NOTE: was here last
                         next_result, next_m = data_dict['downloads'].get(video_id, (None, None))
                         if next_result:
-                            get_yield(next_result)
+                            run_coro(next_result)
                             data_dict['downloads'].pop(next_result)
                         else: next_m = run_coro(download_if_not_exists(ctx, title, video_id, in_background=False))
                     next_song = mq[0]
@@ -456,13 +456,16 @@ async def play_file(ctx):
                 if len(voice_client.channel.members) == 1: run_coro(voice_client.disconnect())
 
     if voice_client and upcoming_tracks:
+        # TODO: account for auto_play
         song = upcoming_tracks[0]
         title = song.title
         video_id = song.video_id
         music_filepath = f'Music/{video_id}.mp3'
         result, m = data_dict['downloads'].get(video_id, (None, None))
         if result:
-            get_yield(result)
+            print(upcoming_tracks)
+            await result
+            print(upcoming_tracks)
         else: m = await download_if_not_exists(ctx, title, video_id, in_background=False)
         guild_data['is_stopped'] = False
         voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
