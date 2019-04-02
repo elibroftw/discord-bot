@@ -375,11 +375,11 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
                 data_dict['downloads'].pop(video_id)
                 if play_immediately and guild_data['music'][0].video_id == video_id:
                     #   the latter in case some guy decided to call skip
-                    bot.loop.create_task(play_file(ctx, from_callback=True))
-                    msg_content = f'Now playing {title}'
-                elif play_next: msg_content = f'Added `{title}` to next up'
-                else: msg_content = f'Added `{title}` to the playing queue'
-                bot.loop.create_task(m.edit(content=msg_content))
+                    bot.loop.create_task(play_file(ctx, callback_msg=m))
+                else:
+                    if play_next: msg_content = f'Added `{title}` to next up'
+                    else: msg_content = f'Added `{title}` to the playing queue'
+                    bot.loop.create_task(m.edit(content=msg_content))
             result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
             result.add_done_callback(callback)
 
@@ -399,7 +399,7 @@ async def set_music_chat():
     raise NotImplementedError
 
 
-async def play_file(ctx, from_callback=False):
+async def play_file(ctx, callback_msg: discord.Message = None):
     """Plays first (index=0) song in the music queue"""
     guild = ctx.guild
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
@@ -472,7 +472,9 @@ async def play_file(ctx, from_callback=False):
                 voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
                 temp_mq = deepcopy(upcoming_tracks)
                 temp_dq = deepcopy(play_history)
-                if not from_callback: await ctx.send(f'Now playing `{title}`')
+                msg_content = f'Now playing `{title}`'
+                if callback_msg: await callback_msg.edit(content=msg_content)
+                else: await ctx.send(msg_content)
                 await bot.change_presence(activity=discord.Game(title))
                 if temp_mq != upcoming_tracks:
                     guild_data['music'] = deepcopy(temp_mq)
