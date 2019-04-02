@@ -366,13 +366,14 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
 
     music_filepath = f'Music/{video_id}.mp3'
     m = None
+    guild_data = data_dict[ctx.guild]
     if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
 
         if in_background or play_immediately:
             def callback(_):
                 data_dict['downloads'].pop(video_id)
-                if play_immediately and data_dict[ctx.guild]['music'][0].video_id == video_id:
+                if play_immediately and guild_data['music'][0].video_id == video_id:
                     bot.loop.create_task(play_file(ctx))
                     msg_content = f'Now playing {title}'
                 elif play_next: msg_content = f'Added `{title}` to next up'
@@ -463,25 +464,23 @@ async def play_file(ctx):
         song = upcoming_tracks[0]
         title = song.title
         video_id = song.video_id
-        music_filepath = f'Music/{video_id}.mp3'
         result, m = data_dict['downloads'].get(video_id, (None, None))
         # if result:  # currently downloading so don't do anything
         #     get_yield(result)
         #     data_dict['downloads'].pop(video_id)
         if not result:  # not currently_downloading
-            m = await download_if_not_exists(ctx, title, video_id, play_immediately=True)
-            if not m:  # file already exists. else it'll play on its own
+            if not await download_if_not_exists(ctx, title, video_id, play_immediately=True):
+                # file already exists, good to play it. Else this function will be called again
                 guild_data['is_stopped'] = False
+                music_filepath = f'Music/{video_id}.mp3'
                 voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
                 msg_content = f'Now playing `{title}`'
-                if m: await m.edit(content=msg_content)
-                else:
-                    temp_mq = deepcopy(upcoming_tracks)
-                    temp_dq = deepcopy(play_history)
-                    await ctx.send(msg_content)
-                    if temp_mq != upcoming_tracks:
-                        guild_data['music'] = deepcopy(temp_mq)
-                        guild_data['done'] = deepcopy(temp_dq)
+                temp_mq = deepcopy(upcoming_tracks)
+                temp_dq = deepcopy(play_history)
+                await ctx.send(msg_content)
+                if temp_mq != upcoming_tracks:
+                    guild_data['music'] = deepcopy(temp_mq)
+                    guild_data['done'] = deepcopy(temp_dq)
                 await bot.change_presence(activity=discord.Game(title))
 
 
@@ -501,10 +500,10 @@ async def play(ctx):
     if voice_client is None:
         await bot.get_command('summon').callback(ctx)
         voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
-    url_or_query = ctx.message.content.split(' ')
+    url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
-    if url_or_query and type(url_or_query) != list:
+    # if url_or_query and type(url_or_query) != list:
         if url_or_query.startswith('https://'):
             # TODO: playlist support
             url = url_or_query
@@ -727,7 +726,7 @@ async def stop(ctx):
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     if voice_client and voice_client.is_playing():
         data_dict[guild]['is_stopped'] = True
-        voice_client.stop()
+        voice_client.stop()  # after play does not run
 
 
 @bot.command()
