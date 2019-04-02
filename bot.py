@@ -366,7 +366,8 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
 
     music_filepath = f'Music/{video_id}.mp3'
     m = None
-    guild_data = data_dict[ctx.guild]
+    guild = ctx.guild
+    guild_data = data_dict[guild]
     if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
 
@@ -383,7 +384,7 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
             result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
             result.add_done_callback(callback)
 
-            data_dict['downloads'][video_id] = (result, m)
+            data_dict['downloads'][video_id] = (result, m, guild)  # todo: add guild to this
         else: youtube_download(video_id)
     return m  # if m is None, file has already been downloaded
 
@@ -430,7 +431,7 @@ async def play_file(ctx, callback_msg: discord.Message = None):
                 if mq or setting:
                     if setting and not mq:
                         url, next_title, next_video_id = get_related_video(last_song.video_id, ph)
-                        next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
+                        next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, play_immediately=True))
                         mq.append(Song(next_title, next_video_id))
                     else:  # if mq, check if the song is downloading # NOTE: was here last
                         next_result, next_m = data_dict['downloads'].get(video_id, (None, None))
@@ -462,8 +463,7 @@ async def play_file(ctx, callback_msg: discord.Message = None):
         song = upcoming_tracks[0]
         title = song.title
         video_id = song.video_id
-        result, m = data_dict['downloads'].get(video_id, (None, None))
-        print(result)
+        result, m, download_guild = data_dict['downloads'].get(video_id, (None, None))
         # if result:  # currently downloading so don't do anything
         if not result:  # not currently_downloading
             if not await download_if_not_exists(ctx, title, video_id, play_immediately=True):
