@@ -462,10 +462,7 @@ async def play_file(ctx):
         video_id = song.video_id
         music_filepath = f'Music/{video_id}.mp3'
         result, m = data_dict['downloads'].get(video_id, (None, None))
-        if result:
-            print(upcoming_tracks)
-            await result
-            print(upcoming_tracks)
+        if result: await result
         else: m = await download_if_not_exists(ctx, title, video_id, in_background=False)
         guild_data['is_stopped'] = False
         voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
