@@ -369,7 +369,7 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
     if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
 
-        if in_background:
+        if in_background or play_immediately:
             def callback(_):
                 msg_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
                 bot.loop.create_task(m.edit(content=msg_content))
