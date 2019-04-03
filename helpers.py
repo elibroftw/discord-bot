@@ -208,6 +208,8 @@ def youtube_download(url_or_video_id):
         # 'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
         'outtmpl': 'Music/%(id)s.%(ext)s',
         'external_downloader': 'aria2c',
+        # 'external_downloader_args:' '-c -j 3 -x 3 -s 3 -k 1M',
+        # https://aria2.github.io/manual/en/html/aria2c.html#options
         'ffmpeg_location': 'ffmpeg\\bin',
         # 'verbose': True,
         'quiet': True,
