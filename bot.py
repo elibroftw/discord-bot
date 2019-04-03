@@ -395,6 +395,19 @@ async def set_music_chat():
     raise NotImplementedError
 
 
+async def download_related_video(ctx, auto_play_setting):
+    if auto_play_setting:
+        guild = ctx.guild
+        guild_data = data_dict[guild]
+        upcoming_tracks, play_history = guild_data['music'], guild_data['done']
+        if len(upcoming_tracks) == 1:
+            related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].video_id, play_history)
+            upcoming_tracks.append(Song(related_title, related_video_id))
+            related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
+            related_msg_content = f'Added `{related_title}` to the playing queue'
+            if not related_m: await ctx.send(related_msg_content)
+
+
 async def play_file(ctx):
     """Plays first (index=0) song in the music queue"""
     guild = ctx.guild
@@ -444,12 +457,13 @@ async def play_file(ctx):
                     if next_m: run_coro(next_m.edit(content=next_msg_content))
                     else: run_coro(ctx.send(next_msg_content))
 
-                    if setting and len(mq) == 1:
-                        url, next_title, next_video_id = get_related_video(mq[0].video_id, ph)
-                        next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=True))
-                        mq.append(Song(next_title, next_video_id))
-                        next_msg_content = f'Added `{next_title}` to the playing queue'
-                        if not next_m: run_coro(ctx.send(next_msg_content))
+                    run_coro(download_related_video(ctx, setting))
+                    # if setting and len(mq) == 1:
+                    #     url, next_title, next_video_id = get_related_video(mq[0].video_id, ph)
+                    #     mq.append(Song(next_title, next_video_id))
+                    #     next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=True))
+                    #     next_msg_content = f'Added `{next_title}` to the playing queue'
+                    #     if not next_m: run_coro(ctx.send(next_msg_content))
 
             else:
                 run_coro(bot.change_presence(activity=discord.Game('Prison Break (!)')))
@@ -476,6 +490,14 @@ async def play_file(ctx):
                 guild_data['music'] = deepcopy(temp_mq)
                 guild_data['done'] = deepcopy(temp_dq)
         await bot.change_presence(activity=discord.Game(title))
+
+        await download_related_video(ctx, guild_data['auto_play'])
+        # if len(upcoming_tracks) == 1 and guild_data['auto_play']:
+    #     related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].video_id, play_history)
+        #     upcoming_tracks.append(Song(related_title, related_video_id))
+        #     related_m = run_coro(download_if_not_exists(ctx, related_title, related_video_id, in_background=True))
+        #     related_msg_content = f'Added `{related_title}` to the playing queue'
+        #     if not related_m: run_coro(ctx.send(related_msg_content))
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q', 'pap', 'pn', 'play_next', 'playnext'])
@@ -683,7 +705,7 @@ async def _recently_played(ctx):
 
 
 @bot.command(name='remove')
-async def _remove(ctx, position):
+async def _remove(ctx, position: int):
     guild = ctx.guild
     guild_data = data_dict[guild]
     mq = guild_data['music']
@@ -695,7 +717,6 @@ async def _remove(ctx, position):
         else:
             no_after_play(guild_data, voice_client)
             mq.pop(0)
-            # remove current playing song
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
@@ -706,9 +727,9 @@ async def clear_queue(ctx):
         data_dict[guild]['music'].clear()
 
 
-@bot.command(aliases=['ff', 'fast-forward', 'fast'])
-async def fast_forward(ctx):  # TODO
-    raise NotImplementedError
+# @bot.command(aliases=['ff', 'fast-forward', 'fast'])
+# async def fast_forward(ctx):  # TODO
+#     raise NotImplementedError
 
 
 @bot.command(aliases=['np', 'currently_playing', 'cp'])
