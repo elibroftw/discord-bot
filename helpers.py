@@ -262,13 +262,13 @@ def get_related_video(video_id, done_queue):
                                                     order='relevance', relatedToVideoId=video_id, type='video'
                                                     ).execute()
     except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
-        print('error with youtube service, line 262')
         api_url = 'https://www.googleapis.com/youtube/v3/'
         f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
              'type': 'video', 'key': google_api_key}
         query_string = urlencode(f)
         r = requests.get(f'{api_url}search?{query_string}')
         search_response = json.loads(r.text)
+        print('error with youtube service, line 262', search_response)
     related_song = dq[0] if dq else Song('', '')
     i = 0
     while related_song in dq or related_song == Song('', '') or get_video_duration(related_song.video_id) > 600:
