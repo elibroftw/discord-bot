@@ -476,7 +476,9 @@ async def play_file(ctx):
         video_id = song.video_id
         music_filepath = f'Music/{video_id}.mp3'
         result, m = data_dict['downloads'].get(video_id, (None, None))
-        if result: await result
+        if result:
+            await result
+            return
         else: m = await download_if_not_exists(ctx, title, video_id, in_background=False)
         guild_data['is_stopped'] = False
         voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
@@ -651,6 +653,9 @@ async def skip(ctx, times=1):
             with suppress(IndexError):
                 for _ in range(times): dq.insert(0, mq.pop(0))
             no_after_play(guild_data, voice_client)
+            if mq and guild_data['repeat_all']:
+                guild_data['music'] = dq[::-1]
+                dq.clear()
             await play_file(ctx)
 
 
@@ -725,6 +730,7 @@ async def clear_queue(ctx):
     moderator = discord.utils.get(guild.roles, name='Moderator')
     if ctx.author.top_role >= moderator:
         data_dict[guild]['music'].clear()
+        await ctx.send('Cleared music queue')
 
 
 # @bot.command(aliases=['ff', 'fast-forward', 'fast'])
