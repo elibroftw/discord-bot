@@ -208,7 +208,7 @@ def youtube_download(url_or_video_id):
         # 'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
         'outtmpl': 'Music/%(id)s.%(ext)s',
         'external_downloader': 'aria2c',
-        # 'external_downloader_args:' '-c -j 3 -x 3 -s 3 -k 1M',
+        'external_downloader_args': '-c -j 3 -x 3 -s 3 -k 1M',
         # https://aria2.github.io/manual/en/html/aria2c.html#options
         'ffmpeg_location': 'ffmpeg\\bin',
         # 'verbose': True,
@@ -270,7 +270,7 @@ def get_related_video(video_id, done_queue):
         query_string = urlencode(f)
         r = requests.get(f'{api_url}search?{query_string}')
         search_response = json.loads(r.text)
-        print('error with youtube service, line 262', search_response)
+        print('error with youtube service, line 262')
     related_song = dq[0] if dq else Song('', '')
     i = 0
     while related_song in dq or related_song == Song('', '') or get_video_duration(related_song.video_id) > 600:
