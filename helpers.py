@@ -169,10 +169,11 @@ def get_video_duration(video_id):
 def get_video_durations(video_ids):
     video_ids = ','.join(video_ids)
     # pylint: disable=no-member
-    search_response = youtube_API.videos().list(part='contentDetails', id=video_ids).execute()
-    # url = f'https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id={video_ids}&key={google_api_key}'
-    # r = requests.get(url)
-    # search_response = json.loads(r.text)
+    try: search_response = youtube_API.videos().list(part='contentDetails', id=video_ids).execute()
+    except ConnectionAbortedError:
+        url = f'https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id={video_ids}&key={google_api_key}'
+        r = requests.get(url)
+        search_response = json.loads(r.text)
     return_dict = {}
     for item in search_response.get('items', []):
         return_dict[item['id']] = yt_time(item['contentDetails']['duration'])
