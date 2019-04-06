@@ -72,11 +72,8 @@ async def hi(ctx):
 
 
 @bot.command()
-async def test(ctx, say_something=False):
-    if say_something:
-        await ctx.send('yoooo')
-    else:
-        await ctx.send('broo')
+async def test():
+    print(bot.commands)
 
 
 @bot.command()
