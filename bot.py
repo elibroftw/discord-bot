@@ -6,7 +6,7 @@ from copy import deepcopy
 from datetime import datetime
 
 import discord
-from discord import FFmpegPCMAudio
+from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
 import os
 # noinspection PyUnresolvedReferences
@@ -79,8 +79,10 @@ async def test():
 @bot.command()
 async def sleep(ctx):
     if ctx.message.author == 'eli#4591':
-        try: secs = int(ctx.message.content[7:])
-        except ValueError: secs = 5
+        try:
+            secs = int(ctx.message.content[7:])
+        except ValueError:
+            secs = 5
         print(f'Sleeping for {secs} seconds')
         await asyncio.sleep(secs)
         await ctx.send('Done sleeping')
@@ -160,7 +162,10 @@ async def _exit(ctx):
 async def restart(ctx):
     if str(ctx.author) == 'eli#4591':
         voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-        if voice_client: await voice_client.disconnect()
+        if voice_client:
+            if voice_client.is_playing():
+                no_after_play(data_dict[ctx.guild], voice_client)
+            await voice_client.disconnect()
         print('Restarting')
         run('python bot.py')
         quit()
@@ -276,7 +281,8 @@ async def ttt(ctx):
                         ttt_round = 1
                         temp_msg = tictactoe.greeting(tic_tac_toe_data[author], user_msg)  # msg is y or n
                         await ctx.send_message(game_channel, temp_msg)
-            except asyncio.TimeoutError: tic_tac_toe_data[author]['game_over'] = True
+            except asyncio.TimeoutError:
+                tic_tac_toe_data[author]['game_over'] = True
 
         while not tic_tac_toe_data[author]['game_over']:
             try:
@@ -291,7 +297,8 @@ async def ttt(ctx):
                         temp_msg, d = tictactoe.valid_move(player_move, tic_tac_toe_data[author])
                         print(tic_tac_toe_data[author] == d)
                         tic_tac_toe_data[author] = d
-                        if not temp_msg: await game_channel.send_message('That was not a valid move')
+                        if not temp_msg:
+                            await game_channel.send_message('That was not a valid move')
                         else:
                             temp_msg += '\n'
                             tic_tac_toe_data[author]['user_moves'].append(player_move)
@@ -299,12 +306,15 @@ async def ttt(ctx):
                             if tic_tac_toe_data[author]['game_over']:
                                 print(tic_tac_toe_data[author]['game_over'])
                                 tic_tac_toe_data[author]['game_over'] = True
-                                if ttt_round == 5: await ctx.send(f'Your Move{temp_msg + tempt}')
-                                else: await ctx.send(f'Your Move{temp_msg}My Move{tempt}')
+                                if ttt_round == 5:
+                                    await ctx.send(f'Your Move{temp_msg + tempt}')
+                                else:
+                                    await ctx.send(f'Your Move{temp_msg}My Move{tempt}')
                             else:  # TODO: rich embed???
                                 await ctx.send(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
                             ttt_round += 1
-            except asyncio.TimeoutError: tic_tac_toe_data[author]['game_over'] = True
+            except asyncio.TimeoutError:
+                tic_tac_toe_data[author]['game_over'] = True
 
 
 @bot.command()
@@ -322,8 +332,10 @@ async def created_at(ctx):
             user = discord.utils.get(ctx.guild.members, name=name)
     else:
         user = ctx.author
-    try: await ctx.send(user.created_at)
-    except AttributeError: await ctx.send(f'could not find that user in the server')
+    try:
+        await ctx.send(user.created_at)
+    except AttributeError:
+        await ctx.send(f'could not find that user in the server')
 
 
 @bot.command()
@@ -373,11 +385,13 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
                 data_dict['downloads'].pop(video_id)
                 # todo: call play_file(ctx) if play_immediately and mq[0].title == title
                 #   the latter in case some guy decides to call skip
+
             result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
             result.add_done_callback(callback)
 
             data_dict['downloads'][video_id] = (result, m)
-        else: youtube_download(video_id)
+        else:
+            youtube_download(video_id)
     return m
 
 
@@ -412,6 +426,7 @@ async def play_file(ctx):
     guild_data = data_dict[guild]
     upcoming_tracks = guild_data['music']
     play_history = guild_data['done']
+
     # TODO: use a db to determine which files get constantly used
 
     # noinspection PyUnusedLocal
@@ -426,7 +441,8 @@ async def play_file(ctx):
                 if not guild_data['repeat']:
                     last_song = mq.pop(0)
                     ph.insert(0, last_song)
-                else: last_song = mq[0]
+                else:
+                    last_song = mq[0]
 
                 if guild_data['repeat_all']:
                     if not mq and ph:
@@ -444,15 +460,19 @@ async def play_file(ctx):
                         if next_result:
                             run_coro(next_result)
                             data_dict['downloads'].pop(next_result)
-                        else: next_m = run_coro(download_if_not_exists(ctx, title, video_id, in_background=False))
+                        else:
+                            next_m = run_coro(download_if_not_exists(ctx, title, video_id, in_background=False))
                     next_song = mq[0]
                     next_title = next_song.title
                     next_music_filepath = f'Music/{next_song.video_id}.mp3'
-                    voice_client.play(FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path), after=after_play)
+                    next_audio_source = FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path)
+                    voice_client.play(PCMVolumeTransformer(next_audio_source), after=after_play)
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
                     next_msg_content = f'Now playing `{next_title}`'
-                    if next_m: run_coro(next_m.edit(content=next_msg_content))
-                    else: run_coro(ctx.send(next_msg_content))
+                    if next_m:
+                        run_coro(next_m.edit(content=next_msg_content))
+                    else:
+                        run_coro(ctx.send(next_msg_content))
 
                     run_coro(download_related_video(ctx, setting))
                     # if setting and len(mq) == 1:
@@ -476,11 +496,14 @@ async def play_file(ctx):
         if result:
             await result
             return
-        else: m = await download_if_not_exists(ctx, title, video_id, in_background=False)
+        else:
+            m = await download_if_not_exists(ctx, title, video_id, in_background=False)
         guild_data['is_stopped'] = False
-        voice_client.play(FFmpegPCMAudio(music_filepath, executable=ffmpeg_path), after=after_play)
+        audio_source = FFmpegPCMAudio(music_filepath, executable=ffmpeg_path)
+        voice_client.play(PCMVolumeTransformer(audio_source), after=after_play)
         msg_content = f'Now playing `{title}`'
-        if m: await m.edit(content=msg_content)
+        if m:
+            await m.edit(content=msg_content)
         else:
             temp_mq = deepcopy(upcoming_tracks)
             temp_dq = deepcopy(play_history)
@@ -493,10 +516,10 @@ async def play_file(ctx):
         await download_related_video(ctx, guild_data['auto_play'])
         # if len(upcoming_tracks) == 1 and guild_data['auto_play']:
     #     related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].video_id, play_history)
-        #     upcoming_tracks.append(Song(related_title, related_video_id))
-        #     related_m = run_coro(download_if_not_exists(ctx, related_title, related_video_id, in_background=True))
-        #     related_msg_content = f'Added `{related_title}` to the playing queue'
-        #     if not related_m: run_coro(ctx.send(related_msg_content))
+    #     upcoming_tracks.append(Song(related_title, related_video_id))
+    #     related_m = run_coro(download_if_not_exists(ctx, related_title, related_video_id, in_background=True))
+    #     related_msg_content = f'Added `{related_title}` to the playing queue'
+    #     if not related_m: run_coro(ctx.send(related_msg_content))
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q', 'pap', 'pn', 'play_next', 'playnext'])
@@ -527,15 +550,18 @@ async def play(ctx):
                 await ctx.send('That song is too long! (> 10 minutes)')
                 return
         else:  # get url
-            try: url, title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)
+            try:
+                url, title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)
             except ValueError:
                 await ctx.send(f'No valid video found with query `{url_or_query}`')
                 return
         song = Song(title, video_id)
 
         # adding to queue
-        if mq and play_next: mq.insert(1, song)
-        else: mq.append(song)
+        if mq and play_next:
+            mq.insert(1, song)
+        else:
+            mq.append(song)
 
         # download the song if something is already being played
         if voice_client.is_playing() or voice_client.is_paused():
@@ -544,12 +570,14 @@ async def play(ctx):
             m_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
             if not m: await ctx.send(m_content)
             # else: await m.edit(content=m_content)
-        else: await play_file(ctx)  # download if need to and then play the song
+        else:
+            await play_file(ctx)  # download if need to and then play the song
 
     else:
         if (voice_client.is_playing() or voice_client.is_paused()) and not play_next:
             await bot.get_command('pause').callback(ctx)
-        elif mq: await play_file(ctx)
+        elif mq:
+            await play_file(ctx)
     if ctx_msg_content.startswith('!pap'):
         await bot.get_command('auto_play').callback(ctx)
 
@@ -559,8 +587,10 @@ async def pause(ctx):
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice_client:
         await bot.change_presence(activity=discord.Game('Prison Break (!)'))
-        if voice_client.is_paused(): voice_client.resume()
-        else: voice_client.pause()
+        if voice_client.is_paused():
+            voice_client.resume()
+        else:
+            voice_client.pause()
 
 
 @bot.command(name='auto_play', aliases=['ap', 'autoplay'])
@@ -605,7 +635,8 @@ async def _repeat(ctx, setting: bool = None):
             if not mq and dq:
                 mq.append(dq.pop(0))
                 await play_file(ctx)
-    else: await ctx.send('Repeating song set to False')
+    else:
+        await ctx.send('Repeating song set to False')
 
 
 @bot.command(name='repeat_all', aliases=['ra'])
@@ -627,7 +658,8 @@ async def _repeat_all(ctx, setting: bool = None):
                 guild_data['music'] = dq[::-1]
                 dq.clear()
                 await play_file(ctx)
-    else: await ctx.send('Repeating all set to False')
+    else:
+        await ctx.send('Repeating all set to False')
 
 
 def no_after_play(guild_data, voice_client):
@@ -678,15 +710,18 @@ async def next_up(ctx):
     guild = ctx.guild
     mq = data_dict[guild]['music']
     if mq:
-        if data_dict[guild]['auto_play']: msg = 'MUSIC QUEUE | AUTO PLAY ENABLED'
-        else: msg = 'MUSIC QUEUE | AUTO PLAY DISABLED'
+        if data_dict[guild]['auto_play']:
+            msg = 'MUSIC QUEUE | AUTO PLAY ENABLED'
+        else:
+            msg = 'MUSIC QUEUE | AUTO PLAY DISABLED'
         for i, song in enumerate(mq):
             if i == 10:
                 msg += '\n...'
                 break
             msg += f'\n{i} `{song.title}`' if i > 0 else f'\nCurrently Playing `{song.title}`'
         await ctx.send(msg)
-    else: await ctx.send('MUSIC QUEUE IS EMPTY')
+    else:
+        await ctx.send('MUSIC QUEUE IS EMPTY')
 
 
 @bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
@@ -703,7 +738,8 @@ async def _recently_played(ctx):
                 break
             msg += f'\n-{i + 1} `{song.title}`'
         await ctx.send(msg)
-    else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
+    else:
+        await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
 
 
 @bot.command(name='remove')
@@ -714,14 +750,16 @@ async def _remove(ctx, position: int):
     dq = guild_data['done']
     voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
     with suppress(IndexError):
-        if position < 0: dq.pop(-position - 1)
-        elif position > 0: mq.pop(position)
+        if position < 0:
+            dq.pop(-position - 1)
+        elif position > 0:
+            mq.pop(position)
         else:
             no_after_play(guild_data, voice_client)
             mq.pop(0)
 
 
-@bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue'])
+@bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue', 'queue_clear', 'queueclear'])
 async def clear_queue(ctx):
     guild = ctx.guild
     moderator = discord.utils.get(guild.roles, name='Moderator')
@@ -790,16 +828,33 @@ async def ban(ctx):
                 user = discord.utils.get(ctx.guild.members, name=name)
             await ctx.guild.ban(user)
 
-# @bot.command(aliases=['set_volume', 'sv')
-# async def volume(ctx):
-#     pass
-    # voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    # if voice_client:
-    #     amount = ctx.message.content[8:]
-    #     voice_client.volume
 
-    # discord.PCMVolumeTransformer
-    # https://discordpy.readthedocs.io/en/rewrite/api.html#discord.PCMVolumeTransformer
+@bot.command(aliases=['set_volume', 'sv', 'v'])
+async def volume(ctx):
+    vc: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if vc:
+        args = ctx.message.content.split(' ')
+        if len(args) == 2:
+            try:
+                arg = args[1]
+                if arg.startswith('+'):
+                    if arg[1:]: amount = vc.source.volume + float(arg[1:])/100
+                    else: amount = vc.source.volume + 0.1
+                elif arg.startswith('-'):
+                    if arg[1:]: amount = vc.source.volume - float(arg[1:]) / 100
+                    else: amount = vc.source.volume - 0.1
+                else:
+                    amount = float(args[1]) / 100
+                # noinspection PyTypeChecker
+                amount = max(0, amount)
+                amount = min(1, amount)
+                vc.source.volume = amount
+                s: discord.AudioSource = vc.source
+                s.read()
+            except ValueError:
+                await ctx.send('Invalid argument')
+        else:
+            await ctx.send(vc.source.volume)
 
 
 @bot.command()
@@ -807,6 +862,8 @@ async def about(ctx):
     ctx.author.send(f'Hi there. Thank you for wanting to know more about me. I was made by Elijah Lopez.\n'
                     'For more information visit https://github.com/elibroftw/discord-bot.\n'
                     'Join my server at https://discord.gg/{invitation_code})')
+
+
 bot.run(os.environ['discord'])
 
 # TODO: 'shop', 'math', 'ban', 'remove_role', 'delete_role'
