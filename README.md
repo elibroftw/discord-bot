@@ -16,6 +16,12 @@ A discord bot (called El Chapo) I made using the discord.py module and is hosted
     - Autoplay (!pap <query/youtube_url> (always turns it on), !auto_play, !ap)
     - Leave (!leave, !disconnect, !unsummon, !desummon, !dismiss)
     - Play next (adds the song to play right after, will rework this later !pn, !play_next)
+    - Set volume (!volume, !v, prints volume if no int given)
+        - !v 100  # this will set volume to 100/100
+        - !v +20  # increase volume by 20
+        - !v -20  # decrease volume by 20
+        - !v +  # increase volume by 10
+        - !v -  # decrease volume by 10
     
 
 - Twitter search (going to rework this)
