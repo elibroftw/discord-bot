@@ -153,22 +153,26 @@ async def youtube(ctx):
 @bot.command(name='exit', aliases=['quit'])
 async def _exit(ctx):
     if str(ctx.author) == 'eli#4591':
-        voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-        if voice_client: await voice_client.disconnect()
+        # voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+        for voice_client in bot.voice_clients:
+            if voice_client: await voice_client.disconnect()
         quit()
 
 
 @bot.command()
 async def restart(ctx):
     if str(ctx.author) == 'eli#4591':
-        voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-        if voice_client:
-            if voice_client.is_playing():
-                no_after_play(data_dict[ctx.guild], voice_client)
-            await voice_client.disconnect()
+        # voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
         print('Restarting')
         run('python bot.py')
-        quit()
+        # for voice_client in bot.voice_clients:
+        #     print('test')
+        #     if voice_client:
+        #         if voice_client.is_playing():
+        #             no_after_play(data_dict[ctx.guild], voice_client)
+        #         await voice_client.disconnect()
+        #         await voice_client.connect()
+        # quit()
 
 
 # @bot.command(, aliases=['gettweet', 'get_tweet'])
@@ -345,8 +349,7 @@ async def summon(ctx):
     if not author.voice:
         await discord.utils.get(guild.voice_channels, name='music').connect()
     else:
-        voice_client: discord.VoiceClient = discord.utils.get(
-            bot.voice_clients, guild=guild)
+        voice_client: discord.VoiceClient = guild.voice_client
         channel: discord.VoiceChannel = author.voice.channel
         if not voice_client:
             await channel.connect()
@@ -421,8 +424,8 @@ async def download_related_video(ctx, auto_play_setting):
 
 async def play_file(ctx):
     """Plays first (index=0) song in the music queue"""
-    guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    guild: discord.Guild = ctx.guild
+    voice_client: discord.VoiceClient = guild.voice_client
     guild_data = data_dict[guild]
     upcoming_tracks = guild_data['music']
     play_history = guild_data['done']
@@ -530,14 +533,14 @@ async def play(ctx):
     # TODO: time remaining command + song length command
     # TODO: download option
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = guild.voice_client
     ctx_msg_content = ctx.message.content
     play_next = any([cmd in ctx_msg_content for cmd in ('pn', 'play_next', 'playnext')])
     guild_data = data_dict[guild]
     mq = guild_data['music']
     if voice_client is None:
         await bot.get_command('summon').callback(ctx)
-        voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+        voice_client: discord.VoiceClient = guild.voice_client
     url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
@@ -585,7 +588,7 @@ async def play(ctx):
 
 @bot.command(aliases=['resume'])
 async def pause(ctx):
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    voice_client: discord.VoiceClient = ctx.guild.voice_client
     if voice_client:
         await bot.change_presence(activity=discord.Game('Prison Break (!)'))
         if voice_client.is_paused():
@@ -624,7 +627,7 @@ async def _auto_play(ctx, setting: bool = None):
 @bot.command(name='repeat', aliases=['r'])
 async def _repeat(ctx, setting: bool = None):
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = guild.voice_client
     guild_data = data_dict[guild]
     if setting is None: setting = not guild_data['repeat']
     data_dict[guild]['repeat'] = setting
@@ -643,7 +646,7 @@ async def _repeat(ctx, setting: bool = None):
 @bot.command(name='repeat_all', aliases=['ra'])
 async def _repeat_all(ctx, setting: bool = None):
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = guild.voice_client
     guild_data = data_dict[guild]
     if setting is None:
         setting = not data_dict[guild]['repeat_all']
@@ -674,7 +677,7 @@ def no_after_play(guild_data, voice_client):
 async def skip(ctx, times=1):
     # TODO: make it a partial democracy but mods and admins can bypass it
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
         guild_data = data_dict[guild]
         mq = guild_data['music']
@@ -693,7 +696,7 @@ async def skip(ctx, times=1):
 async def previous(ctx, times=1):
     # TODO: make it a partial democracy but mods and admins can bypass it
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
         guild_data = data_dict[guild]
         mq = guild_data['music']
@@ -749,7 +752,7 @@ async def _remove(ctx, position: int):
     guild_data = data_dict[guild]
     mq = guild_data['music']
     dq = guild_data['done']
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = guild.voice_client
     with suppress(IndexError):
         if position < 0:
             dq.pop(-position - 1)
@@ -785,7 +788,7 @@ async def now_playing(ctx):
 async def leave(ctx):
     # clear music queue
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
         await voice_client.disconnect()
         guild_data = data_dict[guild]
@@ -797,7 +800,7 @@ async def leave(ctx):
 @bot.command(aliases=['end'])
 async def stop(ctx):
     guild = ctx.guild
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = guild.voice_client
     if voice_client and voice_client.is_playing():
         data_dict[guild]['is_stopped'] = True
         voice_client.stop()
@@ -807,7 +810,7 @@ async def stop(ctx):
 async def fix(ctx):
     guild = ctx.message.channel.guild
     await bot.get_command('summon').callback(ctx)
-    voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=guild)
+    voice_client: discord.VoiceClient = guild.voice_client
     await voice_client.disconnect()
     await bot.get_command('summon').callback(ctx)
 
@@ -832,7 +835,7 @@ async def ban(ctx):
 
 @bot.command(aliases=['set_volume', 'sv', 'v'])
 async def volume(ctx):
-    vc: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    vc: discord.VoiceClient = ctx.guild.voice_client
     if vc:
         args = ctx.message.content.split(' ')
         if len(args) == 2:
