@@ -712,12 +712,14 @@ async def previous(ctx, times=1):
 async def next_up(ctx):
     # TODO: rich embed?
     guild = ctx.guild
-    mq = data_dict[guild]['music']
+    guild_data = data_dict[guild]
+    mq = guild_data['music']
     if mq:
-        if data_dict[guild]['auto_play']:
-            msg = 'MUSIC QUEUE | AUTO PLAY ENABLED'
-        else:
-            msg = 'MUSIC QUEUE | AUTO PLAY DISABLED'
+        setting1 = 'ENABLED' if guild_data['auto_play'] else 'DISABLED'
+        setting2 = 'ENABLED' if guild_data['repeat_all'] else 'DISABLED'
+        setting3 = 'ENABLED' if guild_data['repeat'] else 'DISABLED'
+        msg = f'MUSIC QUEUE | AUTO PLAY {setting1} | REPEAT ALL {setting2} | REPEAT SONG {setting3}'
+        # TODO: send only enabled stuff?
         for i, song in enumerate(mq):
             if i == 10:
                 msg += '\n...'
