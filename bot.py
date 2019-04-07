@@ -196,6 +196,7 @@ async def thank(ctx):
     await ctx.send(f"You're welcome {ctx.author.mention}")
 
 
+@commands.has_permissions(manage_messages=True)
 @bot.command()
 async def clear(ctx):
     with suppress(AttributeError):
@@ -383,7 +384,8 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
 
         if in_background or play_immediately:
             def callback(_):
-                msg_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
+                if play_next: msg_content = f'Added __**{title}**__ to next up'
+                else: msg_content = f'Added __**{title}**__ to the playing queue'
                 bot.loop.create_task(m.edit(content=msg_content))
                 data_dict['downloads'].pop(video_id)
                 # todo: call play_file(ctx) if play_immediately and mq[0].title == title
@@ -418,7 +420,7 @@ async def download_related_video(ctx, auto_play_setting):
             related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].video_id, play_history)
             upcoming_tracks.append(Song(related_title, related_video_id))
             related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
-            related_msg_content = f'Added `{related_title}` to the playing queue'
+            related_msg_content = f'Added __**{related_title}**__ to the playing queue'
             if not related_m: await ctx.send(related_msg_content)
 
 
@@ -525,7 +527,7 @@ async def play_file(ctx):
     #     if not related_m: run_coro(ctx.send(related_msg_content))
 
 
-@bot.command(aliases=['paly', 'p', 'P', 'queue', 'que', 'q', 'pap', 'pn', 'play_next', 'playnext'])
+@bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
 async def play(ctx):
     # TODO: rename done queue to recently played
     # TODO: rename music_queue to next up
@@ -571,9 +573,9 @@ async def play(ctx):
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
             m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
-            m_content = f'Added `{title}` to next up' if play_next else f'Added `{title}` to the playing queue'
+            if play_next:  m_content = f'Added __**{title}**__ to next up'
+            else: m_content = f'Added __**{title}**__ to the playing queue'
             if not m: await ctx.send(m_content)
-            # else: await m.edit(content=m_content)
         else:
             await play_file(ctx)  # download if need to and then play the song
 
@@ -620,7 +622,7 @@ async def _auto_play(ctx, setting: bool = None):
             url, title, video_id, = get_related_video(song_id, dq)
             mq.append(Song(title, video_id))
             m = await download_if_not_exists(ctx, title, video_id, in_background=True)
-            msg_content = f'Added `{title}` to the playing queue'
+            msg_content = f'Added __**{title}**__ to the playing queue'
             if not m: await ctx.send(msg_content)
 
 
@@ -708,7 +710,7 @@ async def previous(ctx, times=1):
             await play_file(ctx)
 
 
-@bot.command(aliases=['music_queue', 'mq', 'nu'])
+@bot.command(aliases=['music_queue', 'mq', 'nu', 'queue', 'que', 'q'])
 async def next_up(ctx):
     # TODO: rich embed?
     guild = ctx.guild
