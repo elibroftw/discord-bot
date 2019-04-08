@@ -4,12 +4,12 @@ import glob
 import smtplib
 import socket
 import ssl
-import sys
 from collections import namedtuple, OrderedDict
 from contextlib import suppress
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import logging
+# noinspection PyUnresolvedReferences
 from pprint import pprint
 
 import requests
