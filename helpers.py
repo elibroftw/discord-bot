@@ -157,7 +157,7 @@ def get_video_duration(video_id):
     # pylint: disable=no-member
     try: search_response = youtube_API.videos().list(part='contentDetails,snippet', id=video_id).execute()
     except ConnectionAbortedError:
-        url = f'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id={video_ids}&key={google_api_key}'
+        url = f'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id={video_id}&key={google_api_key}'
         search_response = json.loads(requests.get(url).text)
     item = search_response.get('items', [])[0]
     is_live = item['snippet']['liveBroadcastContent'] == 'live'
