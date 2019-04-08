@@ -170,8 +170,8 @@ async def restart(ctx):
         print('Restarting')
         for voice_client in bot.voice_clients:
             if voice_client:
-                if voice_client.is_playing():
-                    no_after_play(data_dict[ctx.guild], voice_client)
+                # if voice_client.is_playing():
+                #     no_after_play(data_dict[ctx.guild], voice_client)
                 await voice_client.disconnect()
                 # await voice_client.connect()
         run('python bot.py')
@@ -348,18 +348,20 @@ async def created_at(ctx):
 
 @bot.command()
 async def summon(ctx):
-    guild = ctx.message.channel.guild
-    author: discord.Member = ctx.message.author
+    guild = ctx.guild
+    author: discord.Member = ctx.author
     if not author.voice:
-        await discord.utils.get(guild.voice_channels, name='music').connect()
+        return await discord.utils.get(guild.voice_channels, name='music').connect()
     else:
         voice_client: discord.VoiceClient = guild.voice_client
         channel: discord.VoiceChannel = author.voice.channel
         if not voice_client:
-            await channel.connect()
+            vc = await channel.connect()
+            return vc
         elif voice_client.channel != channel:
             # TODO: add a role lock?
-            await voice_client.move_to(channel)
+            return await voice_client.move_to(channel)
+        return voice_client
 
 
 def run_coro(coro: asyncio.coroutine):
@@ -548,8 +550,8 @@ async def play(ctx):
     guild_data = data_dict[guild]
     mq = guild_data['music']
     if voice_client is None:
-        await bot.get_command('summon').callback(ctx)
-        voice_client = guild.voice_client
+        voice_client = await bot.get_command('summon').callback(ctx)
+        # voice_client = guild.voice_client
     url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
@@ -586,11 +588,10 @@ async def play(ctx):
         else:
             await play_file(ctx)  # download if need to and then play the song
 
-    else:
-        if (voice_client.is_playing() or voice_client.is_paused()) and not play_next:
-            await bot.get_command('pause').callback(ctx)
-        elif mq:
-            await play_file(ctx)
+    elif (voice_client.is_playing() or voice_client.is_paused()) and not play_next:
+        await bot.get_command('pause').callback(ctx)
+    elif mq:
+        await play_file(ctx)
     if ctx_msg_content.startswith('!pap'):
         await bot.get_command('auto_play').callback(ctx)
 
