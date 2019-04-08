@@ -549,7 +549,7 @@ async def play(ctx):
     mq = guild_data['music']
     if voice_client is None:
         await bot.get_command('summon').callback(ctx)
-        voice_client: discord.VoiceClient = guild.voice_client
+        voice_client = guild.voice_client
     url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
