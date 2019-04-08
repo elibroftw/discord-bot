@@ -175,6 +175,7 @@ async def restart(ctx):
                 await voice_client.disconnect()
                 # await voice_client.connect()
         run('python bot.py')
+        quit()
 
 
 # @bot.command(, aliases=['gettweet', 'get_tweet'])
