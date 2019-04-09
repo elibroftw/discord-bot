@@ -762,7 +762,7 @@ async def _recently_played(ctx):
 
 
 @bot.command(name='remove')
-async def _remove(ctx, position: int):
+async def _remove(ctx, position: int = 0):
     guild = ctx.guild
     guild_data = data_dict[guild]
     mq = guild_data['music']
