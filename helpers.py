@@ -73,14 +73,6 @@ def yt_time(duration="P1W2DT6H21M32S"):
 # twitter_api = tweepy.API(twitter_auth)
 
 
-# def rich_embed(title, url, image, icon, desc, author='', colour=discord.Color.red()):
-#     embed = discord.Embed(url=url, title=title, color=colour, description=desc)
-#     embed.set_thumbnail(url=icon)
-#     embed.set_image(url=image)
-#     author_icon = 'https://cdn.discordapp.com/avatars/282274755426385921/fa592e14d10668e80e981b7e1066746a.webp?size=256'
-#     if author != '': embed.set_author(name=author, url=url, icon_url=author_icon)
-#     return embed
-
 def fix_youtube_title(title):
     return title.replace('&quot;', '\'').replace('&amp;', '&').replace(
         '/', '_').replace('?', '').replace(':', ' -').replace('&#39;', "'").replace(' || ', '_')
@@ -368,14 +360,14 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
 #     return msg
 
 
-def send_email(recipient, name='', subject=''):  # NOTE: for later
+def send_email(recipient, name='', subject=''):  # TODO: for later
     password = os.environ['PASSWORD']
     my_address = os.environ['EMAIL']
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.starttls()
     s.login(my_address, password)
     msg = MIMEMultipart()
-    message = 'Hey, this is just a test'
+    message = f'Hey {name}, this is just a test'
     msg['From'] = my_address
     msg['To'] = recipient
     msg['Subject'] = f'{subject}'
@@ -393,11 +385,5 @@ def search_for(directory, contains):
 
 
 if __name__ == "__main__":
-    # print(get_related_video('PczuoZJ-PtM'))
-    # vid_id = 'QnccxyatrD0'
-    vid_id = get_video_id(youtube_search('Adam K & Soha Twilight'))
-    youtube_download(vid_id)
-    # a, b, c = youtube_search('The grand sound livestream', return_info=True, limit_duration=True)
-    # print(youtube_search('slow'))
-    # youtube_download(youtube_search('Slow'))
-    # print(get_video_title(vid_id))
+    # tests go here
+    pass
