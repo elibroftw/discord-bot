@@ -796,9 +796,7 @@ async def clear_queue(ctx):
 async def now_playing(ctx):
     guild = ctx.guild
     mq = data_dict[guild]['music']
-    embed = create_embed('Currently Playing', 'https://www.youtube.com/watch?v={mq[0].video_id}', discord.Color.red())
-    await ctx.send(f'Currently playing: https://www.youtube.com/watch?v={mq[0].video_id}')
-    await ctx.send(embed=embed)
+    await ctx.send(f'https://www.youtube.com/watch?v={mq[0].video_id}')
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
