@@ -761,8 +761,8 @@ async def _recently_played(ctx):
         await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
 
 
-@bot.command(name='remove')
-async def _remove(ctx, position: int = 0):
+@bot.command()
+async def remove(ctx, position: int = 0):
     guild = ctx.guild
     guild_data = data_dict[guild]
     mq = guild_data['music']
