@@ -8,6 +8,7 @@ from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
+import logging
 import os
 # noinspection PyUnresolvedReferences
 from pprint import pprint
@@ -17,6 +18,11 @@ import tictactoe
 from helpers import youtube_download, youtube_search, get_related_video, get_video_id, get_video_title, load_opus_lib, \
     update_net_worth, check_net_worth, Song, get_video_duration
 
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
 # TODO: make a website
 bot = commands.Bot(command_prefix='!')
 bot.command()
@@ -389,8 +395,10 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
 
         if in_background or play_immediately:
             def callback(_):
-                if play_next: msg_content = f'Added `{title}` to next up'
-                else: msg_content = f'Added `{title}` to the playing queue'
+                if play_next:
+                    msg_content = f'Added `{title}` to next up'
+                else:
+                    msg_content = f'Added `{title}` to the playing queue'
                 bot.loop.create_task(m.edit(content=msg_content))
                 data_dict['downloads'].pop(video_id)
                 # todo: call play_file(ctx) if play_immediately and mq[0].title == title
@@ -581,8 +589,10 @@ async def play(ctx):
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
             m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
-            if play_next:  m_content = f'Added `{title}` to next up'
-            else: m_content = f'Added `{title}` to the playing queue'
+            if play_next:
+                m_content = f'Added `{title}` to next up'
+            else:
+                m_content = f'Added `{title}` to the playing queue'
             if not m: await ctx.send(m_content)
         else:
             await play_file(ctx)  # download if need to and then play the song
@@ -858,11 +868,15 @@ async def volume(ctx):
             try:
                 arg = args[1]
                 if arg.startswith('+'):
-                    if arg[1:]: amount = vc.source.volume + float(arg[1:])/100
-                    else: amount = vc.source.volume + 0.1
+                    if arg[1:]:
+                        amount = vc.source.volume + float(arg[1:]) / 100
+                    else:
+                        amount = vc.source.volume + 0.1
                 elif arg.startswith('-'):
-                    if arg[1:]: amount = vc.source.volume - float(arg[1:]) / 100
-                    else: amount = vc.source.volume - 0.1
+                    if arg[1:]:
+                        amount = vc.source.volume - float(arg[1:]) / 100
+                    else:
+                        amount = vc.source.volume - 0.1
                 else:
                     amount = float(args[1]) / 100
                 # noinspection PyTypeChecker
