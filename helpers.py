@@ -148,7 +148,7 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
 def get_video_duration(video_id):
     # pylint: disable=no-member
     try: search_response = youtube_API.videos().list(part='contentDetails,snippet', id=video_id).execute()
-    except ConnectionAbortedError:
+    except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
         api_url = 'https://www.googleapis.com/youtube/v3/'
         f = {'part': 'contentDetails,snippet', 'id': video_id, 'key': google_api_key}
         query_string = urlencode(f)
@@ -163,7 +163,7 @@ def get_video_durations(video_ids):
     video_ids = ','.join(video_ids)
     # pylint: disable=no-member
     try: search_response = youtube_API.videos().list(part='contentDetails', id=video_ids).execute()
-    except ConnectionAbortedError:
+    except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
         url = f'https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id={video_ids}&key={google_api_key}'
         search_response = json.loads(requests.get(url).text)
     return_dict = {}
