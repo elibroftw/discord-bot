@@ -8,6 +8,7 @@ from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
+import logging
 import os
 # noinspection PyUnresolvedReferences
 from pprint import pprint
@@ -17,6 +18,11 @@ import tictactoe
 from helpers import youtube_download, youtube_search, get_related_video, get_video_id, get_video_title, load_opus_lib, \
     update_net_worth, check_net_worth, Song, get_video_duration
 
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
 # TODO: make a website
 bot = commands.Bot(command_prefix='!')
 bot.command()
@@ -389,8 +395,10 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
 
         if in_background or play_immediately:
             def callback(_):
-                if play_next: msg_content = f'Added `{title}` to next up'
-                else: msg_content = f'Added `{title}` to the playing queue'
+                if play_next:
+                    msg_content = f'Added `{title}` to next up'
+                else:
+                    msg_content = f'Added `{title}` to the playing queue'
                 bot.loop.create_task(m.edit(content=msg_content))
                 data_dict['downloads'].pop(video_id)
                 # todo: call play_file(ctx) if play_immediately and mq[0].title == title
@@ -481,19 +489,9 @@ async def play_file(ctx):
                     voice_client.play(next_audio_source, after=after_play)
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
                     next_msg_content = f'Now playing `{next_title}`'
-                    if next_m:
-                        run_coro(next_m.edit(content=next_msg_content))
-                    else:
-                        run_coro(ctx.send(next_msg_content))
-
+                    if not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
+                    if next_m: run_coro(next_m.edit(content=next_msg_content))
                     run_coro(download_related_video(ctx, setting))
-                    # if setting and len(mq) == 1:
-                    #     url, next_title, next_video_id = get_related_video(mq[0].video_id, ph)
-                    #     mq.append(Song(next_title, next_video_id))
-                    #     next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=True))
-                    #     next_msg_content = f'Added `{next_title}` to the playing queue'
-                    #     if not next_m: run_coro(ctx.send(next_msg_content))
-
             else:
                 run_coro(bot.change_presence(activity=discord.Game('Prison Break (!)')))
                 if len(voice_client.channel.members) == 1: run_coro(voice_client.disconnect())
@@ -528,12 +526,6 @@ async def play_file(ctx):
         await bot.change_presence(activity=discord.Game(title))
 
         await download_related_video(ctx, guild_data['auto_play'])
-        # if len(upcoming_tracks) == 1 and guild_data['auto_play']:
-    #     related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].video_id, play_history)
-    #     upcoming_tracks.append(Song(related_title, related_video_id))
-    #     related_m = run_coro(download_if_not_exists(ctx, related_title, related_video_id, in_background=True))
-    #     related_msg_content = f'Added `{related_title}` to the playing queue'
-    #     if not related_m: run_coro(ctx.send(related_msg_content))
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
@@ -551,7 +543,6 @@ async def play(ctx):
     mq = guild_data['music']
     if voice_client is None:
         voice_client = await bot.get_command('summon').callback(ctx)
-        # voice_client = guild.voice_client
     url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
@@ -581,8 +572,10 @@ async def play(ctx):
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
             m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
-            if play_next:  m_content = f'Added `{title}` to next up'
-            else: m_content = f'Added `{title}` to the playing queue'
+            if play_next:
+                m_content = f'Added `{title}` to next up'
+            else:
+                m_content = f'Added `{title}` to the playing queue'
             if not m: await ctx.send(m_content)
         else:
             await play_file(ctx)  # download if need to and then play the song
@@ -858,11 +851,15 @@ async def volume(ctx):
             try:
                 arg = args[1]
                 if arg.startswith('+'):
-                    if arg[1:]: amount = vc.source.volume + float(arg[1:])/100
-                    else: amount = vc.source.volume + 0.1
+                    if arg[1:]:
+                        amount = vc.source.volume + float(arg[1:]) / 100
+                    else:
+                        amount = vc.source.volume + 0.1
                 elif arg.startswith('-'):
-                    if arg[1:]: amount = vc.source.volume - float(arg[1:]) / 100
-                    else: amount = vc.source.volume - 0.1
+                    if arg[1:]:
+                        amount = vc.source.volume - float(arg[1:]) / 100
+                    else:
+                        amount = vc.source.volume - 0.1
                 else:
                     amount = float(args[1]) / 100
                 # noinspection PyTypeChecker
