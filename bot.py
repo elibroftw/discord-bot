@@ -714,7 +714,7 @@ async def next_up(ctx):
     guild_data = data_dict[str(guild)]
     mq = guild_data['music']
     if mq:
-        title = 'MUSIC QUEUE'  # :musical_note:
+        title = f'MUSIC QUEUE [{len(mq)} Songs]'  # :musical_note:
         if guild_data['auto_play']: title += ' | AUTO PLAY ENABLED'
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
