@@ -137,7 +137,6 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
     try: kind = p.search(text).group()[2:]
     except AttributeError: kind = 'video'
     with suppress(ValueError): text = text[text.index(' '):text.index('--')]
-    # pylint: disable=no-member
     f = {'part': 'id,snippet', 'maxResults': min(results + 5, 50), 'order': 'relevance',
          'q': text, 'type': kind, 'key': google_api_key}
     query_string = urlencode(f)
@@ -186,7 +185,6 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
 
 
 def get_video_duration(video_id):
-    # pylint: disable=no-member
     f = {'part': 'contentDetails,snippet', 'id': video_id, 'key': google_api_key}
     query_string = urlencode(f)
     r = requests.get(f'{youtube_api_url}videos?{query_string}')
@@ -198,7 +196,6 @@ def get_video_duration(video_id):
 
 def get_video_durations(video_ids):
     video_ids = ','.join(video_ids)
-    # pylint: disable=no-member
     url = f'{youtube_api_url}videos?part=contentDetails&id={video_ids}&key={google_api_key}'
     search_response = json.loads(requests.get(url).text)
     return_dict = {}
@@ -286,7 +283,6 @@ def get_youtube_title(video_id):
 def get_related_video(video_id, done_queue):
     dq = done_queue[:20]  # songs have a possibility of repeating after 20 songs
     results = min(5 + len(dq), 50)
-    # pylint: disable=no-member
     f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
          'type': 'video', 'key': google_api_key}
     search_response = json.loads(requests.get(f'{youtube_api_url}search?{urlencode(f)}').text)

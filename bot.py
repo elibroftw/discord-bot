@@ -926,7 +926,6 @@ async def volume(ctx):
                         amount = vc.source.volume - 0.1
                 else:
                     amount = float(args[1]) / 100
-                # noinspection PyTypeChecker
                 amount = max(0, amount)
                 amount = min(1, amount)
                 vc.source.volume = amount
