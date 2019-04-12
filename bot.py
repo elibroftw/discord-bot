@@ -381,7 +381,7 @@ def get_yield(fut):
     return d
 
 
-async def download_if_not_exists(ctx, title, video_id, play_immediately=False, in_background=False, play_next=False):
+async def download_if_not_exists(ctx, title, video_id, in_background=False, play_next=False):
     """
     Checks if file corresponding to title and video_id exists
     If it doesn't exist, download it
@@ -393,7 +393,7 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
     if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
 
-        if in_background or play_immediately:
+        if in_background:
             def callback(_):
                 if play_next:
                     msg_content = f'Added `{title}` to next up'
@@ -406,7 +406,6 @@ async def download_if_not_exists(ctx, title, video_id, play_immediately=False, i
 
             result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
             result.add_done_callback(callback)
-
             data_dict['downloads'][video_id] = (result, m)
         else:
             youtube_download(video_id)
