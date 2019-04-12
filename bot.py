@@ -523,7 +523,6 @@ async def play_file(ctx):
                 guild_data['music'] = deepcopy(temp_mq)
                 guild_data['done'] = deepcopy(temp_dq)
         await bot.change_presence(activity=discord.Game(title))
-
         await download_related_video(ctx, guild_data['auto_play'])
 
 
