@@ -227,9 +227,9 @@ def get_video_id(url):
     return None
 
 
-def get_video_title(video_id):
-    # pylint: disable=no-member
-    response = youtube_API.videos().list(part='snippet', id=video_id).execute()
+def get_youtube_title(video_id):
+    f = {'part': 'snippet',  'id': video_id, 'key': google_api_key}
+    response = json.loads(requests.get(f'{youtube_api_url}videos?{urlencode(f)}').text)
     title = response['items'][0]['snippet']['title']
     return title
     # return fix_youtube_title(title)  # file friendly title
