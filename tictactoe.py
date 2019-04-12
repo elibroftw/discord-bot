@@ -258,7 +258,9 @@ def move_four(data: dict):
         return msg, data
 
 
-def tic_tac_toe_move(ttt_round, data: dict):
+def tic_tac_toe_move(data: dict, choice=None):
+    ttt_round = data['round']
+    if ttt_round == 0: return greeting(data, choice)
     if ttt_round == 1: return move_one(data)
     if ttt_round == 2: return move_two(data)
     if ttt_round == 3: return move_three(data)
