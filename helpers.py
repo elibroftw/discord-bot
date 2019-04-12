@@ -2,13 +2,10 @@ from __future__ import unicode_literals
 
 import glob
 import smtplib
-import socket
-import ssl
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 from contextlib import suppress
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import logging
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 # noinspection PyUnresolvedReferences
@@ -22,10 +19,59 @@ import os
 import json
 from urllib.parse import urlparse, parse_qs, urlencode
 import youtube_dl
+from mutagen.mp3 import MP3
 
-logger = logging.getLogger()
-logger.setLevel(logging.ERROR)
-Song = namedtuple('Song', ('title', 'video_id'))
+
+class Song:
+    _time_stamp = 0
+    start_time = None
+    status = 'NOT_PLAYING'
+
+    def __init__(self, title, video_id):
+        self.title = title
+        self.video_id = video_id
+
+    def start(self, start_at=_time_stamp):
+        self.status = 'PLAYING'
+        self.start_time = time() - start_at
+
+    def play(self):
+        self.start()
+
+    def pause(self):
+        self.status = 'PAUSED'
+        self._time_stamp = time() - self.start_time
+
+    def stop(self):
+        self.status = 'NOT_PLAYING'
+        self._time_stamp = 0
+
+    def get_time_stamp(self):
+        if self.status == 'PLAYING':
+            return time() - self.start_time
+        else:
+            return self._time_stamp
+
+    def set_time_stamp(self, seconds):
+        self._time_stamp = seconds
+
+    def fwd(self, seconds):
+        self.start_time -= seconds
+
+    def rwd(self, seconds):
+        self.start_time += seconds
+
+    def get_status(self):
+        return self.status
+
+    @property
+    def length(self):
+        audio = MP3(f'Music/{self.video_id}.mp3')
+        return audio.info.length
+
+
+# Song = namedtuple('Song', ('title', 'video_id'))
+
 
 try: google_api_key = os.environ['google']
 except KeyError:
@@ -362,6 +408,19 @@ def search_for(directory, contains):
         if contains in file:
             contains_list.append(file)
     return contains_list
+
+
+def format_time_ffmpeg(s):
+    total_msec = s * 1000
+    total_seconds = s
+    total_minutes = s / 60
+    total_hours = s / 3600
+    msec = int(total_msec % 1000)
+    sec = int(total_seconds % 60 - (msec / 3600000))
+    mins = int(total_minutes % 60 - (sec / 3600) - (msec / 3600000))
+    hours = int(total_hours - (mins / 60) - (sec / 3600) - (msec / 3600000))
+
+    return "{:02d}:{:02d}:{:02d}".format(hours, mins, sec)
 
 
 if __name__ == "__main__":
