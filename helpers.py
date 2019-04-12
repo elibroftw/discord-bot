@@ -26,6 +26,7 @@ class Song:
     _time_stamp = 0
     start_time = None
     status = 'NOT_PLAYING'
+    length = None
 
     def __init__(self, title, video_id):
         self.title = title
@@ -64,10 +65,11 @@ class Song:
     def get_status(self):
         return self.status
 
-    @property
-    def length(self):
-        audio = MP3(f'Music/{self.video_id}.mp3')
-        return audio.info.length
+    def get_length(self):
+        if self.length is None:
+            audio = MP3(f'Music/{self.video_id}.mp3')
+            self.length = audio.info.length
+        return self.length
 
 
 # Song = namedtuple('Song', ('title', 'video_id'))

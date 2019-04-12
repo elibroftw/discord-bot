@@ -23,7 +23,6 @@ logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
-# TODO: make a website
 bot = commands.Bot(command_prefix='!')
 bot.command()
 
@@ -74,6 +73,12 @@ async def on_message(message):
         await author.send(help_message)
     else:
         with suppress(discord.ext.commands.errors.CommandNotFound): await bot.process_commands(message)
+
+
+# noinspection PyUnusedLocal
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.errors.CommandNotFound): return
 
 
 @bot.command()
@@ -194,7 +199,7 @@ async def restart(ctx):
 #
 # @bot.command(, aliases=['searchuser' 'search_user'])
 # async def search_twitter_user(ctx):
-#     text = ctx.message.content[ctx.message.content.index(' ') + 1:]  # TODO: except ValueError
+#     text = ctx.message.content[ctx.message.content.index(' ') + 1:]  #  except ValueError
 #     bot_message = discord_search_twitter_user(text)
 #     await ctx.send(bot_message)
 # search_users()
@@ -490,15 +495,15 @@ async def play_file(ctx, start_at=0):
                                                        options="-vn -b:a 128k")
                     next_audio_source = PCMVolumeTransformer(next_audio_source)
                     next_audio_source.volume = guild_data['volume']
-                    next_song.start(0)
                     voice_client.play(next_audio_source, after=after_play)
+                    next_song.start(0)
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
                     time_stamp = round(next_song.get_time_stamp())
                     minutes = time_stamp // 60
                     seconds = time_stamp % 60
                     if minutes < 10: minutes = f'0{minutes}'
                     if seconds < 10: seconds = f'0{seconds}'
-                    song_length = round(next_song.length)
+                    song_length = round(next_song.get_length())
                     m_length = song_length // 60
                     s_length = song_length % 60
                     if m_length < 10: m_length = f'0{m_length}'
@@ -526,20 +531,20 @@ async def play_file(ctx, start_at=0):
         guild_data['is_stopped'] = False
         # -af silenceremove=start_periods=1:stop_periods=1:detection=peak
         start_at = max(0, start_at)
-        start_at = min(song.length, start_at)
+        start_at = min(song.get_length(), start_at)
         audio_source = FFmpegPCMAudio(music_filepath, executable=ffmpeg_path,
                                       before_options=f'-nostdin -ss {format_time_ffmpeg(start_at)}',
                                       options='-vn -b:a 128k')
         audio_source = PCMVolumeTransformer(audio_source)
         audio_source.volume = guild_data['volume']
-        song.start(start_at)
         voice_client.play(audio_source, after=after_play)
+        song.start(start_at)
         time_stamp = round(song.get_time_stamp())
         minutes = time_stamp // 60
         seconds = time_stamp % 60
         if minutes < 10: minutes = f'0{minutes}'
         if seconds < 10: seconds = f'0{seconds}'
-        song_length = round(song.length)
+        song_length = round(song.get_length())
         minutes_length = song_length // 60
         seconds_length = song_length % 60
         if minutes_length < 10: minutes_length = f'0{minutes_length}'
@@ -625,11 +630,11 @@ async def pause(ctx):
         song = data_dict[str(ctx.guild)]['music'][0]
         await bot.change_presence(activity=discord.Game('Prison Break (!)'))
         if voice_client.is_paused():
-            song.start()
             voice_client.resume()
+            song.start()
         else:
-            song.pause()
             voice_client.pause()
+            song.pause()
 
 
 @bot.command(name='auto_play', aliases=['ap', 'autoplay'])
