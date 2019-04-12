@@ -236,7 +236,7 @@ def get_youtube_title(video_id):
 
 
 def get_related_video(video_id, done_queue):
-    dq = done_queue[:10]  # songs have a possibility of repeating after 10 songs
+    dq = done_queue[:20]  # songs have a possibility of repeating after 20 songs
     results = min(5 + len(dq), 50)
     # pylint: disable=no-member
     f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
