@@ -69,7 +69,6 @@ def iso_8061_to_seconds(duration="P1W2DT6H21M32S"):
 
 # twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
 # twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
-#
 # twitter_api = tweepy.API(twitter_auth)
 
 
