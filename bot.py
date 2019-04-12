@@ -738,7 +738,7 @@ async def _recently_played(ctx):
     guild = ctx.guild
     dq = data_dict[str(guild)]['done']
     if dq:
-        title = 'RECENTLY PLAYED'
+        title = f'RECENTLY PLAYED [{len(dq)} Songs]'
         msg = ''
         for i, song in enumerate(dq):
             if i == 10:
@@ -747,7 +747,6 @@ async def _recently_played(ctx):
             msg += f'\n-{i + 1} `{song.title}`'
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
-        await ctx.send(msg)
     else:
         await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
 
