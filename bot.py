@@ -931,10 +931,8 @@ async def volume(ctx):
                 amount = min(1, amount)
                 vc.source.volume = amount
                 data_dict[str(guild)]['volume'] = amount
-            except ValueError:
-                await ctx.send('Invalid argument')
-        else:
-            await ctx.send(vc.source.volume)
+            except ValueError: await ctx.send('Invalid argument', delete_after=5)
+        else: await ctx.send(f'{vc.source.volume * 100}%')
 
 
 @bot.command()
