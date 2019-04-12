@@ -261,7 +261,7 @@ async def ttt(ctx):
     # TODO: turn into DM game
     # print(message.author.top_role.is_everyone) checks if role is @everyone
     if ttt_games.get(author, False):
-        await author.send('You are already in a game. To end a game do !end')
+        await author.send('You are already in a game. To end a game enter !end')
     else:
         msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
@@ -271,11 +271,9 @@ async def ttt(ctx):
         # TODO: replace game_over with in_game
         tic_tac_toe_data[author] = {'username': str(author), 'comp_moves': [], 'user_moves': [], 'danger': None,
                                     'danger2': None, 'game_over': False}
-        user_msg, game_channel = True, author.dm_channel
-        if not game_channel:
-            await author.create_dm()
-
+        user_msg, game_channel = None, author.dm_channel
         # TODO: Change the parameter name??
+
         def check_yn(waited_msg):
             correct_prereqs = waited_msg.channel == game_channel and author == waited_msg.author
             waited_msg = waited_msg.content.lower()
@@ -290,16 +288,15 @@ async def ttt(ctx):
         while user_msg is None and not tic_tac_toe_data[author]['game_over']:
             try:
                 user_msg = await bot.wait_for('message', timeout=120, check=check_yn)
-
-                if user_msg is not None:
+                if user_msg:
                     user_msg = user_msg.content.lower()
                     if 'end' in user_msg:
                         tic_tac_toe_data[author]['game_over'] = True
-                        await ctx.send_message(game_channel, 'You have ended your tic-tac-toe game')
+                        await author.send('You have ended your tic-tac-toe game')
                     else:
                         ttt_round = 1
                         temp_msg = tictactoe.greeting(tic_tac_toe_data[author], user_msg)  # msg is y or n
-                        await ctx.send_message(game_channel, temp_msg)
+                        await author.send(temp_msg)
             except asyncio.TimeoutError:
                 tic_tac_toe_data[author]['game_over'] = True
 
@@ -309,28 +306,25 @@ async def ttt(ctx):
                 if user_msg is not None:
                     if 'end' in user_msg.content.lower():
                         tic_tac_toe_data[author]['game_over'] = True
-                        await game_channel.send_message('You have ended your tic-tac-toe game')
-                        continue
+                        await author.send('You have ended your tic-tac-toe game')
                     else:
                         player_move = int(user_msg.content)
                         temp_msg, d = tictactoe.valid_move(player_move, tic_tac_toe_data[author])
-                        print(tic_tac_toe_data[author] == d)
                         tic_tac_toe_data[author] = d
                         if not temp_msg:
-                            await game_channel.send_message('That was not a valid move')
+                            await author.send('That was an invalid move')
                         else:
                             temp_msg += '\n'
                             tic_tac_toe_data[author]['user_moves'].append(player_move)
                             tempt = tictactoe.tic_tac_toe_move(ttt_round, tic_tac_toe_data[author])[0]
                             if tic_tac_toe_data[author]['game_over']:
-                                print(tic_tac_toe_data[author]['game_over'])
                                 tic_tac_toe_data[author]['game_over'] = True
                                 if ttt_round == 5:
-                                    await ctx.send(f'Your Move{temp_msg + tempt}')
+                                    await author.send(f'Your Move{temp_msg + tempt}')
                                 else:
-                                    await ctx.send(f'Your Move{temp_msg}My Move{tempt}')
+                                    await author.send(f'Your Move{temp_msg}My Move{tempt}')
                             else:  # TODO: rich embed???
-                                await ctx.send(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
+                                await author.send(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
                             ttt_round += 1
             except asyncio.TimeoutError:
                 tic_tac_toe_data[author]['game_over'] = True
