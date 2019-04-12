@@ -15,8 +15,8 @@ from pprint import pprint
 from subprocess import run
 
 import tictactoe
-from helpers import youtube_download, youtube_search, get_related_video, get_video_id, get_video_title, load_opus_lib, \
-    update_net_worth, check_net_worth, Song, get_video_duration
+from helpers import youtube_download, youtube_search, get_related_video, get_video_id, get_youtube_title,\
+    load_opus_lib, update_net_worth, check_net_worth, Song, get_video_duration
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -548,7 +548,7 @@ async def play(ctx):
             # TODO: playlist support
             url = url_or_query
             video_id = get_video_id(url)
-            title = get_video_title(video_id)
+            title = get_youtube_title(video_id)
             if get_video_duration(video_id) > 600:
                 await ctx.send('That song is too long! (> 10 minutes)')
                 return
