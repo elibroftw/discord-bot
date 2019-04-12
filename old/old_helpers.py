@@ -11,7 +11,6 @@ from email.mime.text import MIMEText
 import logging
 # noinspection PyUnresolvedReferences
 from pprint import pprint
-# noinspection PyUnresolvedReferences
 from time import time
 
 import requests
@@ -20,6 +19,8 @@ from discord import opus
 import re
 import os
 import json
+# noinspection PyPackageRequirements
+from googleapiclient.discovery import build
 from urllib.parse import urlparse, parse_qs, urlencode
 import youtube_dl
 
@@ -36,7 +37,7 @@ except KeyError:
     google_api_key = os.environ['google']
 
 
-youtube_api_url = 'https://www.googleapis.com/youtube/v3/'
+youtube_API = build('youtube', 'v3', developerKey=google_api_key, cache_discovery=False)
 
 if not os.path.exists('Music'):
     os.mkdir('Music')
@@ -91,11 +92,19 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
     except AttributeError: kind = 'video'
     with suppress(ValueError): text = text[text.index(' '):text.index('--')]
     # pylint: disable=no-member
-    f = {'part': 'id,snippet', 'maxResults': min(results + 5, 50), 'order': 'relevance',
-         'q': text, 'type': kind, 'key': google_api_key}
-    query_string = urlencode(f)
-    r = requests.get(f'{youtube_api_url}search?{query_string}')
-    search_response = json.loads(r.text)
+    try:
+        if test: raise AttributeError
+        search_response = youtube_API.search().list(part='id,snippet', maxResults=min(results + 5, 50),
+                                                    order='relevance', q=text, type=kind,
+                                                    ).execute()
+    except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
+        print('error with youtube service in function youtube_search')
+        api_url = 'https://www.googleapis.com/youtube/v3/'
+        f = {'part': 'id,snippet', 'maxResults': min(results + 5, 50), 'order': 'relevance',
+             'q': text, 'type': kind, 'key': google_api_key}
+        query_string = urlencode(f)
+        r = requests.get(f'{api_url}search?{query_string}')
+        search_response = json.loads(r.text)
     videos, channels, play_lists = OrderedDict(), [], []
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
@@ -140,10 +149,14 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
 
 def get_video_duration(video_id):
     # pylint: disable=no-member
-    f = {'part': 'contentDetails,snippet', 'id': video_id, 'key': google_api_key}
-    query_string = urlencode(f)
-    r = requests.get(f'{youtube_api_url}videos?{query_string}')
-    search_response = json.loads(r.text)
+    try:
+        search_response = youtube_API.videos().list(part='contentDetails,snippet', id=video_id).execute()
+    except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
+        api_url = 'https://www.googleapis.com/youtube/v3/'
+        f = {'part': 'contentDetails,snippet', 'id': video_id, 'key': google_api_key}
+        query_string = urlencode(f)
+        r = requests.get(f'{api_url}videos?{query_string}')
+        search_response = json.loads(r.text)
     item = search_response.get('items', [])[0]
     is_live = item['snippet']['liveBroadcastContent'] == 'live'
     return 2088000 if is_live else iso_8061_to_seconds(item['contentDetails']['duration'])
@@ -152,8 +165,10 @@ def get_video_duration(video_id):
 def get_video_durations(video_ids):
     video_ids = ','.join(video_ids)
     # pylint: disable=no-member
-    url = f'{youtube_api_url}videos?part=contentDetails&id={video_ids}&key={google_api_key}'
-    search_response = json.loads(requests.get(url).text)
+    try: search_response = youtube_API.videos().list(part='contentDetails', id=video_ids).execute()
+    except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
+        url = f'https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id={video_ids}&key={google_api_key}'
+        search_response = json.loads(requests.get(url).text)
     return_dict = {}
     for item in search_response.get('items', []):
         return_dict[item['id']] = iso_8061_to_seconds(item['contentDetails']['duration'])
@@ -233,16 +248,23 @@ def get_video_title(video_id):
     response = youtube_API.videos().list(part='snippet', id=video_id).execute()
     title = response['items'][0]['snippet']['title']
     return title
-    # return fix_youtube_title(title)  # file friendly title
+    # return fix_youtube_title(title)  # NOTE: file friendly title
 
 
 def get_related_video(video_id, done_queue):
     dq = done_queue[:10]  # songs have a possibility of repeating after 10 songs
     results = min(5 + len(dq), 50)
     # pylint: disable=no-member
-    f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
-         'type': 'video', 'key': google_api_key}
-    search_response = json.loads(requests.get(f'{youtube_api_url}search?{urlencode(f)}').text)
+    try:
+        search_response = youtube_API.search().list(part='id,snippet',  maxResults=results,
+                                                    order='relevance', relatedToVideoId=video_id, type='video'
+                                                    ).execute()
+    except (ssl.SSLError, AttributeError, socket.timeout, ConnectionAbortedError):
+        api_url = 'https://www.googleapis.com/youtube/v3/'
+        f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
+             'type': 'video', 'key': google_api_key}
+        search_response = json.loads(requests.get(f'{api_url}search?{urlencode(f)}').text)
+        print('error with youtube service in function get_related_video')
     related_song = dq[0] if dq else Song('', '')
     i = 0
     while related_song in dq or related_song == Song('', '') or get_video_duration(related_song.video_id) > 600:
