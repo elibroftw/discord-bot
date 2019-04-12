@@ -25,10 +25,11 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 bot = commands.Bot(command_prefix='!')
 bot.command()
+load_opus_lib()
 
 invitation_code = os.environ['INVITATION_CODE']
-load_opus_lib()
-ttt_round = 0
+my_server_id = os.environ['SERVER_ID']
+
 players_in_game = []
 tic_tac_toe_data = {}
 ttt_games = {}
@@ -47,7 +48,7 @@ def create_embed(title, description='', color=discord.Color.blue()):
 async def on_ready():
     for guild in bot.guilds:
         data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1, 'repeat': False,
-                                 'repeat_all': False, 'auto_play': False, 'downloads': {}, 'invite': None}
+                            'repeat_all': False, 'auto_play': False, 'downloads': {}, 'invite': None}
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
@@ -246,7 +247,12 @@ async def _eval(ctx):
 @bot.command(aliases=['invite', 'invitecode', 'invite_link', 'invitelink'])
 async def invite_code(ctx):
     # await ctx.send(discord.Invite(channel=ctx.message.channel, code=invitation_code).url)
-    await ctx.send(f'https://discord.gg/{invitation_code}')
+    if ctx.guild.id == my_server_id:
+        await ctx.send(f'https://discord.gg/{invitation_code}')
+    else:
+        with suppress(IndexError):
+            await ctx.send(ctx.guild.invites()[0].url)
+
 
 
 @bot.command()
@@ -256,7 +262,7 @@ async def games(ctx):
 
 @bot.command()
 async def ttt(ctx):
-    global ttt_round, players_in_game, tic_tac_toe_data
+    global players_in_game, tic_tac_toe_data
     author: discord.User = ctx.message.author
     if ttt_games.get(author, False):
         await author.send('You are already in a game. To end a game enter !end')
@@ -264,11 +270,10 @@ async def ttt(ctx):
         msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
         await author.send(msg)
-        ttt_round = 0
         # TODO: do I really need username in dict??
         # TODO: replace game_over with in_game
         tic_tac_toe_data[author] = {'username': str(author), 'comp_moves': [], 'user_moves': [], 'danger': None,
-                                    'danger2': None, 'game_over': False}
+                                    'danger2': None, 'game_over': False, 'round': 0}
         user_msg, game_channel = None, author.dm_channel
         # TODO: Change the parameter name??
 
@@ -292,12 +297,12 @@ async def ttt(ctx):
                         tic_tac_toe_data[author]['game_over'] = True
                         await author.send('You have ended your tic-tac-toe game')
                     else:
-                        ttt_round = 1
+                        tic_tac_toe_data[author]['round'] = 1
                         temp_msg = tictactoe.greeting(tic_tac_toe_data[author], user_msg)  # msg is y or n
                         await author.send(temp_msg)
             except asyncio.TimeoutError:
                 tic_tac_toe_data[author]['game_over'] = True
-
+        # TODO: combine while statements
         while not tic_tac_toe_data[author]['game_over']:
             try:
                 user_msg = await bot.wait_for('message', timeout=120, check=check_digit)
@@ -314,16 +319,16 @@ async def ttt(ctx):
                         else:
                             temp_msg += '\n'
                             tic_tac_toe_data[author]['user_moves'].append(player_move)
-                            tempt = tictactoe.tic_tac_toe_move(ttt_round, tic_tac_toe_data[author])[0]
+                            tempt = tictactoe.tic_tac_toe_move(tic_tac_toe_data[author])[0]
                             if tic_tac_toe_data[author]['game_over']:
                                 tic_tac_toe_data[author]['game_over'] = True
-                                if ttt_round == 5:
+                                if tic_tac_toe_data[author]['round'] == 5:
                                     await author.send(f'Your Move{temp_msg + tempt}')
                                 else:
                                     await author.send(f'Your Move{temp_msg}My Move{tempt}')
                             else:  # TODO: rich embed???
                                 await author.send(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
-                            ttt_round += 1
+                            tic_tac_toe_data[author]['round'] += 1
             except asyncio.TimeoutError:
                 tic_tac_toe_data[author]['game_over'] = True
 
@@ -619,7 +624,7 @@ async def play(ctx):
 async def pause(ctx):
     voice_client: discord.VoiceClient = ctx.guild.voice_client
     if voice_client:
-        song = data_dict[str(ctx.guild)]['music'][0]
+        song = data_dict[ctx.guild]['music'][0]
         await bot.change_presence(activity=discord.Game('Prison Break (!)'))
         if voice_client.is_paused():
             voice_client.resume()
@@ -930,9 +935,9 @@ async def volume(ctx):
 async def about(ctx):
     ctx.author.send(f'Hi there. Thank you for wanting to know more about me. I was made by Elijah Lopez.\n'
                     'For more information visit https://github.com/elibroftw/discord-bot.\n'
-                    'Join my server at https://discord.gg/{invitation_code})')
+                    f'Join my server at https://discord.gg/{invitation_code})')
 
 
-bot.run(os.environ['discord'])
+bot.run(os.environ['DISCORD'])
 
 # TODO: 'shop', 'math', 'ban', 'remove_role', 'delete_role'
