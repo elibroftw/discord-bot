@@ -222,7 +222,7 @@ def remove_silence(input_file, output_file):
     os.remove(input_file)
 
 
-def youtube_download(url_or_video_id):
+def youtube_download(url_or_video_id, verbose=False):
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -236,8 +236,8 @@ def youtube_download(url_or_video_id):
         'external_downloader_args': '-c -j 3 -x 3 -s 3 -k 1M',
         # https://aria2.github.io/manual/en/html/aria2c.html#options
         'ffmpeg_location': 'ffmpeg\\bin',
-        # 'verbose': True,
-        'quiet': True,
+        'verbose': verbose,
+        'quiet': not verbose,
         'audio-quality': 0
     }
 
@@ -423,4 +423,6 @@ def format_time_ffmpeg(s):
 
 if __name__ == "__main__":
     # tests go below here
+    url = youtube_search('Magnolia')
+    youtube_download(url, verbose=True)
     pass
