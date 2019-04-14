@@ -605,27 +605,21 @@ async def play(ctx):
         song = Song(title, video_id)
 
         # adding to queue
-        if mq and play_next:
-            mq.insert(1, song)
-        else:
-            mq.append(song)
+        if mq and play_next: mq.insert(1, song)
+        else: mq.append(song)
 
         # download the song if something is playing
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
             m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
-            if play_next:
-                m_content = f'Added `{title}` to next up'
-            else:
-                m_content = f'Added `{title}` to the playing queue'
+            if play_next: m_content = f'Added `{title}` to next up'
+            else: m_content = f'Added `{title}` to the playing queue'
             if not m: await ctx.send(m_content)
-        else:
-            await play_file(ctx)  # download if need to and then play the song
+        else: await play_file(ctx)  # download if need to and then play the song
 
     elif (voice_client.is_playing() or voice_client.is_paused()) and not play_next:
         await bot.get_command('pause').callback(ctx)
-    elif mq:
-        await play_file(ctx)
+    elif mq: await play_file(ctx)
     if ctx_msg_content.startswith('!pap'):
         await bot.get_command('auto_play').callback(ctx)
 
@@ -697,8 +691,7 @@ async def _repeat_all(ctx, setting: bool = None):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     guild_data = data_dict[guild]
-    if setting is None:
-        setting = not data_dict[guild]['repeat_all']
+    if setting is None: setting = not data_dict[guild]['repeat_all']
     data_dict[guild]['repeat_all'] = setting
 
     if setting:
@@ -711,8 +704,7 @@ async def _repeat_all(ctx, setting: bool = None):
                 guild_data['music'] = dq[::-1]
                 dq.clear()
                 await play_file(ctx)
-    else:
-        await ctx.send('Repeating all set to False')
+    else: await ctx.send('Repeating all set to False')
 
 
 def no_after_play(guild_data, voice_client):
@@ -794,8 +786,7 @@ async def _recently_played(ctx):
             msg += f'\n`-{i + 1}` {song.title} `{song.get_length(True)}`'
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
-    else:
-        await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
+    else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
 
 
 @bot.command()
@@ -807,13 +798,12 @@ async def remove(ctx, position: int = 0):
     dq = guild_data['done']
     voice_client: discord.VoiceClient = guild.voice_client
     with suppress(IndexError):
-        if position < 0:
-            dq.pop(-position - 1)
-        elif position > 0:
-            mq.pop(position)
+        if position < 0: dq.pop(-position - 1)
+        elif position > 0: mq.pop(position)
         else:
             no_after_play(guild_data, voice_client)
             mq.pop(0)
+            if mq: await play_file(ctx)
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue', 'queue_clear', 'queueclear'])
@@ -856,6 +846,7 @@ async def fast_forward(ctx, seconds: int = 5):  # TODO
 @bot.command(aliases=['rwd', 'rw'])
 @commands.check(in_guild)
 async def rewind(ctx, seconds: int = 5):
+    # TODO: fix
     guild = ctx.guild
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():
