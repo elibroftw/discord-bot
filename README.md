@@ -2,26 +2,31 @@
 A discord bot (called El Chapo) I made using the discord.py module and is hosted on Repl.it (for now).
 
 # Features
+For a list of commands view bot.py
 
 - Uses rewritten version (old_bot.py is the repl.it version)
-- Tic-Tac-Toe (ultra difficult setting, there is a bug)
+- Tic-Tac-Toe (Impossible difficult setting, there is a bug)
 - Youtube search
-- Plays music (in development)
+- Plays music (Working but adding features)
     - Summon (!summon, !play <query/youtube_url>)
-    - Queues (!play, !paly, !p, !queue, !que, !q)
-    - Skip (!skip, !next, !s, !n)
-    - Previous song (!previous, !back, !b)
-    - Pause/Resume (!pause, !p, !resume)
-    - Stop (!stop, !end)
-    - Autoplay (!pap <query/youtube_url> (always turns it on), !auto_play, !ap)
-    - Leave (!leave, !disconnect, !unsummon, !desummon, !dismiss)
+    - Play or Add to queue (!play, !p)
     - Play next (adds the song to play right after, will rework this later !pn, !play_next)
+    - Pause/Resume (!pause, !p, !resume)
+    - Skip (!skip, !next, !s, !n)
+    - Back (!back, !b, !previous, !prev)
+    - Fast-forward (!ff <seconds=5>)
+    - Rewind (!rw <seconds=5>)
+    - Stop (!stop, !s, !end)
+    - Autoplay (adds to the music queue when the queue is empty or has only the playing track; !auto_play, !ap)
+    - View Upcoming tracks (!q)
+    - View Recently Played (!dq)
     - Set volume (!volume, !v, prints volume if no int given)
         - !v 100  # this will set volume to 100/100
         - !v +20  # increase volume by 20
         - !v -20  # decrease volume by 20
         - !v +  # increase volume by 10
         - !v -  # decrease volume by 10
+    - Leave (!leave, !disconnect, !unsummon, !desummon, !dismiss)
     
 
 - Twitter search (going to rework this)
