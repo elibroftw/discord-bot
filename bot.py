@@ -748,7 +748,7 @@ async def next_up(ctx):
             if i == 10:
                 msg += '\n...'
                 break
-            if i > 0: msg += f'\n`{i}.` {song.title} [{song.get_length(True)}]'
+            if i > 0: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
             else: msg += f'\n`Playing` {song.title} `{song.get_time_stamp(True)}`'
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
@@ -767,7 +767,7 @@ async def _recently_played(ctx):
             if i == 10:
                 msg += '\n...'
                 break
-            msg += f'\n-{i + 1} `{song.title}`'
+            msg += f'\n`-{i + 1}` {song.title} `{song.get_time_stamp(True)}`'
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
     else:
