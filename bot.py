@@ -8,11 +8,13 @@ from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
+import git
 import logging
 import os
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 from subprocess import run
+
 
 import tictactoe
 from helpers import youtube_download, youtube_search, get_related_video, get_video_id, get_youtube_title, \
@@ -187,6 +189,8 @@ async def restart(ctx):
                 #     no_after_play(data_dict[ctx.guild], voice_client)
                 await voice_client.disconnect()
                 # await voice_client.connect()
+        g = git.cmd.Git(os.getcwd())
+        g.pull()
         run('python bot.py')
         quit()
 
