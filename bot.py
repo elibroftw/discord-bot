@@ -644,14 +644,13 @@ async def pause(ctx):
             song.pause()
 
 
-@bot.command(name='auto_play', aliases=['ap', 'autoplay'])
-async def _auto_play(ctx, setting: bool = None):
+@bot.command(aliases=['ap', 'autoplay'])
+async def auto_play(ctx, setting: bool = None):
     """Turns auto play on or off"""
     guild = ctx.guild
     guild_data = data_dict[guild]
     if setting is None: setting = not guild_data['auto_play']
     guild_data['auto_play'] = setting
-
     await ctx.send(f'Auto play set to {setting}')
     if setting:
         guild_data['repeat_all'] = False
@@ -659,12 +658,11 @@ async def _auto_play(ctx, setting: bool = None):
         dq = guild_data['done']
         if not mq and dq:
             song_id = dq[0].video_id
-            url, title, video_id, = get_related_video(song_id, dq)
+            title, video_id, = get_related_video(song_id, dq)[1:]
             mq.append(Song(title, video_id))
             await play_file(ctx)  # takes care of the download
         if len(mq) == 1:
-            song_id = mq[0].video_id
-            url, title, video_id, = get_related_video(song_id, dq)
+            title, video_id, = get_related_video(mq[0].video_id, dq)[1:]
             mq.append(Song(title, video_id))
             m = await download_if_not_exists(ctx, title, video_id, in_background=True)
             msg_content = f'Added `{title}` to the playing queue'
