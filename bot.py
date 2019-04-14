@@ -48,6 +48,7 @@ def create_embed(title, description='', color=discord.Color.blue()):
 
 @bot.event
 async def on_ready():
+    # todo: send me a message and then delete it
     for guild in bot.guilds:
         data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1, 'repeat': False,
                             'repeat_all': False, 'auto_play': False, 'downloads': {}, 'invite': None, 'output': True}
