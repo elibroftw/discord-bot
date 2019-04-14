@@ -426,6 +426,20 @@ async def set_music_chat():
     raise NotImplementedError
 
 
+def get_time_stamp(song):
+    time_stamp = round(song.get_time_stamp())
+    minutes = time_stamp // 60
+    seconds = time_stamp % 60
+    if minutes < 10: minutes = f'0{minutes}'
+    if seconds < 10: seconds = f'0{seconds}'
+    song_length = round(song.get_length())
+    minutes_length = song_length // 60
+    seconds_length = song_length % 60
+    if minutes_length < 10: minutes_length = f'0{minutes_length}'
+    if seconds_length < 10: seconds_length = f'0{seconds_length}'
+    return f'[{minutes}:{seconds} - {minutes_length}:{seconds_length}]'
+
+
 async def download_related_video(ctx, auto_play_setting):
     if auto_play_setting:
         guild = ctx.guild
@@ -503,18 +517,9 @@ async def play_file(ctx, start_at=0):
                     voice_client.play(next_audio_source, after=after_play)
                     next_song.start(0)
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
-                    time_stamp = round(next_song.get_time_stamp())
-                    minutes = time_stamp // 60
-                    seconds = time_stamp % 60
-                    if minutes < 10: minutes = f'0{minutes}'
-                    if seconds < 10: seconds = f'0{seconds}'
-                    song_length = round(next_song.get_length())
-                    m_length = song_length // 60
-                    s_length = song_length % 60
-                    if m_length < 10: m_length = f'0{m_length}'
-                    if s_length < 10: s_length = f'0{s_length}'
+                    next_time_stamp = get_time_stamp(next_song)
                     if guild_data['output']:
-                        next_msg_content = f'Now playing `{next_title}` [{minutes}:{seconds} - {m_length}:{s_length}]'
+                        next_msg_content = f'Now playing `{next_title}` {next_time_stamp}'
                         if not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
                         if next_m: run_coro(next_m.edit(content=next_msg_content))
                     run_coro(download_related_video(ctx, setting))
@@ -545,18 +550,9 @@ async def play_file(ctx, start_at=0):
         audio_source.volume = guild_data['volume']
         voice_client.play(audio_source, after=after_play)
         song.start(start_at)
-        time_stamp = round(song.get_time_stamp())
-        minutes = time_stamp // 60
-        seconds = time_stamp % 60
-        if minutes < 10: minutes = f'0{minutes}'
-        if seconds < 10: seconds = f'0{seconds}'
-        song_length = round(song.get_length())
-        minutes_length = song_length // 60
-        seconds_length = song_length % 60
-        if minutes_length < 10: minutes_length = f'0{minutes_length}'
-        if seconds_length < 10: seconds_length = f'0{seconds_length}'
+        time_stamp = get_time_stamp(song)
         if guild_data['output']:
-            msg_content = f'Now playing `{title}` [{minutes}:{seconds} - {minutes_length}:{seconds_length}]'
+            msg_content = f'Now playing `{title}` {time_stamp}'
             if m:
                 await m.edit(content=msg_content)
             else:
@@ -765,7 +761,8 @@ async def next_up(ctx):
             if i == 10:
                 msg += '\n...'
                 break
-            msg += f'\n`{i}.` {song.title}' if i > 0 else f'\n`Playing` {song.title}'
+            if i > 0: msg += f'\n`{i}.` {song.title} [{song.get_length()}]'
+            else: msg += f'\n`Playing` {song.title} `{get_time_stamp(song)}`'
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
     else: await ctx.send(embed=create_embed('MUSIC QUEUE IS EMPTY'))
@@ -815,7 +812,7 @@ async def clear_queue(ctx):
         voice_client: discord.VoiceClient = guild.voice_client
         mq = data_dict[guild]['music']
         if voice_client.is_playing() or voice_client.is_paused():
-            data_dict[guild]['music'] = mq[0]
+            data_dict[guild]['music'] = mq[0:1]
         else: mq.clear()
         await ctx.send('Cleared music queue')
 
@@ -853,10 +850,13 @@ async def rewind(ctx, seconds: int = 5):
 
 
 @bot.command(aliases=['np', 'currently_playing', 'cp'])
-async def now_playing(ctx):
+async def now_playing(ctx, send_link=False):
     guild = ctx.guild
     mq = data_dict[guild]['music']
-    await ctx.send(f'https://www.youtube.com/watch?v={mq[0].video_id}')
+    if send_link:
+        await ctx.send(f'https://www.youtube.com/watch?v={mq[0].video_id}')
+    song = mq[0]
+    await ctx.send(f'`{song.title}` {get_time_stamp(song)}')
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
@@ -892,24 +892,6 @@ async def fix(ctx):
     await bot.get_command('summon').callback(ctx)
 
 
-@bot.command()
-async def source(ctx):
-    await ctx.send('https://github.com/elibroftw/discord-bot')
-
-
-@bot.command()
-async def ban(ctx):
-    # TODO: add are you sure
-    if ctx.author.guild_permissions.ban_members:
-        args = ctx.message.content.split(' ')
-        if len(args) > 1:
-            name = ' '.join(args[1:])
-            user = discord.utils.get(ctx.guild.members, nick=name)
-            if not user:
-                user = discord.utils.get(ctx.guild.members, name=name)
-            await ctx.guild.ban(user)
-
-
 @bot.command(aliases=['set_volume', 'sv', 'v'])
 async def volume(ctx):
     guild = ctx.guild
@@ -937,6 +919,24 @@ async def volume(ctx):
                 data_dict[guild]['volume'] = amount
             except ValueError: await ctx.send('Invalid argument', delete_after=5)
         else: await ctx.send(f'{vc.source.volume * 100}%')
+
+
+@bot.command()
+async def source(ctx):
+    await ctx.send('https://github.com/elibroftw/discord-bot')
+
+
+@bot.command()
+async def ban(ctx):
+    # TODO: add are you sure
+    if ctx.author.guild_permissions.ban_members:
+        args = ctx.message.content.split(' ')
+        if len(args) > 1:
+            name = ' '.join(args[1:])
+            user = discord.utils.get(ctx.guild.members, nick=name)
+            if not user:
+                user = discord.utils.get(ctx.guild.members, name=name)
+            await ctx.guild.ban(user)
 
 
 @bot.command()
