@@ -434,14 +434,28 @@ async def download_related_video(ctx, auto_play_setting):
         guild_data = data_dict[guild]
         upcoming_tracks, play_history = guild_data['music'], guild_data['done']
         if len(upcoming_tracks) == 1:
-            related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].get_video_id(), play_history)
+            song = upcoming_tracks[0]
+            related_url, related_title, related_video_id = get_related_video(song.get_video_id(), play_history)
             upcoming_tracks.append(Song(related_title, related_video_id))
             related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
             related_msg_content = f'Added `{related_title}` to the playing queue'
             if not related_m: await ctx.send(related_msg_content)
 
 
+async def in_guild(ctx):
+    if ctx.guild:
+        return True
+    return False
+
+
+async def has_vc(ctx):
+    if ctx.guild and ctx.guild.voice_client:
+        return True
+    return False
+
+
 @bot.command(aliases=['mute'])
+@commands.check(in_guild)
 async def quiet(ctx):
     guild_data = data_dict[ctx.guild]
     guild_data['output'] = not guild_data['output']
@@ -555,6 +569,7 @@ async def play_file(ctx, start_at=0):
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
+@commands.check(in_guild)
 async def play(ctx):
     # TODO: add repeat play option
     # TODO: time remaining command + song length command
@@ -615,6 +630,7 @@ async def play(ctx):
 
 
 @bot.command(aliases=['resume'])
+@commands.check(in_guild)
 async def pause(ctx):
     voice_client: discord.VoiceClient = ctx.guild.voice_client
     if voice_client:
@@ -629,6 +645,7 @@ async def pause(ctx):
 
 
 @bot.command(aliases=['ap', 'autoplay'])
+@commands.check(in_guild)
 async def auto_play(ctx, setting: bool = None):
     """Turns auto play on or off"""
     guild = ctx.guild
@@ -654,6 +671,7 @@ async def auto_play(ctx, setting: bool = None):
 
 
 @bot.command(name='repeat', aliases=['r'])
+@commands.check(in_guild)
 async def _repeat(ctx, setting: bool = None):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
@@ -673,6 +691,7 @@ async def _repeat(ctx, setting: bool = None):
 
 
 @bot.command(name='repeat_all', aliases=['ra'])
+@commands.check(in_guild)
 async def _repeat_all(ctx, setting: bool = None):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
@@ -703,6 +722,7 @@ def no_after_play(guild_data, voice_client):
 
 
 @bot.command(aliases=['next', 'n', 'sk'])
+@commands.check(in_guild)
 async def skip(ctx, times=1):
     # TODO: make it a partial democracy but mods and admins can bypass it
     guild = ctx.guild
@@ -719,6 +739,7 @@ async def skip(ctx, times=1):
 
 
 @bot.command(aliases=['back', 'b', 'prev', 'go_back', 'gb'])
+@commands.check(in_guild)
 async def previous(ctx, times=1):
     # TODO: make it a partial democracy but mods and admins can bypass it
     guild = ctx.guild
@@ -735,6 +756,7 @@ async def previous(ctx, times=1):
 
 
 @bot.command(aliases=['music_queue', 'mq', 'nu', 'queue', 'que', 'q'])
+@commands.check(in_guild)
 async def next_up(ctx):
     guild = ctx.guild
     guild_data = data_dict[guild]
@@ -757,6 +779,7 @@ async def next_up(ctx):
 
 
 @bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
+@commands.check(in_guild)
 async def _recently_played(ctx):
     # TODO: make a play_history list that never gets modified and takes in a parameter page_number
     guild = ctx.guild
@@ -776,6 +799,7 @@ async def _recently_played(ctx):
 
 
 @bot.command()
+@commands.check(in_guild)
 async def remove(ctx, position: int = 0):
     guild = ctx.guild
     guild_data = data_dict[guild]
@@ -793,6 +817,7 @@ async def remove(ctx, position: int = 0):
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue', 'queue_clear', 'queueclear'])
+@commands.check(in_guild)
 async def clear_queue(ctx):
     guild = ctx.guild
     moderator = discord.utils.get(guild.roles, name='Moderator')
@@ -806,6 +831,7 @@ async def clear_queue(ctx):
 
 
 @bot.command()
+@commands.check(in_guild)
 async def skip_to(ctx, seconds: int):
     guild = ctx.guild
     voice_client = guild.voice_client
@@ -815,6 +841,7 @@ async def skip_to(ctx, seconds: int):
 
 
 @bot.command(aliases=['ff', 'fwd'])
+@commands.check(in_guild)
 async def fast_forward(ctx, seconds: int = 5):  # TODO
     # raise NotImplementedError
     guild = ctx.guild
@@ -827,6 +854,7 @@ async def fast_forward(ctx, seconds: int = 5):  # TODO
 
 
 @bot.command(aliases=['rwd', 'rw'])
+@commands.check(in_guild)
 async def rewind(ctx, seconds: int = 5):
     guild = ctx.guild
     voice_client = guild.voice_client
@@ -838,6 +866,7 @@ async def rewind(ctx, seconds: int = 5):
 
 
 @bot.command(aliases=['np', 'currently_playing', 'cp'])
+@commands.check(in_guild)
 async def now_playing(ctx, send_link=False):
     guild = ctx.guild
     mq = data_dict[guild]['music']
@@ -848,6 +877,7 @@ async def now_playing(ctx, send_link=False):
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
+@commands.check(in_guild)
 async def leave(ctx):
     # clear music queue
     guild = ctx.guild
@@ -861,6 +891,7 @@ async def leave(ctx):
 
 
 @bot.command(aliases=['s', 'end'])
+@commands.check(in_guild)
 async def stop(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
@@ -872,6 +903,7 @@ async def stop(ctx):
 
 
 @bot.command()
+@commands.check(in_guild)
 async def fix(ctx):
     guild = ctx.message.channel.guild
     await bot.get_command('summon').callback(ctx)
@@ -881,6 +913,7 @@ async def fix(ctx):
 
 
 @bot.command(aliases=['set_volume', 'sv', 'v'])
+@commands.check(in_guild)
 async def volume(ctx):
     guild = ctx.guild
     vc: discord.VoiceClient = guild.voice_client
