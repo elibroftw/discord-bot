@@ -179,7 +179,7 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
     # id_dict = {'video': video_id, 'channel': channel_id, 'playlist': playlist_id}
     url = url_dict[kind]
     if 'None' in url: url = f'No {kind} found'
-    if return_info and url != 'No video found': return url, fix_youtube_title(title), video_id
+    if return_info and url != 'No video found': return url, title, video_id
     return url
     # image = f'https://img.youtube.com/vi/{vid_id}/mqdefault.jpg'
 
@@ -287,17 +287,17 @@ def get_related_video(video_id, done_queue):
     f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
          'type': 'video', 'key': google_api_key}
     search_response = json.loads(requests.get(f'{youtube_api_url}search?{urlencode(f)}').text)
-    related_song = dq[0] if dq else Song('', '')
+    related_song = dq[0] if dq else None
     i = 0
-    while related_song in dq or related_song == Song('', '') or get_video_duration(related_song.video_id) > 600:
+    while related_song in dq or related_song is None or get_video_duration(related_song.video_id) > 600:
         search_result = search_response['items'][i]
         title = search_result['snippet']['title']
         video_id = search_result['id']['videoId']
         related_song = Song(title, video_id)
         i += 1
-    url = f'https://www.youtube.com/watch?v={video_id}'
+    related_url = f'https://www.youtube.com/watch?v={video_id}'
     # noinspection PyUnboundLocalVariable
-    return url, fix_youtube_title(title), video_id
+    return related_url, title, video_id
 
 
 async def check_net_worth(author: str):  # use a database
@@ -424,6 +424,8 @@ def format_time_ffmpeg(s):
 
 if __name__ == "__main__":
     # tests go below here
-    url = youtube_search('Magnolia')
-    youtube_download(url, verbose=True)
+    # url, title, video_id = youtube_search('Magnolia', return_info=True)
+    # url = youtube_search('Magnolia')
+    # a = get_related_video(video_id, [])
+    # youtube_download(url, verbose=True)
     pass

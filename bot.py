@@ -191,7 +191,6 @@ async def restart(ctx):
                 #     no_after_play(data_dict[ctx.guild], voice_client)
                 await voice_client.disconnect()
                 # await voice_client.connect()
-        await bot.logout()
         g = git.cmd.Git(os.getcwd())
         g.pull()
         run('python bot.py')
