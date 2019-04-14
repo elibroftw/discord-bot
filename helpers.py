@@ -224,6 +224,9 @@ def remove_silence(input_file, output_file):
 
 def youtube_download(url_or_video_id, verbose=False):
     ydl_opts = {
+        'external_downloader': 'aria2c/aria2c',
+        'external_downloader_args': ['-c', '-j', '3', '-x', '3', '-s', '3', '-k', '1M'],
+        # https://aria2.github.io/manual/en/html/aria2c.html#options
         'format': 'bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
@@ -232,10 +235,7 @@ def youtube_download(url_or_video_id, verbose=False):
         }],
         # 'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
         'outtmpl': 'Music/%(id)s.%(ext)s',
-        'postprocessor_args': '-threads 1',
-        'external_downloader': 'aria2c',
-        'external_downloader_args': '-c -j 3 -x 3 -s 3 -k 1M',
-        # https://aria2.github.io/manual/en/html/aria2c.html#options
+        'postprocessor_args': ['-threads', '1'],
         'ffmpeg_location': 'ffmpeg\\bin',
         'verbose': verbose,
         'quiet': not verbose,
