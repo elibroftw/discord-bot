@@ -44,7 +44,7 @@ class Song:
         return 'Song(' + str({'title': self.title, 'video_id': self._video_id}) + ')'
 
     def __eq__(self, other):
-        return self.__class__ == other.__class__ and other.video_id == self._video_id
+        return self.__class__ == other.__class__ and other.get_video_id() == self._video_id
 
     def start(self, start_at=_time_stamp):
         self.status = 'PLAYING'
