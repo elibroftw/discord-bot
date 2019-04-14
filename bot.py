@@ -826,7 +826,7 @@ async def fast_forward(ctx, seconds: int = 5):  # TODO
         await play_file(ctx, song.get_time_stamp() + seconds)
 
 
-@bot.command(aliases=['rwd'])
+@bot.command(aliases=['rwd', 'rw'])
 async def rewind(ctx, seconds: int = 5):
     guild = ctx.guild
     voice_client = guild.voice_client
@@ -860,7 +860,7 @@ async def leave(ctx):
         await ctx.send('Stopped playing music, music que has been emptied')
 
 
-@bot.command(aliases=['end'])
+@bot.command(aliases=['s', 'end'])
 async def stop(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
