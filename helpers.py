@@ -30,21 +30,21 @@ class Song:
 
     def __init__(self, title, video_id):
         self.title = title
-        self.video_id = video_id
+        self._video_id = video_id
 
     def __hash__(self):
-        return hash(self.video_id)
+        return hash(self._video_id)
 
     def __repr__(self):
-        return 'Song(' + str({'title': self.title, 'video_id': self.video_id,
+        return 'Song(' + str({'title': self.title, 'video_id': self._video_id,
                               'length': self.get_length(), 'status': self.status,
                               'time_stamp': self.get_time_stamp(), 'start_time': self.start_time}) + ')'
 
     def __str__(self):
-        return 'Song(' + str({'title': self.title, 'video_id': self.video_id, 'length': self.get_length(True)}) + ')'
+        return 'Song(' + str({'title': self.title, 'video_id': self._video_id}) + ')'
 
     def __eq__(self, other):
-        return self.__class__ == other.__class__ and other.video_id == self.video_id
+        return self.__class__ == other.__class__ and other.video_id == self._video_id
 
     def start(self, start_at=_time_stamp):
         self.status = 'PLAYING'
@@ -87,7 +87,7 @@ class Song:
 
     def get_length(self, string=False):
         if self.length is None:
-            audio = MP3(f'Music/{self.video_id}.mp3')
+            audio = MP3(f'Music/{self._video_id}.mp3')
             self.length = audio.info.length
         if string:
             temp = round(self.length)
