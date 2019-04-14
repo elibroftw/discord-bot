@@ -74,8 +74,6 @@ async def on_message(message):
         await message.channel.send('I GOT EXTRADITED! :(')
     elif message.content.lower().startswith('!run'):
         await message.channel.send('N o t  h y p e  e n o u g h')
-    elif message.content.lower().startswith('!help'):
-        await author.send(help_message)
     else:
         with suppress(discord.ext.commands.errors.CommandNotFound): await bot.process_commands(message)
 
@@ -85,6 +83,11 @@ async def on_message(message):
 async def on_command_error(ctx, error):
     if isinstance(error, commands.errors.CommandNotFound): return
     raise error
+
+
+@bot.command(name='help')
+async def _help(ctx):
+    await ctx.author.send(help_message)
 
 
 @bot.command()
