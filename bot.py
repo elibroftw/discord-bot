@@ -262,7 +262,6 @@ async def invite_code(ctx):
             await ctx.send(ctx.guild.invites()[0].url)
 
 
-
 @bot.command()
 async def games(ctx):
     await ctx.send('We have: Tic-Tac-Toe (!ttt) and Shift (!shift)')
@@ -475,10 +474,10 @@ async def play_file(ctx, start_at=0):
     elif not upcoming_tracks and guild_data['repeat']:
         upcoming_tracks.append(play_history.pop(0))
 
-    # noinspection PyUnusedLocal,PyShadowingNames
     def after_play(error):
         mq = guild_data['music']
         ph = guild_data['done']
+        # noinspection PyTypeChecker
         if not error and not data_dict[guild]['is_stopped']:
             # pylint: disable=assignment-from-no-return
             if len(voice_client.channel.members) > 1:

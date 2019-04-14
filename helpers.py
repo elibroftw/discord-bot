@@ -120,13 +120,16 @@ def iso_8061_to_seconds(duration="P1W2DT6H21M32S"):
 # twitter_api = tweepy.API(twitter_auth)
 
 
-def fix_youtube_title(title):
+def file_friendly_title(title):
     return title.replace('&quot;', '\'').replace('&amp;', '&').replace(
         '/', '_').replace('?', '').replace(':', ' -').replace('&#39;', "'").replace(' || ', '_')
 
 
+def fix_youtube_title(title):
+    return title.replace('&quot;', '\'').replace('&amp;', '&').replace('&#39;', "'")
+
+
 def youtube_search(text, return_info=False, limit_duration=False, duration_limit=600):
-    # if broken, compare this with https://repl.it/@elilopez/DiscordBot
     if text in ('maagnolia', 'magnolia') and return_info:
         text = 'magnolia (Audio)'
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
@@ -179,7 +182,7 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
     # id_dict = {'video': video_id, 'channel': channel_id, 'playlist': playlist_id}
     url = url_dict[kind]
     if 'None' in url: url = f'No {kind} found'
-    if return_info and url != 'No video found': return url, title, video_id
+    if return_info and url != 'No video found': return url, fix_youtube_title(title), video_id
     return url
     # image = f'https://img.youtube.com/vi/{vid_id}/mqdefault.jpg'
 
@@ -277,8 +280,7 @@ def get_youtube_title(video_id):
     f = {'part': 'snippet',  'id': video_id, 'key': google_api_key}
     response = json.loads(requests.get(f'{youtube_api_url}videos?{urlencode(f)}').text)
     title = response['items'][0]['snippet']['title']
-    return title
-    # return fix_youtube_title(title)  # file friendly title
+    return fix_youtube_title(title)
 
 
 def get_related_video(video_id, done_queue):
@@ -293,7 +295,7 @@ def get_related_video(video_id, done_queue):
         related_song = Song(title, video_id)
         if related_song not in dq and get_video_duration(video_id) <= 600:
             related_url = f'https://www.youtube.com/watch?v={video_id}'
-            return related_url, title, video_id
+            return related_url, fix_youtube_title(title), video_id
     raise Exception('No related videos found :(')
 
 
