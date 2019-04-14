@@ -12,7 +12,7 @@ For a list of commands view bot.py
     - Play or Add to queue (!play, !p)
     - Play next (adds the song to play right after, will rework this later !pn, !play_next)
     - Pause/Resume (!pause, !p, !resume)
-    - Skip (!skip, !next, !s, !n)
+    - Skip (!skip, !next, !n)
     - Back (!back, !b, !previous, !prev)
     - Fast-forward (!ff <seconds=5>)
     - Rewind (!rw <seconds=5>)
@@ -21,6 +21,7 @@ For a list of commands view bot.py
     - Repeat Options (!repeat, !repeat_all)
     - View Upcoming tracks (!q)
     - View Recently Played (!dq)
+    - Clear queue (!cq)
     - Set volume (!volume, !v, prints volume if no int given)
         - !v 100  # this will set volume to 100/100
         - !v +20  # increase volume by 20
