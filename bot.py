@@ -178,6 +178,7 @@ async def _exit(ctx):
             if voice_client: await voice_client.disconnect()
         await bot.logout()
         quit()
+        quit()
 
 
 @bot.command()
