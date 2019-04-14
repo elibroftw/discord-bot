@@ -171,7 +171,10 @@ async def delete_channel(ctx):
 
 @bot.command(aliases=['yt'])
 async def youtube(ctx):
-    url = youtube_search(' '.join(ctx.message.content.split(' ')[1:]))
+    try:
+        url = youtube_search(' '.join(ctx.message.content.split(' ')[1:]))
+    except IndexError:
+        url = 'No Video Found'
     await ctx.send(url)
 
 
@@ -586,7 +589,7 @@ async def play(ctx):
     url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
-        if url_or_query.startswith('https://'):
+        if url_or_query.startswith('https://y'):
             # TODO: playlist support
             url = url_or_query
             video_id = get_video_id(url)
@@ -595,9 +598,8 @@ async def play(ctx):
                 await ctx.send('That song is too long! (> 10 minutes)')
                 return
         else:  # get url
-            try:
-                url, title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)
-            except ValueError:
+            try: url, title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)
+            except (ValueError, IndexError):
                 await ctx.send(f'No valid video found with query `{url_or_query}`')
                 return
         song = Song(title, video_id)
