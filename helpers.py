@@ -98,6 +98,9 @@ class Song:
             return f'{minutes}:{seconds}'
         return self.length
 
+    def get_video_id(self):
+        return self._video_id
+
 
 try: google_api_key = os.environ['google']
 except KeyError:
