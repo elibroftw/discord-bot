@@ -400,7 +400,7 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
         if in_background:
             def callback(_):
                 data_dict['downloads'].pop(video_id)
-                if data_dict[ctx.guild]['music'][0].video_id == video_id:
+                if data_dict[ctx.guild]['music'][0].get_video_id() == video_id:
                     bot.loop.create_task(play_file(ctx))
                     bot.loop.create_task(m.delete())
                     return
@@ -433,7 +433,7 @@ async def download_related_video(ctx, auto_play_setting):
         guild_data = data_dict[guild]
         upcoming_tracks, play_history = guild_data['music'], guild_data['done']
         if len(upcoming_tracks) == 1:
-            related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].video_id, play_history)
+            related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].get_videoo_id(), play_history)
             upcoming_tracks.append(Song(related_title, related_video_id))
             related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
             related_msg_content = f'Added `{related_title}` to the playing queue'
@@ -483,7 +483,7 @@ async def play_file(ctx, start_at=0):
                 setting = guild_data['auto_play']
                 if mq or setting:
                     if setting and not mq:
-                        url, next_title, next_video_id = get_related_video(last_song.video_id, ph)
+                        url, next_title, next_video_id = get_related_video(last_song.get_video_id(), ph)
                         next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
                         mq.append(Song(next_title, next_video_id))
                     else:  # if mq, check if the song is downloading # NOTE: was here last
@@ -495,7 +495,7 @@ async def play_file(ctx, start_at=0):
                             next_m = run_coro(download_if_not_exists(ctx, title, video_id, in_background=False))
                     next_song: Song = mq[0]
                     next_title = next_song.title
-                    next_music_filepath = f'Music/{next_song.video_id}.mp3'
+                    next_music_filepath = f'Music/{next_song.get_video_id()}.mp3'
                     next_audio_source = FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path,
                                                        before_options="-nostdin",
                                                        options="-vn -b:a 128k")
@@ -515,10 +515,10 @@ async def play_file(ctx, start_at=0):
                 if len(voice_client.channel.members) == 1: run_coro(voice_client.disconnect())
 
     if voice_client and upcoming_tracks:
-        # TODO: account for auto_play
+        # TODO: account for auto_play?
         song = upcoming_tracks[0]
         title = song.title
-        video_id = song.video_id
+        video_id = song.get_video_id()
         music_filepath = f'Music/{video_id}.mp3'
         result, m = data_dict['downloads'].get(video_id, (None, None))
         if result:
@@ -593,7 +593,7 @@ async def play(ctx):
         else:
             mq.append(song)
 
-        # download the song if something is already being played
+        # download the song if something is playing
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
             m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
@@ -640,12 +640,12 @@ async def auto_play(ctx, setting: bool = None):
         mq = guild_data['music']
         dq = guild_data['done']
         if not mq and dq:
-            song_id = dq[0].video_id
+            song_id = dq[0].get_video_id()
             title, video_id, = get_related_video(song_id, dq)[1:]
             mq.append(Song(title, video_id))
             await play_file(ctx)  # takes care of the download
         if len(mq) == 1:
-            title, video_id, = get_related_video(mq[0].video_id, dq)[1:]
+            title, video_id, = get_related_video(mq[0].get_video_id(), dq)[1:]
             mq.append(Song(title, video_id))
             m = await download_if_not_exists(ctx, title, video_id, in_background=True)
             msg_content = f'Added `{title}` to the playing queue'
@@ -843,7 +843,7 @@ async def now_playing(ctx, send_link=False):
     song = mq[0]
     await ctx.send(f'`{song.title}` {song.get_time_stamp(True)}')
     if send_link:
-        await ctx.send(f'https://www.youtube.com/watch?v={song.video_id}')
+        await ctx.send(f'https://www.youtube.com/watch?v={song.get_video_id()}')
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
