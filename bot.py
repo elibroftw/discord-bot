@@ -427,20 +427,6 @@ async def set_music_chat():
     raise NotImplementedError
 
 
-def get_time_stamp(song):
-    time_stamp = round(song.get_time_stamp())
-    minutes = time_stamp // 60
-    seconds = time_stamp % 60
-    if minutes < 10: minutes = f'0{minutes}'
-    if seconds < 10: seconds = f'0{seconds}'
-    song_length = round(song.get_length())
-    minutes_length = song_length // 60
-    seconds_length = song_length % 60
-    if minutes_length < 10: minutes_length = f'0{minutes_length}'
-    if seconds_length < 10: seconds_length = f'0{seconds_length}'
-    return f'[{minutes}:{seconds} - {minutes_length}:{seconds_length}]'
-
-
 async def download_related_video(ctx, auto_play_setting):
     if auto_play_setting:
         guild = ctx.guild
@@ -518,7 +504,7 @@ async def play_file(ctx, start_at=0):
                     voice_client.play(next_audio_source, after=after_play)
                     next_song.start(0)
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
-                    next_time_stamp = get_time_stamp(next_song)
+                    next_time_stamp = next_song.get_time_stamp(True)
                     if guild_data['output']:
                         next_msg_content = f'Now playing `{next_title}` {next_time_stamp}'
                         if not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
@@ -551,7 +537,7 @@ async def play_file(ctx, start_at=0):
         audio_source.volume = guild_data['volume']
         voice_client.play(audio_source, after=after_play)
         song.start(start_at)
-        time_stamp = get_time_stamp(song)
+        time_stamp = song.get_time_stamp(True)
         if guild_data['output']:
             msg_content = f'Now playing `{title}` {time_stamp}'
             if m:
@@ -753,7 +739,7 @@ async def next_up(ctx):
     guild_data = data_dict[guild]
     mq = guild_data['music']
     if mq:
-        title = f'MUSIC QUEUE [{len(mq)} Songs]'  # :musical_note:
+        title = f'MUSIC QUEUE [{len(mq)} Songs]'
         if guild_data['auto_play']: title += ' | AUTO PLAY ENABLED'
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
@@ -762,8 +748,8 @@ async def next_up(ctx):
             if i == 10:
                 msg += '\n...'
                 break
-            if i > 0: msg += f'\n`{i}.` {song.title} [{song.get_length()}]'
-            else: msg += f'\n`Playing` {song.title} `{get_time_stamp(song)}`'
+            if i > 0: msg += f'\n`{i}.` {song.title} [{song.get_length(True)}]'
+            else: msg += f'\n`Playing` {song.title} `{song.get_time_stamp(True)}`'
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
     else: await ctx.send(embed=create_embed('MUSIC QUEUE IS EMPTY'))
@@ -854,10 +840,10 @@ async def rewind(ctx, seconds: int = 5):
 async def now_playing(ctx, send_link=False):
     guild = ctx.guild
     mq = data_dict[guild]['music']
-    if send_link:
-        await ctx.send(f'https://www.youtube.com/watch?v={mq[0].video_id}')
     song = mq[0]
-    await ctx.send(f'`{song.title}` {get_time_stamp(song)}')
+    await ctx.send(f'`{song.title}` {song.get_time_stamp(True)}')
+    if send_link:
+        await ctx.send(f'https://www.youtube.com/watch?v={song.video_id}')
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])

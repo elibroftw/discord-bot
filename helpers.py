@@ -47,11 +47,17 @@ class Song:
         self.status = 'NOT_PLAYING'
         self._time_stamp = 0
 
-    def get_time_stamp(self):
+    def get_time_stamp(self, string=False):
         if self.status == 'PLAYING':
-            return time() - self.start_time
-        else:
-            return self._time_stamp
+            self._time_stamp = time() - self.start_time
+        if string:
+            temp = round(self._time_stamp)
+            minutes = temp // 60
+            seconds = temp % 60
+            if minutes < 10: minutes = f'0{minutes}'
+            if seconds < 10: seconds = f'0{seconds}'
+            return f'[{minutes}:{seconds} - {self.get_length(True)}]'
+        return self._time_stamp
 
     def set_time_stamp(self, seconds):
         self._time_stamp = seconds
@@ -65,14 +71,18 @@ class Song:
     def get_status(self):
         return self.status
 
-    def get_length(self):
+    def get_length(self, string=False):
         if self.length is None:
             audio = MP3(f'Music/{self.video_id}.mp3')
             self.length = audio.info.length
+        if string:
+            temp = round(self.length)
+            minutes = temp // 60
+            seconds = temp % 60
+            if minutes < 10: minutes = f'0{minutes}'
+            if seconds < 10: seconds = f'0{seconds}'
+            return f'{minutes}:{seconds}'
         return self.length
-
-
-# Song = namedtuple('Song', ('title', 'video_id'))
 
 
 try: google_api_key = os.environ['google']
