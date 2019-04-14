@@ -48,7 +48,8 @@ def create_embed(title, description='', color=discord.Color.blue()):
 async def on_ready():
     for guild in bot.guilds:
         data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1, 'repeat': False,
-                            'repeat_all': False, 'auto_play': False, 'downloads': {}, 'invite': None}
+                            'repeat_all': False, 'auto_play': False, 'downloads': {}, 'invite': None, 'output': True}
+        # output means Now playing messages
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
@@ -378,11 +379,6 @@ def run_coro(coro: asyncio.coroutine):
     return fut.result()
 
 
-def get_yield(fut):
-    d = yield from fut
-    return d
-
-
 async def download_if_not_exists(ctx, title, video_id, in_background=False, play_next=False):
     """
     Checks if file corresponding to title and video_id exists
@@ -397,14 +393,14 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
 
         if in_background:
             def callback(_):
-                if play_next:
-                    msg_content = f'Added `{title}` to next up'
-                else:
-                    msg_content = f'Added `{title}` to the playing queue'
-                bot.loop.create_task(m.edit(content=msg_content))
                 data_dict['downloads'].pop(video_id)
-                # todo: call play_file(ctx) if play_immediately and mq[0].title == title
-                #   the latter in case some guy decides to call skip
+                if data_dict[ctx.guild]['music'][0].video_id == video_id:
+                    bot.loop.create_task(play_file(ctx))
+                    bot.loop.create_task(m.delete())
+                    return
+                elif play_next: msg_content = f'Added `{title}` to next up'
+                else: msg_content = f'Added `{title}` to the playing queue'
+                bot.loop.create_task(m.edit(content=msg_content))
 
             result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
             result.add_done_callback(callback)
@@ -438,18 +434,25 @@ async def download_related_video(ctx, auto_play_setting):
             if not related_m: await ctx.send(related_msg_content)
 
 
+@bot.command(aliases=['mute'])
+async def quiet(ctx):
+    guild_data = data_dict[ctx.guild]
+    guild_data['output'] = not guild_data['output']
+
+
 async def play_file(ctx, start_at=0):
     """Plays first (index=0) song in the music queue"""
     guild: discord.Guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
+    # noinspection PyTypeChecker
     guild_data = data_dict[guild]
     upcoming_tracks = guild_data['music']
     play_history = guild_data['done']
     if not upcoming_tracks and guild_data['repeat_all']:
         guild_data['music'] = play_history[::-1]
         play_history.clear()
-
-    # TODO: use a db to determine which files get constantly used
+    elif not upcoming_tracks and guild_data['repeat']:
+        upcoming_tracks.append(play_history.pop(0))
 
     # noinspection PyUnusedLocal,PyShadowingNames
     def after_play(error):
@@ -505,9 +508,10 @@ async def play_file(ctx, start_at=0):
                     s_length = song_length % 60
                     if m_length < 10: m_length = f'0{m_length}'
                     if s_length < 10: s_length = f'0{s_length}'
-                    next_msg_content = f'Now playing `{next_title}` [{minutes}:{seconds} - {m_length}:{s_length}]'
-                    if not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
-                    if next_m: run_coro(next_m.edit(content=next_msg_content))
+                    if guild_data['output']:
+                        next_msg_content = f'Now playing `{next_title}` [{minutes}:{seconds} - {m_length}:{s_length}]'
+                        if not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
+                        if next_m: run_coro(next_m.edit(content=next_msg_content))
                     run_coro(download_related_video(ctx, setting))
             else:
                 run_coro(bot.change_presence(activity=discord.Game('Prison Break (!)')))
@@ -546,27 +550,28 @@ async def play_file(ctx, start_at=0):
         seconds_length = song_length % 60
         if minutes_length < 10: minutes_length = f'0{minutes_length}'
         if seconds_length < 10: seconds_length = f'0{seconds_length}'
-        msg_content = f'Now playing `{title}` [{minutes}:{seconds} - {minutes_length}:{seconds_length}]'
-        if m:
-            await m.edit(content=msg_content)
-        else:
-            temp_mq = deepcopy(upcoming_tracks)
-            temp_dq = deepcopy(play_history)
-            await ctx.send(msg_content)
-            if temp_mq != upcoming_tracks:
-                guild_data['music'] = deepcopy(temp_mq)
-                guild_data['done'] = deepcopy(temp_dq)
+        if guild_data['output']:
+            msg_content = f'Now playing `{title}` [{minutes}:{seconds} - {minutes_length}:{seconds_length}]'
+            if m:
+                await m.edit(content=msg_content)
+            else:
+                temp_mq = deepcopy(upcoming_tracks)
+                temp_dq = deepcopy(play_history)
+                await ctx.send(msg_content)
+                if temp_mq != upcoming_tracks:
+                    guild_data['music'] = deepcopy(temp_mq)
+                    guild_data['done'] = deepcopy(temp_dq)
         await bot.change_presence(activity=discord.Game(title))
         await download_related_video(ctx, guild_data['auto_play'])
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
 async def play(ctx):
-    # TODO: rename done queue to recently played
-    # TODO: rename music_queue to next up
     # TODO: add repeat play option
     # TODO: time remaining command + song length command
-    # TODO: download option
+    # TODO: download option, rename file, add metadata and album art and then send it to user in dm.
+    #   Download video as mp3 if the file does not exist.
+    # TODO: use a db to determine which files get constantly queued (db should be title: video_id, times_queued)
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     ctx_msg_content = ctx.message.content
