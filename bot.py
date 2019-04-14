@@ -434,7 +434,7 @@ async def download_related_video(ctx, auto_play_setting):
         guild_data = data_dict[guild]
         upcoming_tracks, play_history = guild_data['music'], guild_data['done']
         if len(upcoming_tracks) == 1:
-            related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].get_videoo_id(), play_history)
+            related_url, related_title, related_video_id = get_related_video(upcoming_tracks[0].get_video_id(), play_history)
             upcoming_tracks.append(Song(related_title, related_video_id))
             related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
             related_msg_content = f'Added `{related_title}` to the playing queue'

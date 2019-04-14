@@ -18,6 +18,7 @@ For a list of commands view bot.py
     - Rewind (!rw <seconds=5>)
     - Stop (!stop, !s, !end)
     - Autoplay (adds to the music queue when the queue is empty or has only the playing track; !auto_play, !ap)
+    - Repeat Options (!repeat, !repeat_all)
     - View Upcoming tracks (!q)
     - View Recently Played (!dq)
     - Set volume (!volume, !v, prints volume if no int given)
@@ -26,7 +27,7 @@ For a list of commands view bot.py
         - !v -20  # decrease volume by 20
         - !v +  # increase volume by 10
         - !v -  # decrease volume by 10
-    - Leave (!leave, !disconnect, !unsummon, !desummon, !dismiss)
+    - Leave Voice chat (!leave, !disconnect, !unsummon, !desummon, !dismiss)
     
 
 - Twitter search (going to rework this)
@@ -40,6 +41,7 @@ For a list of commands view bot.py
 # Future
 - Set and get invite codes (currently only gets my invite code)
 - repeat mode for music
+- report user for bot abuse
 
 Invitation [url](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
 DISCLAIMER: This bot has not been tested to be used on multiple servers
