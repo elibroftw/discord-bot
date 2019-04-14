@@ -3,10 +3,7 @@ simplejson
 youtube_dl
 environs
 requests
-apiclient
 tweepy
 discord
 asyncio
-google-api-python-client
-flask
 PyNaCl
