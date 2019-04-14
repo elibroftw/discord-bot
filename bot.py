@@ -222,27 +222,22 @@ async def thank(ctx):
 
 @commands.has_permissions(manage_messages=True)
 @bot.command()
-async def clear(ctx):
+async def clear(ctx, number: int = 1):
     with suppress(AttributeError):
         channel: discord.TextChannel = ctx.channel
         if ctx.message.author.permissions_in(ctx.channel).manage_messages:
             # await ctx.send('Clearing messages...')
             await bot.change_presence(activity=discord.Game('Clearing messages...'))
-            number = 3
-            if ctx.message.content[7:].isnumeric():  # len(user_msg) > 7 and
-                if int(ctx.message.content[7:]) > 98:
-                    number = 100 - int(ctx.message.content[7:])
-                number += int(ctx.message.content[7:]) - 1
+            if number > 99:
+                number = 99
             messages = []
-            async for m in channel.history(limit=number):
+            async for m in channel.history(limit=number + 1):
                 date = m.created_at
-                # if older than 14: delete else add onto msg list
-                if (datetime.now() - date).days > 14:
-                    await m.delete()
-                else:
-                    messages.append(m)
+                # delete if older than 14 else add onto msg list
+                if (datetime.now() - date).days > 14: await m.delete()
+                else: messages.append(m)
             await channel.delete_messages(messages)
-            print(f'{ctx.message.author} cleared {number - 2} message(s)')
+            print(f'{ctx.message.author} cleared {number + 1} messages')
         await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
 
@@ -477,7 +472,7 @@ async def play_file(ctx, start_at=0):
 
     def after_play(error):
         mq = guild_data['music']
-        ph = guild_data['done']
+        dq = guild_data['done']
         # noinspection PyTypeChecker
         if not error and not data_dict[guild]['is_stopped']:
             # pylint: disable=assignment-from-no-return
@@ -486,19 +481,19 @@ async def play_file(ctx, start_at=0):
                 # ph = guild_data['done']
                 if not guild_data['repeat']:
                     last_song = mq.pop(0)
-                    ph.insert(0, last_song)
+                    dq.insert(0, last_song)
                 else:
                     last_song = mq[0]
 
                 if guild_data['repeat_all']:
-                    if not mq and ph:
-                        mq = guild_data['music'] = ph[::-1]
-                        ph.clear()
+                    if not mq and dq:
+                        mq = guild_data['music'] = dq[::-1]
+                        dq.clear()
 
                 setting = guild_data['auto_play']
                 if mq or setting:
                     if setting and not mq:
-                        url, next_title, next_video_id = get_related_video(last_song.get_video_id(), ph)
+                        url, next_title, next_video_id = get_related_video(last_song.get_video_id(), dq)
                         next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
                         mq.append(Song(next_title, next_video_id))
                     else:  # if mq, check if the song is downloading # NOTE: was here last
@@ -732,8 +727,7 @@ async def skip(ctx, times=1):
         mq = guild_data['music']
         dq = guild_data['done']
         if mq:
-            with suppress(IndexError):
-                for _ in range(times): dq.insert(0, mq.pop(0))
+            for _ in range(min(times, len(mq))): dq.insert(0, mq.pop(0))
             no_after_play(guild_data, voice_client)
             await play_file(ctx)
 
@@ -742,15 +736,15 @@ async def skip(ctx, times=1):
 @commands.check(in_guild)
 async def previous(ctx, times=1):
     # TODO: make it a partial democracy but mods and admins can bypass it
+    # note: there is a bug when times > 1
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
         guild_data = data_dict[guild]
         mq = guild_data['music']
-        ph = guild_data['done']
-        if ph:
-            with suppress(IndexError):
-                for _ in range(times): mq.insert(0, ph.pop(0))
+        dq = guild_data['done']
+        if dq:
+            for _ in range(min(times, len(dq))): mq.insert(0, dq.pop(0))
             no_after_play(guild_data, voice_client)
             await play_file(ctx)
 
