@@ -287,17 +287,14 @@ def get_related_video(video_id, done_queue):
     f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
          'type': 'video', 'key': google_api_key}
     search_response = json.loads(requests.get(f'{youtube_api_url}search?{urlencode(f)}').text)
-    related_song = dq[0] if dq else None
-    i = 0
-    while related_song in dq or related_song is None or get_video_duration(related_song.video_id) > 600:
-        search_result = search_response['items'][i]
-        title = search_result['snippet']['title']
-        video_id = search_result['id']['videoId']
+    for item in search_response['items']:
+        title = item['snippet']['title']
+        video_id = item['id']['videoId']
         related_song = Song(title, video_id)
-        i += 1
-    related_url = f'https://www.youtube.com/watch?v={video_id}'
-    # noinspection PyUnboundLocalVariable
-    return related_url, title, video_id
+        if related_song not in dq and get_video_duration(video_id) <= 600:
+            related_url = f'https://www.youtube.com/watch?v={video_id}'
+            return related_url, title, video_id
+    raise Exception('No related videos found :(')
 
 
 async def check_net_worth(author: str):  # use a database
