@@ -767,7 +767,7 @@ async def _recently_played(ctx):
             if i == 10:
                 msg += '\n...'
                 break
-            msg += f'\n`-{i + 1}` {song.title} `{song.get_time_stamp(True)}`'
+            msg += f'\n`-{i + 1}` {song.title} `{song.get_length(True)}`'
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
     else:
