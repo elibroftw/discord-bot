@@ -439,7 +439,7 @@ async def download_related_video(ctx, auto_play_setting):
         mq = guild_data['music']
         if len(mq) == 1:
             song = mq[0]
-            related_url, related_title, related_video_id = get_related_video(song.get_video_id(),  guild_data['done'])
+            related_title, related_video_id = get_related_video(song.get_video_id(),  guild_data['done'])[1:]
             mq.append(Song(related_title, related_video_id))
             related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
             related_msg_content = f'Added `{related_title}` to the playing queue'
@@ -503,7 +503,7 @@ async def play_file(ctx, start_at=0):
                 setting = guild_data['auto_play']
                 if mq or setting:
                     if setting and not mq:
-                        url, next_title, next_video_id = get_related_video(last_song.get_video_id(), dq)
+                        next_title, next_video_id = get_related_video(last_song.get_video_id(), dq)[1:]
                         next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
                         mq.append(Song(next_title, next_video_id))
                     else:  # if mq, check if the song is downloading # NOTE: was here last
