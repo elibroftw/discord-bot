@@ -196,6 +196,7 @@ async def restart(ctx):
     if str(ctx.author) == 'eli#4591':
         # voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
         print('Restarting')
+        await bot.change_presence(activity=discord.Game('Restarting...'))
         for voice_client in bot.voice_clients:
             if voice_client:
                 # if voice_client.is_playing():
