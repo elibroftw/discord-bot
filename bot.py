@@ -535,7 +535,6 @@ async def play_file(ctx, start_at=0):
                 if len(voice_client.channel.members) == 1: run_coro(voice_client.disconnect())
 
     if voice_client and upcoming_tracks:
-        await ctx.send('testing')
         song = upcoming_tracks[0]
         title = song.title
         video_id = song.get_video_id()
