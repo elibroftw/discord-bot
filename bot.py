@@ -427,11 +427,6 @@ async def sigh():
     raise NotImplementedError
 
 
-@bot.command()
-async def set_music_chat():
-    raise NotImplementedError
-
-
 async def download_related_video(ctx, auto_play_setting):
     if auto_play_setting:
         guild = ctx.guild
