@@ -622,13 +622,13 @@ async def pause(ctx):
     voice_client: discord.VoiceClient = ctx.guild.voice_client
     if voice_client:
         song = data_dict[ctx.guild]['music'][0]
-        await bot.change_presence(activity=discord.Game('Prison Break (!)'))
         if voice_client.is_paused():
             voice_client.resume()
             song.start()
         else:
             voice_client.pause()
             song.pause()
+            await bot.change_presence(discord.Game('Prison Break (!)'))
 
 
 @bot.command(aliases=['ap', 'autoplay'])
