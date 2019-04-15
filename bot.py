@@ -707,6 +707,7 @@ async def _repeat_all(ctx, setting: bool = None):
 def no_after_play(guild_data, voice_client):
     if voice_client and voice_client.is_playing() or voice_client.is_paused():
         guild_data['is_stopped'] = True
+        guild_data['music'][0].stop()
         voice_client.stop()
 
 
@@ -741,6 +742,37 @@ async def previous(ctx, times=1):
             no_after_play(guild_data, voice_client)
             for _ in range(min(times, len(dq))): mq.insert(0, dq.pop(0))
             await play_file(ctx)
+
+
+@bot.command()
+@commands.check(in_guild)
+async def remove(ctx, position: int = 0):
+    guild = ctx.guild
+    guild_data = data_dict[guild]
+    mq = guild_data['music']
+    dq = guild_data['done']
+    voice_client: discord.VoiceClient = guild.voice_client
+    with suppress(IndexError):
+        if position < 0: dq.pop(-position - 1)
+        elif position > 0: mq.pop(position)
+        else:
+            no_after_play(guild_data, voice_client)
+            mq.pop(0)
+            await play_file(ctx)
+
+
+@bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue', 'queue_clear', 'queueclear'])
+@commands.check(in_guild)
+async def clear_queue(ctx):
+    guild = ctx.guild
+    moderator = discord.utils.get(guild.roles, name='Moderator')
+    if ctx.author.top_role >= moderator:
+        voice_client: discord.VoiceClient = guild.voice_client
+        mq = data_dict[guild]['music']
+        if voice_client.is_playing() or voice_client.is_paused():
+            data_dict[guild]['music'] = mq[0:1]
+        else: mq.clear()
+        await ctx.send('Cleared music queue')
 
 
 @bot.command(aliases=['music_queue', 'mq', 'nu', 'queue', 'que', 'q'])
@@ -783,37 +815,6 @@ async def _recently_played(ctx):
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
     else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
-
-
-@bot.command()
-@commands.check(in_guild)
-async def remove(ctx, position: int = 0):
-    guild = ctx.guild
-    guild_data = data_dict[guild]
-    mq = guild_data['music']
-    dq = guild_data['done']
-    voice_client: discord.VoiceClient = guild.voice_client
-    with suppress(IndexError):
-        if position < 0: dq.pop(-position - 1)
-        elif position > 0: mq.pop(position)
-        else:
-            no_after_play(guild_data, voice_client)
-            mq.pop(0)
-            if mq: await play_file(ctx)
-
-
-@bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue', 'queue_clear', 'queueclear'])
-@commands.check(in_guild)
-async def clear_queue(ctx):
-    guild = ctx.guild
-    moderator = discord.utils.get(guild.roles, name='Moderator')
-    if ctx.author.top_role >= moderator:
-        voice_client: discord.VoiceClient = guild.voice_client
-        mq = data_dict[guild]['music']
-        if voice_client.is_playing() or voice_client.is_paused():
-            data_dict[guild]['music'] = mq[0:1]
-        else: mq.clear()
-        await ctx.send('Cleared music queue')
 
 
 @bot.command()
