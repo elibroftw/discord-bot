@@ -26,7 +26,7 @@ class Song:
     _time_stamp = 0
     start_time = None
     status = 'NOT_PLAYING'
-    length = None
+    length = 'DOWNLOADING'
 
     def __init__(self, title, video_id):
         self.title = title
@@ -86,9 +86,11 @@ class Song:
         return self.status
 
     def get_length(self, string=False):
-        if self.length is None:
-            audio = MP3(f'Music/{self._video_id}.mp3')
-            self.length = audio.info.length
+        if self.length == 'DOWNLOADING':
+            try:
+                audio = MP3(f'Music/{self._video_id}.mp3')
+                self.length = audio.info.length
+            except FileNotFoundError: self.length = 'DOWNLOADING'
         if string:
             temp = round(self.length)
             minutes = temp // 60
