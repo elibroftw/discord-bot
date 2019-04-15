@@ -421,12 +421,6 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
     return m
 
 
-# TODO: Sigh sound
-@bot.command()
-async def sigh():
-    raise NotImplementedError
-
-
 async def download_related_video(ctx, auto_play_setting):
     if auto_play_setting:
         guild = ctx.guild
