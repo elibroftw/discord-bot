@@ -83,11 +83,15 @@ async def on_message(message):
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.errors.CommandNotFound): return
+    if error == KeyboardInterrupt:
+        await bot.logout()
+        return
     raise error
 
 
 @bot.command(name='help')
 async def _help(ctx):
+    # TODO: rich embed
     await ctx.author.send(help_message)
 
 
@@ -104,10 +108,8 @@ async def test():
 @bot.command()
 async def sleep(ctx):
     if ctx.message.author == 'eli#4591':
-        try:
-            secs = int(ctx.message.content[7:])
-        except ValueError:
-            secs = 5
+        try: secs = int(ctx.message.content[7:])
+        except ValueError: secs = 5
         print(f'Sleeping for {secs} seconds')
         await asyncio.sleep(secs)
         await ctx.send('Done sleeping')
@@ -434,11 +436,11 @@ async def download_related_video(ctx, auto_play_setting):
     if auto_play_setting:
         guild = ctx.guild
         guild_data = data_dict[guild]
-        upcoming_tracks, play_history = guild_data['music'], guild_data['done']
-        if len(upcoming_tracks) == 1:
-            song = upcoming_tracks[0]
-            related_url, related_title, related_video_id = get_related_video(song.get_video_id(), play_history)
-            upcoming_tracks.append(Song(related_title, related_video_id))
+        mq = guild_data['music']
+        if len(mq) == 1:
+            song = mq[0]
+            related_url, related_title, related_video_id = get_related_video(song.get_video_id(),  guild_data['done'])
+            mq.append(Song(related_title, related_video_id))
             related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
             related_msg_content = f'Added `{related_title}` to the playing queue'
             if not related_m: await ctx.send(related_msg_content)
@@ -465,6 +467,7 @@ async def quiet(ctx):
 
 async def play_file(ctx, start_at=0):
     """Plays first (index=0) song in the music queue"""
+
     guild: discord.Guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     # noinspection PyTypeChecker
@@ -478,10 +481,10 @@ async def play_file(ctx, start_at=0):
         upcoming_tracks.append(play_history.pop(0))
 
     def after_play(error):
-        mq = guild_data['music']
-        dq = guild_data['done']
         # noinspection PyTypeChecker
         if not error and not data_dict[guild]['is_stopped']:
+            mq = guild_data['music']
+            dq = guild_data['done']
             # pylint: disable=assignment-from-no-return
             if len(voice_client.channel.members) > 1:
                 # mq = guild_data['music']
@@ -532,7 +535,7 @@ async def play_file(ctx, start_at=0):
                 if len(voice_client.channel.members) == 1: run_coro(voice_client.disconnect())
 
     if voice_client and upcoming_tracks:
-        # TODO: account for auto_play?
+        await ctx.send('testing')
         song = upcoming_tracks[0]
         title = song.title
         video_id = song.get_video_id()
@@ -657,12 +660,7 @@ async def auto_play(ctx, setting: bool = None):
             title, video_id, = get_related_video(song_id, dq)[1:]
             mq.append(Song(title, video_id))
             await play_file(ctx)  # takes care of the download
-        if len(mq) == 1:
-            title, video_id, = get_related_video(mq[0].get_video_id(), dq)[1:]
-            mq.append(Song(title, video_id))
-            m = await download_if_not_exists(ctx, title, video_id, in_background=True)
-            msg_content = f'Added `{title}` to the playing queue'
-            if not m: await ctx.send(msg_content)
+        await download_related_video(ctx, True)
 
 
 @bot.command(name='repeat', aliases=['r'])
@@ -708,10 +706,9 @@ async def _repeat_all(ctx, setting: bool = None):
 
 
 def no_after_play(guild_data, voice_client):
-    if voice_client and voice_client.is_playing():
+    if voice_client and voice_client.is_playing() or voice_client.is_paused():
         guild_data['is_stopped'] = True
         voice_client.stop()
-        guild_data['is_stopped'] = False
 
 
 @bot.command(aliases=['next', 'n', 'sk'])
@@ -725,8 +722,8 @@ async def skip(ctx, times=1):
         mq = guild_data['music']
         dq = guild_data['done']
         if mq:
-            for _ in range(min(times, len(mq))): dq.insert(0, mq.pop(0))
             no_after_play(guild_data, voice_client)
+            for _ in range(min(times, len(mq))): dq.insert(0, mq.pop(0))
             await play_file(ctx)
 
 
@@ -742,8 +739,8 @@ async def previous(ctx, times=1):
         mq = guild_data['music']
         dq = guild_data['done']
         if dq:
-            for _ in range(min(times, len(dq))): mq.insert(0, dq.pop(0))
             no_after_play(guild_data, voice_client)
+            for _ in range(min(times, len(dq))): mq.insert(0, dq.pop(0))
             await play_file(ctx)
 
 
@@ -846,7 +843,6 @@ async def fast_forward(ctx, seconds: int = 5):  # TODO
 @bot.command(aliases=['rwd', 'rw'])
 @commands.check(in_guild)
 async def rewind(ctx, seconds: int = 5):
-    # TODO: fix
     guild = ctx.guild
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():
@@ -909,22 +905,17 @@ async def volume(ctx):
     guild = ctx.guild
     vc: discord.VoiceClient = guild.voice_client
     if vc:
-        args = ctx.message.content.split(' ')
+        args = ctx.message.content.split()
         if len(args) == 2:
             try:
                 arg = args[1]
                 if arg.startswith('+'):
-                    if arg[1:]:
-                        amount = vc.source.volume + float(arg[1:]) / 100
-                    else:
-                        amount = vc.source.volume + 0.1
+                    if arg[1:]: amount = vc.source.volume + float(arg[1:]) / 100
+                    else: amount = vc.source.volume + 0.1
                 elif arg.startswith('-'):
-                    if arg[1:]:
-                        amount = vc.source.volume - float(arg[1:]) / 100
-                    else:
-                        amount = vc.source.volume - 0.1
-                else:
-                    amount = float(args[1]) / 100
+                    if arg[1:]: amount = vc.source.volume - float(arg[1:]) / 100
+                    else: amount = vc.source.volume - 0.1
+                else: amount = float(args[1]) / 100
                 amount = max(0, amount)
                 amount = min(1, amount)
                 vc.source.volume = amount
