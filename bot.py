@@ -497,12 +497,12 @@ async def play_file(ctx, start_at=0):
                         next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
                         mq.append(Song(next_title, next_video_id))
                     else:  # if mq, check if the song is downloading # NOTE: was here last
-                        next_result, next_m = data_dict['downloads'].get(video_id, (None, None))
+                        next_result, next_m = data_dict['downloads'].get(next_video_id, (None, None))
                         if next_result:
                             run_coro(next_result)
                             data_dict['downloads'].pop(next_result)
                         else:
-                            next_m = run_coro(download_if_not_exists(ctx, title, video_id, in_background=False))
+                            next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
                     next_song: Song = mq[0]
                     next_title = next_song.title
                     next_music_filepath = f'Music/{next_song.get_video_id()}.mp3'
