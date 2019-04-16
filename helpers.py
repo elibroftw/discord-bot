@@ -455,7 +455,7 @@ def format_time_ffmpeg(s):
 if __name__ == "__main__":
     # tests go below here
     # url, title, video_id = youtube_search('Magnolia', return_info=True)
+    # youtube_download(url, verbose=True)
     # url = youtube_search('Magnolia')
     # a = get_related_video(video_id, [])
-    # youtube_download(url, verbose=True)
     pass

@@ -14,7 +14,6 @@ import os
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 from subprocess import Popen
-import threading
 
 
 import tictactoe
@@ -281,7 +280,8 @@ async def games(ctx):
 async def ttt(ctx):
     global players_in_game, tic_tac_toe_data
     author: discord.User = ctx.message.author
-    if author in tic_tac_toe_data and tic_tac_toe_data[author]['game_over'] == False:
+    # Note: game_over is synonymous with being in game
+    if author in tic_tac_toe_data and not tic_tac_toe_data[author]['game_over']:
         await author.send('You are already in a game. To end a game enter !end')
     else:
         msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
@@ -497,8 +497,9 @@ async def play_file(ctx, start_at=0):
                 if mq or setting:
                     if setting and not mq:
                         next_title, next_video_id = get_related_video(last_song.get_video_id(), dq)[1:]
+                        next_song = Song(next_title, next_video_id)
                         next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
-                        mq.append(Song(next_title, next_video_id))
+                        mq.append(next_song)
                     else:  # if mq, check if the next song is downloading
                         next_song = mq[0]
                         next_video_id = next_song.get_video_id()
@@ -508,7 +509,8 @@ async def play_file(ctx, start_at=0):
                             run_coro(next_result)
                             data_dict['downloads'].pop(next_result)
                         else:
-                            next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
+                            coro = download_if_not_exists(ctx, next_title, next_video_id, in_background=False)
+                            next_m = run_coro(coro)
                     next_music_filepath = f'Music/{next_video_id}.mp3'
                     next_audio_source = FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path,
                                                        before_options="-nostdin",
@@ -541,7 +543,7 @@ async def play_file(ctx, start_at=0):
             m = await download_if_not_exists(ctx, title, video_id, in_background=False)
         guild_data['is_stopped'] = False
         # -af silenceremove=start_periods=1:stop_periods=1:detection=peak
-        start_at = max(0, start_at)
+        start_at = max(0.0, start_at)
         start_at = min(song.get_length(), start_at)
         audio_source = FFmpegPCMAudio(music_filepath, executable=ffmpeg_path,
                                       before_options=f'-nostdin -ss {format_time_ffmpeg(start_at)}',
@@ -743,7 +745,6 @@ async def previous(ctx, times=1):
             pass
             
 
-
 @bot.command()
 @commands.check(in_guild)
 async def remove(ctx, position: int = 0):
@@ -915,8 +916,8 @@ async def volume(ctx):
                     if arg[1:]: amount = vc.source.volume - float(arg[1:]) / 100
                     else: amount = vc.source.volume - 0.1
                 else: amount = float(args[1]) / 100
-                amount = max(0, amount)
-                amount = min(1, amount)
+                amount = max(0.0, amount)
+                amount = min(1.0, amount)
                 vc.source.volume = amount
                 data_dict[guild]['volume'] = amount
             except ValueError: await ctx.send('Invalid argument', delete_after=5)
