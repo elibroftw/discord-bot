@@ -212,8 +212,10 @@ async def _exit(ctx):
 async def restart(ctx):
     if ctx.author.id == my_user_id:
         print('Restarting')
-        # TODO: save all information to a file
         await bot.change_presence(activity=discord.Game('Restarting...'))
+        g = git.cmd.Git(os.getcwd())
+        g.pull()
+        # TODO: save all information to a file
         save = {'voice_connections': {}}
         for voice_client in bot.voice_clients:
             save['voice_connections'][voice_client.guild.id] = voice_client.channel.id
@@ -223,8 +225,6 @@ async def restart(ctx):
                 await voice_client.disconnect()
         with open('save.json', 'w') as fp:
             json.dump(save, fp, indent=4)
-        g = git.cmd.Git(os.getcwd())
-        g.pull()
         Popen('python bot.py', shell=True)
         # Popen('python bot.py')  # TODO: Test this
         await bot.logout()
