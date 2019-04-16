@@ -199,7 +199,9 @@ async def restart(ctx):
         print('Restarting')
         # TODO: save all information to a file
         await bot.change_presence(activity=discord.Game('Restarting...'))
+        save = {'voice_clients': {}}
         for voice_client in bot.voice_clients:
+            save['voice_clients'][voice_client.guild] = voice_client.channel
             if voice_client:
                 if voice_client.is_playing() or voice_client.is_paused():
                     no_after_play(data_dict[ctx.guild], voice_client)
@@ -207,6 +209,7 @@ async def restart(ctx):
         g = git.cmd.Git(os.getcwd())
         g.pull()
         Popen('python bot.py', shell=True)
+        # Popen('python bot.py')  # TODO: Test
         await bot.logout()
 
 
@@ -486,10 +489,9 @@ async def play_file(ctx, start_at=0):
                 else:
                     last_song = mq[0]
 
-                if guild_data['repeat_all']:
-                    if not mq and dq:
-                        mq = guild_data['music'] = dq[::-1]
-                        dq.clear()
+                if guild_data['repeat_all'] and not mq and dq:
+                    mq = guild_data['music'] = dq[::-1]
+                    dq.clear()
 
                 setting = guild_data['auto_play']
                 if mq or setting:
@@ -497,16 +499,17 @@ async def play_file(ctx, start_at=0):
                         next_title, next_video_id = get_related_video(last_song.get_video_id(), dq)[1:]
                         next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
                         mq.append(Song(next_title, next_video_id))
-                    else:  # if mq, check if the song is downloading # NOTE: was here last
+                    else:  # if mq, check if the next song is downloading
+                        next_song = mq[0]
+                        next_video_id = next_song.get_video_id()
+                        next_title = next_song.title
                         next_result, next_m = data_dict['downloads'].get(next_video_id, (None, None))
                         if next_result:
                             run_coro(next_result)
                             data_dict['downloads'].pop(next_result)
                         else:
                             next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
-                    next_song: Song = mq[0]
-                    next_title = next_song.title
-                    next_music_filepath = f'Music/{next_song.get_video_id()}.mp3'
+                    next_music_filepath = f'Music/{next_video_id}.mp3'
                     next_audio_source = FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path,
                                                        before_options="-nostdin",
                                                        options="-vn -b:a 128k")
@@ -828,6 +831,7 @@ async def skip_to(ctx, seconds: int):
 @commands.check(in_guild)
 async def fast_forward(ctx, seconds: int = 5):  # TODO
     # raise NotImplementedError
+    # TODO: fix this
     guild = ctx.guild
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():

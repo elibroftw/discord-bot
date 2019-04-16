@@ -1,4 +1,5 @@
 {
+    "voice_clients": {"Guild": "voice_channel"},
     "data_dict": {"downloads": {}},
     "tic_tac_toe_data": {}
 }
