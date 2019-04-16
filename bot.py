@@ -477,7 +477,7 @@ async def quiet(ctx):
     guild_data['output'] = not guild_data['output']
 
 
-def get_audio_source(guild_data, song, start_at=0):
+def create_audio_source(guild_data, song, start_at=0.0):
     music_filepath = f'Music/{song.get_video_id()}.mp3'
     start_at = max(0.0, start_at)
     start_at = min(song.get_length(), start_at)
@@ -549,8 +549,8 @@ async def play_file(ctx, start_at=0):
                                                        options="-vn -b:a 128k")
                     next_audio_source = PCMVolumeTransformer(next_audio_source)
                     next_audio_source.volume = guild_data['volume']
-                    temp2_audio_source = get_audio_source(guild_data, next_song)
-                    print('Good to use get audio source', temp2_audio_source == next_audio_source)
+                    temp2_audio_source = create_audio_source(guild_data, next_song)
+                    print('Good to use create audio source', temp2_audio_source == next_audio_source)
                     voice_client.play(next_audio_source, after=after_play)
                     next_song.start(0)
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
@@ -584,8 +584,9 @@ async def play_file(ctx, start_at=0):
                                       options='-vn -b:a 128k')
         audio_source = PCMVolumeTransformer(audio_source)
         audio_source.volume = guild_data['volume']
-        temp_audio_source = get_audio_source(guild_data, song)
-        print('Good to use get audio source', temp_audio_source == audio_source)
+        temp_audio_source = create_audio_source(guild_data, song, start_at=start_at)
+        # todo: test this audio source tomorrow
+        print('Good to use create audio source', temp_audio_source == audio_source)
         voice_client.play(audio_source, after=after_play)
         song.start(start_at)
         time_stamp = song.get_time_stamp(True)
