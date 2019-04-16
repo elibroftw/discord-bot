@@ -13,7 +13,8 @@ import logging
 import os
 # noinspection PyUnresolvedReferences
 from pprint import pprint
-from subprocess import run
+from subprocess import Popen
+import threading
 
 
 import tictactoe
@@ -32,6 +33,7 @@ load_opus_lib()
 
 invitation_code = os.environ['INVITATION_CODE']
 my_server_id = os.environ['SERVER_ID']
+my_user_id = int(os.environ['MY_USER_ID'])
 
 players_in_game = []
 tic_tac_toe_data = {}
@@ -182,21 +184,18 @@ async def youtube(ctx):
 
 @bot.command(name='exit', aliases=['quit'])
 async def _exit(ctx):
-    if str(ctx.author) == 'eli#4591':
-        # voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if ctx.author.id == my_user_id:
+        await bot.change_presence(activity=discord.Game('Exiting...'))
         for voice_client in bot.voice_clients:
             if voice_client.is_playing() or voice_client.is_paused():
                 no_after_play(data_dict[ctx.guild], voice_client)
             await voice_client.disconnect()
         await bot.logout()
-        quit()
-        quit()
 
 
 @bot.command()
 async def restart(ctx):
-    if str(ctx.author) == 'eli#4591':
-        # voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if ctx.author.id == my_user_id:
         print('Restarting')
         await bot.change_presence(activity=discord.Game('Restarting...'))
         for voice_client in bot.voice_clients:
@@ -206,8 +205,8 @@ async def restart(ctx):
                 await voice_client.disconnect()
         g = git.cmd.Git(os.getcwd())
         g.pull()
-        run('python bot.py')
-        quit()
+        Popen('python bot.py', shell=True)
+        await bot.logout()
 
 
 # @bot.command(, aliases=['gettweet', 'get_tweet'])
