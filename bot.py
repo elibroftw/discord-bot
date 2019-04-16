@@ -1,5 +1,6 @@
 import asyncio
 # noinspection PyUnresolvedReferences
+import json
 import time
 from contextlib import suppress
 from copy import deepcopy
@@ -39,8 +40,8 @@ tic_tac_toe_data = {}
 ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 data_dict = {'downloads': {}}
 
-with open('help.txt') as f:
-    help_message = f.read()
+with open('help.txt') as h:
+    help_message = h.read()
 
 
 def create_embed(title, description='', color=discord.Color.blue()):
@@ -50,11 +51,26 @@ def create_embed(title, description='', color=discord.Color.blue()):
 @bot.event
 async def on_ready():
     # todo: send me a message and then delete it
-    for guild in bot.guilds:
-        data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1, 'repeat': False,
-                            'repeat_all': False, 'auto_play': False, 'downloads': {}, 'invite': None, 'output': True}
+
     # TODO: load data from save file
     #   delete save file after
+    # bot.get_guild(id)
+
+    # if os.path.exists('save.json'):
+    #     with open('save.json') as f:
+    #         save = json.load(f)
+    #         os.remove('save.json')
+    # for guild_id, channel_id in save['voice_clients'].items():
+    #     guild = bot.get_guild(guild_id)
+    #     voice_channel = bot.get_guild(channel_id)
+    #     voice_channel.connect()
+    # TODO: somehow make a ctx object and call play_file
+    # todo: set data_dict
+    for guild in bot.guilds:
+        if guild not in data_dict:
+            data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1,
+                                'repeat': False, 'repeat_all': False, 'auto_play': False,
+                                'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
@@ -102,8 +118,8 @@ async def hi(ctx):
 
 
 @bot.command()
-async def test():
-    print(bot.commands)
+async def test(ctx):
+    print('test called')
 
 
 @bot.command()
@@ -198,17 +214,19 @@ async def restart(ctx):
         print('Restarting')
         # TODO: save all information to a file
         await bot.change_presence(activity=discord.Game('Restarting...'))
-        save = {'voice_clients': {}}
+        save = {'voice_connections': []}
         for voice_client in bot.voice_clients:
-            save['voice_clients'][voice_client.guild] = voice_client.channel
+            save['voice_connections'][voice_client.guild.id] = voice_client.channel.id
             if voice_client:
                 if voice_client.is_playing() or voice_client.is_paused():
                     no_after_play(data_dict[ctx.guild], voice_client)
                 await voice_client.disconnect()
+        with open('save.json', 'w') as fp:
+            json.dump(save, fp, indent=4)
         g = git.cmd.Git(os.getcwd())
         g.pull()
         Popen('python bot.py', shell=True)
-        # Popen('python bot.py')  # TODO: Test
+        # Popen('python bot.py')  # TODO: Test this
         await bot.logout()
 
 
@@ -459,6 +477,18 @@ async def quiet(ctx):
     guild_data['output'] = not guild_data['output']
 
 
+def get_audio_source(guild_data, song, start_at=0):
+    music_filepath = f'Music/{song.get_video_id()}.mp3'
+    start_at = max(0.0, start_at)
+    start_at = min(song.get_length(), start_at)
+    audio_source = FFmpegPCMAudio(music_filepath, executable=ffmpeg_path,
+                                  before_options=f'-nostdin -ss {format_time_ffmpeg(start_at)}',
+                                  options='-vn -b:a 128k')
+    audio_source = PCMVolumeTransformer(audio_source)
+    audio_source.volume = guild_data['volume']
+    return audio_source
+
+
 async def play_file(ctx, start_at=0):
     """Plays first (index=0) song in the music queue"""
 
@@ -475,11 +505,12 @@ async def play_file(ctx, start_at=0):
         upcoming_tracks.append(play_history.pop(0))
 
     def after_play(error):
+        # TODO: make this a global function?
         # noinspection PyTypeChecker
         if not error and not data_dict[guild]['is_stopped']:
             mq = guild_data['music']
             dq = guild_data['done']
-            # pylint: disable=assignment-from-no-return
+            
             if len(voice_client.channel.members) > 1:
                 # mq = guild_data['music']
                 # ph = guild_data['done']
@@ -511,12 +542,15 @@ async def play_file(ctx, start_at=0):
                         else:
                             coro = download_if_not_exists(ctx, next_title, next_video_id, in_background=False)
                             next_m = run_coro(coro)
+
                     next_music_filepath = f'Music/{next_video_id}.mp3'
                     next_audio_source = FFmpegPCMAudio(next_music_filepath, executable=ffmpeg_path,
                                                        before_options="-nostdin",
                                                        options="-vn -b:a 128k")
                     next_audio_source = PCMVolumeTransformer(next_audio_source)
                     next_audio_source.volume = guild_data['volume']
+                    temp2_audio_source = get_audio_source(guild_data, next_song)
+                    print('Good to use get audio source', temp2_audio_source == next_audio_source)
                     voice_client.play(next_audio_source, after=after_play)
                     next_song.start(0)
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
@@ -550,6 +584,8 @@ async def play_file(ctx, start_at=0):
                                       options='-vn -b:a 128k')
         audio_source = PCMVolumeTransformer(audio_source)
         audio_source.volume = guild_data['volume']
+        temp_audio_source = get_audio_source(guild_data, song)
+        print('Good to use get audio source', temp_audio_source == audio_source)
         voice_client.play(audio_source, after=after_play)
         song.start(start_at)
         time_stamp = song.get_time_stamp(True)
@@ -856,12 +892,19 @@ async def rewind(ctx, seconds: int = 5):
 @bot.command(aliases=['np', 'currently_playing', 'cp'])
 @commands.check(in_guild)
 async def now_playing(ctx, send_link=False):
+    # TODO: rich embed
     guild = ctx.guild
     mq = data_dict[guild]['music']
     song = mq[0]
     await ctx.send(f'`{song.title}` {song.get_time_stamp(True)}')
     if send_link:
         await ctx.send(f'https://www.youtube.com/watch?v={song.get_video_id()}')
+    # embed = discord.Embed(title=song.title, url=f'https://www.youtube.com/watch?v={song.get_video_id()}',
+    #                       description=song.get_time_stamp(True), color=0x0080ff)
+    # embed.set_author(name='Now Playing')
+    # # embed.add_field(name=, value=undefined, inline=False)
+    # await ctx.send(embed=embed)
+    # https://cog-creators.github.io/discord-embed-sandbox/
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
