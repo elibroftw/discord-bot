@@ -37,7 +37,6 @@ my_user_id = int(os.environ['MY_USER_ID'])
 
 players_in_game = []
 tic_tac_toe_data = {}
-ttt_games = {}
 ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 data_dict = {'downloads': {}}
 
@@ -55,7 +54,8 @@ async def on_ready():
     for guild in bot.guilds:
         data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1, 'repeat': False,
                             'repeat_all': False, 'auto_play': False, 'downloads': {}, 'invite': None, 'output': True}
-        # output means Now playing messages
+    # TODO: load data from save file
+    #   delete save file after
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
@@ -197,6 +197,7 @@ async def _exit(ctx):
 async def restart(ctx):
     if ctx.author.id == my_user_id:
         print('Restarting')
+        # TODO: save all information to a file
         await bot.change_presence(activity=discord.Game('Restarting...'))
         for voice_client in bot.voice_clients:
             if voice_client:
@@ -277,7 +278,7 @@ async def games(ctx):
 async def ttt(ctx):
     global players_in_game, tic_tac_toe_data
     author: discord.User = ctx.message.author
-    if ttt_games.get(author, False):
+    if author in tic_tac_toe_data and tic_tac_toe_data[author]['game_over'] == False:
         await author.send('You are already in a game. To end a game enter !end')
     else:
         msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
