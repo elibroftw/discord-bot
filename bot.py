@@ -631,6 +631,7 @@ async def pause(ctx):
         if voice_client.is_paused():
             voice_client.resume()
             song.start()
+            await bot.change_presence(activity=discord.Game(song.title))
         else:
             voice_client.pause()
             song.pause()
