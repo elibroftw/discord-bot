@@ -185,7 +185,9 @@ async def _exit(ctx):
     if str(ctx.author) == 'eli#4591':
         # voice_client: discord.VoiceClient = discord.utils.get(bot.voice_clients, guild=ctx.guild)
         for voice_client in bot.voice_clients:
-            if voice_client: await voice_client.disconnect()
+            if voice_client.is_playing() or voice_client.is_paused():
+                no_after_play(data_dict[ctx.guild], voice_client)
+            await voice_client.disconnect()
         await bot.logout()
         quit()
         quit()
@@ -199,10 +201,9 @@ async def restart(ctx):
         await bot.change_presence(activity=discord.Game('Restarting...'))
         for voice_client in bot.voice_clients:
             if voice_client:
-                # if voice_client.is_playing():
-                #     no_after_play(data_dict[ctx.guild], voice_client)
+                if voice_client.is_playing() or voice_client.is_paused():
+                    no_after_play(data_dict[ctx.guild], voice_client)
                 await voice_client.disconnect()
-                # await voice_client.connect()
         g = git.cmd.Git(os.getcwd())
         g.pull()
         run('python bot.py')
@@ -465,7 +466,7 @@ async def play_file(ctx, start_at=0):
     upcoming_tracks = guild_data['music']
     play_history = guild_data['done']
     if not upcoming_tracks and guild_data['repeat_all']:
-        guild_data['music'] = play_history[::-1]
+        upcoming_tracks = guild_data['music'] = play_history[::-1]
         play_history.clear()
     elif not upcoming_tracks and guild_data['repeat']:
         upcoming_tracks.append(play_history.pop(0))
@@ -705,6 +706,7 @@ def no_after_play(guild_data, voice_client):
 @commands.check(in_guild)
 async def skip(ctx, times=1):
     # TODO: make it a partial democracy but mods and admins can bypass it
+    # TODO: fix bug
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
@@ -731,7 +733,12 @@ async def previous(ctx, times=1):
         if dq:
             no_after_play(guild_data, voice_client)
             for _ in range(min(times, len(dq))): mq.insert(0, dq.pop(0))
+            # TODO: what if repeat_all == True
             await play_file(ctx)
+        elif mq and guild_data['repeat_all']:  # TODO
+            # move everything before the selected song to the done_queue
+            pass
+            
 
 
 @bot.command()
