@@ -829,16 +829,15 @@ async def skip_to(ctx, seconds: int):
 
 @bot.command(aliases=['ff', 'fwd'])
 @commands.check(in_guild)
-async def fast_forward(ctx, seconds: int = 5):  # TODO
-    # raise NotImplementedError
-    # TODO: fix this
+async def fast_forward(ctx, seconds: int = 5):
     guild = ctx.guild
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():
         guild_data = data_dict[guild]
+        start_at = song.get_time_stamp() + seconds
         no_after_play(guild_data, voice_client)
         song = guild_data['music'][0]
-        await play_file(ctx, song.get_time_stamp() + seconds)
+        await play_file(ctx, start_at)
 
 
 @bot.command(aliases=['rwd', 'rw'])
@@ -848,9 +847,10 @@ async def rewind(ctx, seconds: int = 5):
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():
         guild_data = data_dict[guild]
+        start_at = song.get_time_stamp() - seconds
         no_after_play(guild_data, voice_client)
         song = guild_data['music'][0]
-        await play_file(ctx, song.get_time_stamp() - seconds)
+        await play_file(ctx, start_at)
 
 
 @bot.command(aliases=['np', 'currently_playing', 'cp'])
