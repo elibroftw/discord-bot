@@ -817,7 +817,7 @@ async def _recently_played(ctx):
     else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
 
 
-@bot.command()
+@bot.command(aliases=['start_at'])
 @commands.check(in_guild)
 async def skip_to(ctx, seconds: int):
     guild = ctx.guild
@@ -924,11 +924,6 @@ async def volume(ctx):
 
 
 @bot.command()
-async def source(ctx):
-    await ctx.send('https://github.com/elibroftw/discord-bot')
-
-
-@bot.command()
 async def ban(ctx):
     # TODO: add are you sure
     if ctx.author.guild_permissions.ban_members:
@@ -941,9 +936,9 @@ async def ban(ctx):
             await ctx.guild.ban(user)
 
 
-@bot.command()
+@bot.command(aliases=['source'])
 async def about(ctx):
-    ctx.author.send(f'Hi there. Thank you for wanting to know more about me. I was made by Elijah Lopez.\n'
+    ctx.author.send(f'Hi there. Thank you for inquiring about me. I was made by Elijah Lopez.\n'
                     'For more information visit https://github.com/elibroftw/discord-bot.\n'
                     f'Join my server at https://discord.gg/{invitation_code})')
 
