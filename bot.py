@@ -214,7 +214,7 @@ async def restart(ctx):
         print('Restarting')
         # TODO: save all information to a file
         await bot.change_presence(activity=discord.Game('Restarting...'))
-        save = {'voice_connections': []}
+        save = {'voice_connections': {}}
         for voice_client in bot.voice_clients:
             save['voice_connections'][voice_client.guild.id] = voice_client.channel.id
             if voice_client:
