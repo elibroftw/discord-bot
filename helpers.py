@@ -28,9 +28,11 @@ class Song:
     status = 'NOT_PLAYING'
     length = 'DOWNLOADING'
 
-    def __init__(self, title, video_id):
+    def __init__(self, title, video_id, status='NOT_PLAYING', start_at=0):
         self.title = title
         self._video_id = video_id
+        if status == 'PLAYING':
+            self.start(start_at)
 
     def __hash__(self):
         return hash(self._video_id)
