@@ -8,7 +8,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 # noinspection PyUnresolvedReferences
 from pprint import pprint
-# noinspection PyUnresolvedReferences
 from time import time
 
 import requests
@@ -122,7 +121,6 @@ if not os.path.exists('Music'):
 
 
 def iso_8061_to_seconds(duration="P1W2DT6H21M32S"):
-    # pylint: disable=anomalous-backslash-in-string
     """
     Converts YouTube duration (ISO 8061)
     into Seconds
