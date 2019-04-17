@@ -1,25 +1,19 @@
 import asyncio
-# noinspection PyUnresolvedReferences
 import json
-import time
-from contextlib import suppress
 from copy import deepcopy
+from contextlib import suppress
 from datetime import datetime
-
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
 import git
 import logging
 import os
-# noinspection PyUnresolvedReferences
-from pprint import pprint
 from subprocess import Popen
 
-
 import tictactoe
-from helpers import youtube_download, youtube_search, get_related_video, get_video_id, get_youtube_title, \
-    load_opus_lib, update_net_worth, check_net_worth, Song, get_video_duration, format_time_ffmpeg
+from helpers import load_opus_lib, update_net_worth, check_net_worth, youtube_search, youtube_download,\
+    get_related_video, Song, format_time_ffmpeg, get_video_id, get_youtube_title, get_video_duration
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -118,7 +112,7 @@ async def hi(ctx):
 
 
 @bot.command()
-async def test(ctx):
+async def test():
     print('test called')
 
 
@@ -319,7 +313,7 @@ async def ttt(ctx):
             return bool_value and correct_prereqs
 
         def check_digit(waited_msg):
-            correct_prereqs = waited_msg.channel == game_channel and ctx.message.author == waited_msg.author
+            correct_prereqs = waited_msg.channel == game_channel and author == waited_msg.author
             waited_msg = waited_msg.content
             return (waited_msg.isdigit() or 'end' in waited_msg.lower()) and correct_prereqs
 
