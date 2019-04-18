@@ -60,7 +60,7 @@ async def on_ready():
     for guild in bot.guilds:
         if guild not in data_dict:
             data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1,
-                                   'repeat': False, 'repeat_all': False, 'auto_play': False,
+                                   'repeat': False, 'repeat_all': False, 'auto_play': False, 'skip_voters': [],
                                    'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
@@ -290,19 +290,18 @@ async def games(ctx):
 async def ttt(ctx):
     global players_in_game, tic_tac_toe_data
     author: discord.User = ctx.message.author
-    # Note: game_over is synonymous with being in game
+    # game_over is synonymous with being in game
     if author in tic_tac_toe_data and not tic_tac_toe_data[author]['game_over']:
         await author.send('You are already in a game. To end a game enter !end')
     else:
         msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
         await author.send(msg)
-        # TODO: do I really need username in dict??
+        # NOTE: do I really need username in dict??
         # TODO: replace game_over with in_game
         tic_tac_toe_data[author] = {'username': str(author), 'comp_moves': [], 'user_moves': [], 'danger': None,
                                     'danger2': None, 'game_over': False, 'round': 0}
         user_msg, game_channel = None, author.dm_channel
-        # TODO: Change the parameter name??
 
         def check_yn(waited_msg):
             correct_prereqs = waited_msg.channel == game_channel and author == waited_msg.author
@@ -394,7 +393,6 @@ async def summon(ctx):
             vc = await channel.connect()
             return vc
         elif voice_client.channel != channel:
-            # TODO: add a role lock?
             return await voice_client.move_to(channel)
         return voice_client
 
@@ -501,15 +499,15 @@ async def play_file(ctx, start_at=0):
         if not error and not guild_data['is_stopped'] and not (vc.is_playing() or vc.is_paused()):
             mq = guild_data['music']
             dq = guild_data['done']
-            
+            guild_data['skip_voters'] = []
+
             if len(vc.channel.members) > 1:
                 # mq = guild_data['music']
                 # ph = guild_data['done']
                 if not guild_data['repeat']:
                     last_song = mq.pop(0)
                     dq.insert(0, last_song)
-                else:
-                    last_song = mq[0]
+                else: last_song = mq[0]
 
                 if guild_data['repeat_all'] and not mq and dq:
                     mq = guild_data['music'] = dq[::-1]
@@ -560,10 +558,10 @@ async def play_file(ctx, start_at=0):
         song.start(start_at)
         time_stamp = song.get_time_stamp(True)
         guild_data['is_stopped'] = False
+        guild_data['skip_voters'] = []
         if guild_data['output']:
             msg_content = f'Now playing `{title}` {time_stamp}'
-            if m:
-                await m.edit(content=msg_content)
+            if m: await m.edit(content=msg_content)
             else:
                 temp_mq = deepcopy(upcoming_tracks)
                 temp_dq = deepcopy(play_history)
@@ -719,27 +717,27 @@ def no_after_play(guild_data, voice_client):
 @bot.command(aliases=['next', 'n', 'sk'])
 @commands.check(in_guild)
 async def skip(ctx, times=1):
-    # TODO: make it a partial democracy but mods and admins can bypass it
-    # TODO: fix bug
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
         guild_data = data_dict[guild.id]
         mq = guild_data['music']
+        dq = guild_data['done']
         if mq:
-            dq = guild_data['done']
             no_after_play(guild_data, voice_client)
             times = min(times, len(mq))
-            # dq = guild_data['done'] = mq[0:times].reverse() + dq
+            # TODO: if times > len(mq) see if repeat_all is enabled
+            # guild_data['done'] = reversed(mq[:times]) + dq
+            # guild_data['music'] = mq[times:]
             for _ in range(times): dq.insert(0, mq.pop(0))
             await play_file(ctx)
+        # if dq and guild_data['repeat_all']:
+        #     pass
 
 
 @bot.command(aliases=['back', 'b', 'prev', 'go_back', 'gb'])
 @commands.check(in_guild)
 async def previous(ctx, times=1):
-    # TODO: make it a partial democracy but mods and admins can bypass it
-    # note: there is a bug when times > 1
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
@@ -748,12 +746,16 @@ async def previous(ctx, times=1):
         dq = guild_data['done']
         if dq:
             no_after_play(guild_data, voice_client)
-            for _ in range(min(times, len(dq))): mq.insert(0, dq.pop(0))
-            # TODO: what if repeat_all == True
+            times = min(times, len(dq))
+            # TODO: if times > len(dq) see if repeat_all is enabled
+            # data_dict['music'] = reversed(dq[:times]) + mq  # todo: test this
+            # data_dict['done'] = dq[times:]
+            for _ in range(times): mq.insert(0, dq.pop(0))
             await play_file(ctx)
-        elif mq and guild_data['repeat_all']:  # TODO
-            # move everything before the selected song to the done_queue
-            pass
+        elif mq and guild_data['repeat_all']:
+            dq += reversed(mq[:-times])
+            guild_data['music'] = mq[-times:]
+            await play_file(ctx)
             
 
 @bot.command()
