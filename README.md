@@ -1,5 +1,5 @@
-# Discord Bot
-A discord bot (called El Chapo) I made using the discord.py module and is hosted on Repl.it (for now).
+# Discord Bot (Private)
+A discord bot (called El Chapo) I made using the discord.py module and is self hosted and is also hosted on AWS (for now). This bot is tailored towards being a custom bot for your server rather than one bot for a bunch of servers (music system is not meant to be used on more than the owners server).
 
 # Features
 For a list of commands view bot.py
@@ -45,4 +45,4 @@ For a list of commands view bot.py
 - report user for bot abuse
 
 Invitation [url](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
-DISCLAIMER: This bot has not been tested to be used on multiple servers
+DISCLAIMER: I don't recommend using the bot in your server for music, I will probably make another bot for that.
