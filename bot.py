@@ -422,7 +422,7 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
                 data_dict['downloads'].pop(video_id)
                 if data_dict[ctx.guild.id]['music'][0].get_video_id() == video_id:
                     bot.loop.create_task(play_file(ctx))
-                    bot.loop.create_task(m.delete())
+                    bot.loop.create_task(m.edit(content=f'Downloaded `{title}`', delete_after=5))
                     return
                 elif play_next: msg_content = f'Added `{title}` to next up'
                 else: msg_content = f'Added `{title}` to the playing queue'
@@ -553,7 +553,9 @@ async def play_file(ctx, start_at=0):
         if result:
             await result
             return
-        else: m = await download_if_not_exists(ctx, title, video_id, in_background=False)
+        else:
+            m = await download_if_not_exists(ctx, title, video_id, in_background=False)
+            # m = await download_if_not_exists(ctx, title, video_id, in_background=True)
         vc.play(create_audio_source(guild_data, song, start_at=start_at), after=after_play)
         song.start(start_at)
         time_stamp = song.get_time_stamp(True)
