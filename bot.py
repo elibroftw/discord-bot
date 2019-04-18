@@ -721,6 +721,7 @@ async def skip(ctx, times=1):
         guild_data = data_dict[guild.id]
         mq = guild_data['music']
         dq = guild_data['done']
+        guild_data['repeat'] = False
         if mq:
             no_after_play(guild_data, voice_client)
             times = min(times, len(mq))
@@ -742,6 +743,7 @@ async def previous(ctx, times=1):
         guild_data = data_dict[guild.id]
         mq = guild_data['music']
         dq = guild_data['done']
+        guild_data['repeat'] = False
         if dq:
             no_after_play(guild_data, voice_client)
             times = min(times, len(dq))
