@@ -42,6 +42,24 @@ def create_embed(title, description='', color=discord.Color.blue()):
     return discord.Embed(title=title, description=description, color=color)
 
 
+def run_coro(coro: asyncio.coroutine):
+    # e.g. coro = bot.change_presence(activity=discord.Game('Prison Break (!)'))
+    fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+    return fut.result()
+
+
+async def in_guild(ctx):
+    if ctx.guild:
+        return True
+    return False
+
+
+async def has_vc(ctx):
+    if ctx.guild and ctx.guild.voice_client:
+        return True
+    return False
+
+
 @bot.event
 async def on_ready():
     # TODO: load data from save file
@@ -396,10 +414,11 @@ async def summon(ctx):
         return voice_client
 
 
-def run_coro(coro: asyncio.coroutine):
-    # e.g. coro = bot.change_presence(activity=discord.Game('Prison Break (!)'))
-    fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
-    return fut.result()
+@bot.command()
+async def dl_songs(ctx, playlist_link):
+    if ctx.author.id == my_user_id:
+        pass
+    # download songs in playlist in background
 
 
 async def download_if_not_exists(ctx, title, video_id, in_background=False, play_next=False):
@@ -444,18 +463,6 @@ async def download_related_video(ctx, auto_play_setting):
             related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
             related_msg_content = f'Added `{related_title}` to the playing queue'
             if not related_m: await ctx.send(related_msg_content)
-
-
-async def in_guild(ctx):
-    if ctx.guild:
-        return True
-    return False
-
-
-async def has_vc(ctx):
-    if ctx.guild and ctx.guild.voice_client:
-        return True
-    return False
 
 
 @bot.command(aliases=['mute'])
