@@ -44,27 +44,24 @@ def create_embed(title, description='', color=discord.Color.blue()):
 
 @bot.event
 async def on_ready():
-    # todo: send me a message and then delete it
-
     # TODO: load data from save file
     #   delete save file after
-    # bot.get_guild(id)
 
     # if os.path.exists('save.json'):
     #     with open('save.json') as f:
     #         save = json.load(f)
     #         os.remove('save.json')
-    # for guild_id, channel_id in save['voice_clients'].items():
-    #     guild = bot.get_guild(guild_id)
-    #     voice_channel = bot.get_guild(channel_id)
-    #     voice_channel.connect()
+    # for guild_id, guild_data in save['voice_clients'].items():
+    #     channel_id = guild_data['voice_channel']
+    #     voice_channel = bot.get_channel(channel_id)
+    #     vc = voice_channel.connect()
     # TODO: somehow make a ctx object and call play_file
     # todo: set data_dict
     for guild in bot.guilds:
         if guild not in data_dict:
-            data_dict[guild] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1,
-                                'repeat': False, 'repeat_all': False, 'auto_play': False,
-                                'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
+            data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1,
+                                   'repeat': False, 'repeat_all': False, 'auto_play': False,
+                                   'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
@@ -197,7 +194,7 @@ async def _exit(ctx):
         await bot.change_presence(activity=discord.Game('Exiting...'))
         for voice_client in bot.voice_clients:
             if voice_client.is_playing() or voice_client.is_paused():
-                no_after_play(data_dict[ctx.guild], voice_client)
+                no_after_play(data_dict[ctx.guild.id], voice_client)
             await voice_client.disconnect()
         await bot.logout()
 
@@ -210,12 +207,15 @@ async def restart(ctx):
         g = git.cmd.Git(os.getcwd())
         g.pull()
         # TODO: save all information to a file
-        save = {'voice_connections': {}}
+        save = {'voice_connections': {}, 'downloads': data_dict['downloads']}
         for voice_client in bot.voice_clients:
-            save['voice_connections'][voice_client.guild.id] = voice_client.channel.id
+            guild = voice_client.guild
+            guild_data = data_dict[guild.id]
+            guild_data['voice_channel'] = voice_client.channel.id
+            save['voice_connections'][guild.id] = guild_data
             if voice_client:
                 if voice_client.is_playing() or voice_client.is_paused():
-                    no_after_play(data_dict[ctx.guild], voice_client)
+                    no_after_play(data_dict[guild.id], voice_client)
                 await voice_client.disconnect()
         with open('save.json', 'w') as fp:
             json.dump(save, fp, indent=4)
@@ -225,10 +225,8 @@ async def restart(ctx):
 
 
 # @bot.command(, aliases=['gettweet', 'get_tweet'])
-# async def twitter(ctx):
-#     # TODO: add --integer to define how many statuses, use regex
-#     # TODO: add a clamp (3 for this 10 for the next) so nobody can abuse the system
-#     msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])  # TODO: except ValueError
+# async def twitter(ctx, statuses=1):
+#     msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])
 #     await ctx.send(msg)
 #
 #
@@ -422,7 +420,7 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
         if in_background:
             def callback(_):
                 data_dict['downloads'].pop(video_id)
-                if data_dict[ctx.guild]['music'][0].get_video_id() == video_id:
+                if data_dict[ctx.guild.id]['music'][0].get_video_id() == video_id:
                     bot.loop.create_task(play_file(ctx))
                     bot.loop.create_task(m.delete())
                     return
@@ -440,7 +438,7 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
 async def download_related_video(ctx, auto_play_setting):
     if auto_play_setting:
         guild = ctx.guild
-        guild_data = data_dict[guild]
+        guild_data = data_dict[guild.id]
         mq = guild_data['music']
         if len(mq) == 1:
             song = mq[0]
@@ -466,7 +464,7 @@ async def has_vc(ctx):
 @bot.command(aliases=['mute'])
 @commands.check(in_guild)
 async def quiet(ctx):
-    guild_data = data_dict[ctx.guild]
+    guild_data = data_dict[ctx.guild.id]
     guild_data['output'] = not guild_data['output']
 
 
@@ -489,7 +487,7 @@ async def play_file(ctx, start_at=0):
     guild: discord.Guild = ctx.guild
     vc: discord.VoiceClient = guild.voice_client
     # noinspection PyTypeChecker
-    guild_data = data_dict[guild]
+    guild_data = data_dict[guild.id]
     upcoming_tracks = guild_data['music']
     play_history = guild_data['done']
     if not upcoming_tracks and guild_data['repeat_all']:
@@ -587,8 +585,9 @@ async def play(ctx):
     voice_client: discord.VoiceClient = guild.voice_client
     ctx_msg_content = ctx.message.content
     play_next = any([cmd in ctx_msg_content for cmd in ('pn', 'play_next', 'playnext')])
-    guild_data = data_dict[guild]
+    guild_data = data_dict[guild.id]
     mq = guild_data['music']
+    guild_data['text_channel'] = ctx.channel
     if voice_client is None:
         voice_client = await bot.get_command('summon').callback(ctx)
     url_or_query = ctx.message.content.split()
@@ -634,7 +633,7 @@ async def play(ctx):
 async def pause(ctx):
     voice_client: discord.VoiceClient = ctx.guild.voice_client
     if voice_client:
-        song = data_dict[ctx.guild]['music'][0]
+        song = data_dict[ctx.guild.id]['music'][0]
         if voice_client.is_paused():
             voice_client.resume()
             song.start()
@@ -650,7 +649,7 @@ async def pause(ctx):
 async def auto_play(ctx, setting: bool = None):
     """Turns auto play on or off"""
     guild = ctx.guild
-    guild_data = data_dict[guild]
+    guild_data = data_dict[guild.id]
     if setting is None: setting = not guild_data['auto_play']
     guild_data['auto_play'] = setting
     await ctx.send(f'Auto play set to {setting}')
@@ -671,14 +670,14 @@ async def auto_play(ctx, setting: bool = None):
 async def _repeat(ctx, setting: bool = None):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
-    guild_data = data_dict[guild]
+    guild_data = data_dict[guild.id]
     if setting is None: setting = not guild_data['repeat']
-    data_dict[guild]['repeat'] = setting
+    data_dict[guild.id]['repeat'] = setting
     if setting:
         await ctx.send('Repeating song set to True')
         if voice_client and not voice_client.is_playing() and not voice_client.is_paused():
-            mq = data_dict[guild]['music']
-            dq = data_dict[guild]['done']
+            mq = data_dict[guild.id]['music']
+            dq = data_dict[guild.id]['done']
             if not mq and dq:
                 mq.append(dq.pop(0))
                 await play_file(ctx)
@@ -691,9 +690,9 @@ async def _repeat(ctx, setting: bool = None):
 async def _repeat_all(ctx, setting: bool = None):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
-    guild_data = data_dict[guild]
-    if setting is None: setting = not data_dict[guild]['repeat_all']
-    data_dict[guild]['repeat_all'] = setting
+    guild_data = data_dict[guild.id]
+    if setting is None: setting = not data_dict[guild.id]['repeat_all']
+    data_dict[guild.id]['repeat_all'] = setting
 
     if setting:
         await ctx.send('Repeating all set to True')
@@ -723,7 +722,7 @@ async def skip(ctx, times=1):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
-        guild_data = data_dict[guild]
+        guild_data = data_dict[guild.id]
         mq = guild_data['music']
         if mq:
             dq = guild_data['done']
@@ -742,7 +741,7 @@ async def previous(ctx, times=1):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
-        guild_data = data_dict[guild]
+        guild_data = data_dict[guild.id]
         mq = guild_data['music']
         dq = guild_data['done']
         if dq:
@@ -759,7 +758,7 @@ async def previous(ctx, times=1):
 @commands.check(in_guild)
 async def remove(ctx, position: int = 0):
     guild = ctx.guild
-    guild_data = data_dict[guild]
+    guild_data = data_dict[guild.id]
     mq = guild_data['music']
     dq = guild_data['done']
     voice_client: discord.VoiceClient = guild.voice_client
@@ -779,9 +778,9 @@ async def clear_queue(ctx):
     moderator = discord.utils.get(guild.roles, name='Moderator')
     if ctx.author.top_role >= moderator:
         voice_client: discord.VoiceClient = guild.voice_client
-        mq = data_dict[guild]['music']
+        mq = data_dict[guild.id]['music']
         if voice_client.is_playing() or voice_client.is_paused():
-            data_dict[guild]['music'] = mq[0:1]
+            data_dict[guild.id]['music'] = mq[0:1]
         else: mq.clear()
         await ctx.send('Cleared music queue')
 
@@ -790,7 +789,7 @@ async def clear_queue(ctx):
 @commands.check(in_guild)
 async def next_up(ctx):
     guild = ctx.guild
-    guild_data = data_dict[guild]
+    guild_data = data_dict[guild.id]
     mq = guild_data['music']
     if mq:
         title = f'MUSIC QUEUE [{len(mq)} Songs]'
@@ -814,7 +813,7 @@ async def next_up(ctx):
 async def _recently_played(ctx):
     # TODO: make a play_history list that never gets modified and takes in a parameter page_number
     guild = ctx.guild
-    dq = data_dict[guild]['done']
+    dq = data_dict[guild.id]['done']
     if dq:
         title = f'RECENTLY PLAYED [{len(dq)} Songs]'
         msg = ''
@@ -834,7 +833,7 @@ async def skip_to(ctx, seconds: int):
     guild = ctx.guild
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():
-        no_after_play(data_dict[guild], voice_client)
+        no_after_play(data_dict[guild.id], voice_client)
         await play_file(ctx, seconds)
 
 
@@ -844,7 +843,7 @@ async def fast_forward(ctx, seconds: int = 5):
     guild = ctx.guild
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():
-        guild_data = data_dict[guild]
+        guild_data = data_dict[guild.id]
         start_at = guild_data['music'][0].get_time_stamp() + seconds
         no_after_play(guild_data, voice_client)
         await play_file(ctx, start_at)
@@ -856,7 +855,7 @@ async def rewind(ctx, seconds: int = 5):
     guild = ctx.guild
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():
-        guild_data = data_dict[guild]
+        guild_data = data_dict[guild.id]
         start_at = guild_data['music'][0].get_time_stamp() - seconds
         no_after_play(guild_data, voice_client)
         await play_file(ctx, start_at)
@@ -867,7 +866,7 @@ async def rewind(ctx, seconds: int = 5):
 async def now_playing(ctx, send_link=False):
     # TODO: rich embed
     guild = ctx.guild
-    mq = data_dict[guild]['music']
+    mq = data_dict[guild.id]['music']
     song = mq[0]
     await ctx.send(f'`{song.title}` {song.get_time_stamp(True)}')
     if send_link:
@@ -888,7 +887,7 @@ async def leave(ctx):
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
         await voice_client.disconnect()
-        guild_data = data_dict[guild]
+        guild_data = data_dict[guild.id]
         guild_data['music'].clear()
         guild_data['auto_play'] = False
         await ctx.send('Stopped playing music, music que has been emptied')
@@ -900,7 +899,7 @@ async def stop(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client and voice_client.is_playing():
-        guild_data = data_dict[guild]
+        guild_data = data_dict[guild.id]
         guild_data['is_stopped'] = True
         guild_data['music'][0].stop()
         voice_client.stop()
@@ -936,7 +935,7 @@ async def volume(ctx):
                 amount = max(0.0, amount)
                 amount = min(1.0, amount)
                 vc.source.volume = amount
-                data_dict[guild]['volume'] = amount
+                data_dict[guild.id]['volume'] = amount
             except ValueError: await ctx.send('Invalid argument', delete_after=5)
         else: await ctx.send(f'{vc.source.volume * 100}%')
 
