@@ -277,8 +277,6 @@ def youtube_download(url_or_video_id, verbose=False):
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url_or_video_id])
-        # TODO: detect then remove silence
-        # TODO: save files as video_id.mp3 cus fiend titles are a mess to deal with
         # info_dict = ydl.extract_info(url_or_video_id, download=False)
         # pprint(info_dict)
         # video_id = info_dict['display_id']
@@ -414,7 +412,7 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
 #     return msg
 
 
-def send_email(recipient, name='', subject=''):  # TODO: for later
+def send_email(recipient, name='', subject=''):  # NOTE: for later
     password = os.environ['PASSWORD']
     my_address = os.environ['EMAIL']
     s = smtplib.SMTP('smtp.gmail.com', 587)

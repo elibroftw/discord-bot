@@ -46,7 +46,6 @@ def create_embed(title, description='', color=discord.Color.blue()):
 async def on_ready():
     # TODO: load data from save file
     #   delete save file after
-
     # if os.path.exists('save.json'):
     #     with open('save.json') as f:
     #         save = json.load(f)
@@ -306,7 +305,7 @@ async def ttt(ctx):
         def check_yn(waited_msg):
             correct_prereqs = waited_msg.channel == game_channel and author == waited_msg.author
             waited_msg = waited_msg.content.lower()
-            bool_value = waited_msg in ('y', 'yes', 'no', 'n') or 'end' in waited_msg
+            bool_value = waited_msg in ('y', 'ye', 'yes', 'n', 'no', 'na', 'nah') or 'end' in waited_msg
             return bool_value and correct_prereqs
 
         def check_digit(waited_msg):
@@ -576,11 +575,10 @@ async def play_file(ctx, start_at=0):
 @bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
 @commands.check(in_guild)
 async def play(ctx):
-    # TODO: add repeat play option
-    # TODO: time remaining command + song length command
     # TODO: download option, rename file, add metadata and album art and then send it to user in dm.
     #   Download video as mp3 if the file does not exist.
     # TODO: use a db to determine which files get constantly queued (db should be title: video_id, times_queued)
+    #   if I make a public bot
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     ctx_msg_content = ctx.message.content
@@ -791,7 +789,8 @@ async def clear_queue(ctx):
 
 @bot.command(aliases=['music_queue', 'mq', 'nu', 'queue', 'que', 'q'])
 @commands.check(in_guild)
-async def next_up(ctx):
+async def next_up(ctx, page=1):
+    # TODO: take in a parameter page_number
     guild = ctx.guild
     guild_data = data_dict[guild.id]
     mq = guild_data['music']
@@ -801,8 +800,11 @@ async def next_up(ctx):
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
         msg = ''
+        # i = 10 * (page - 1)
+        # for song in mq[i:10 * page]:
+        #     i += 1
         for i, song in enumerate(mq):
-            if i == 10:
+            if i % 10 == 0:
                 msg += '\n...'
                 break
             if i > 0: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
@@ -814,13 +816,16 @@ async def next_up(ctx):
 
 @bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
 @commands.check(in_guild)
-async def _recently_played(ctx):
-    # TODO: make a play_history list that never gets modified and takes in a parameter page_number
+async def _recently_played(ctx, page=1):
+    # TODO: take in a parameter page_number
     guild = ctx.guild
     dq = data_dict[guild.id]['done']
     if dq:
         title = f'RECENTLY PLAYED [{len(dq)} Songs]'
         msg = ''
+        # i = 10 * (page - 1)
+        # for song in dq[i:10 * page]:
+        #     i += 1
         for i, song in enumerate(dq):
             if i == 10:
                 msg += '\n...'
@@ -946,15 +951,27 @@ async def volume(ctx):
 
 @bot.command()
 async def ban(ctx):
-    # TODO: add are you sure
-    if ctx.author.guild_permissions.ban_members:
-        args = ctx.message.content.split(' ')
-        if len(args) > 1:
-            name = ' '.join(args[1:])
-            user = discord.utils.get(ctx.guild.members, nick=name)
-            if not user:
-                user = discord.utils.get(ctx.guild.members, name=name)
+    author = ctx.author
+    args = ctx.message.content.split(' ')
+    if author.guild_permissions.ban_members and len(args) > 1:
+        name = ' '.join(args[1:])
+        user = discord.utils.get(ctx.guild.members, nick=name)
+        if not user:
+            user = discord.utils.get(ctx.guild.members, name=name)
+
+        if user:
+            def check_yn(waited_msg):
+                correct_prereqs = waited_msg.channel == ctx.channel and author == waited_msg.author
+                waited_msg = waited_msg.content.lower()
+                bool_value = waited_msg in ('y', 'ye', 'yes', 'n', 'no', 'na', 'nah')
+                return bool_value and correct_prereqs
+
             await ctx.guild.ban(user)
+            await ctx.send(f'{user.mention} has been banished to the shadow realm.\nDo you want to undo the ban (Y/n)?')
+            user_msg = await bot.wait_for('message', check=check_yn, timeout=60)
+            if user_msg:
+                await ctx.guild.unban(user)
+                await ctx.send(f'{user.mention} has been unbanned')
 
 
 @bot.command(aliases=['source'])
