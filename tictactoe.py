@@ -235,6 +235,6 @@ def tic_tac_toe_move(data: dict, choice=None):
     if ttt_round == 2: return move_two(data)
     if ttt_round == 3: return move_three(data)
     if ttt_round == 4: return move_four(data)
-    else:
+    else:  # ttt_move == 5
         data['game_over'] = True
-        return endgame(False), data  # ttt_move == 5
+        return endgame(False), data
