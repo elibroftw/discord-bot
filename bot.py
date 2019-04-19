@@ -809,11 +809,11 @@ async def next_up(ctx, page=1):
         # for song in mq[i:10 * page]:
         #     i += 1
         for i, song in enumerate(mq):
-            if i % 10 == 0:
+            if i == 0: msg += f'\n`Playing` {song.title} `{song.get_time_stamp(True)}`'
+            elif i % 10 == 0:
                 msg += '\n...'
                 break
-            if i > 0: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
-            else: msg += f'\n`Playing` {song.title} `{song.get_time_stamp(True)}`'
+            else: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
     else: await ctx.send(embed=create_embed('MUSIC QUEUE IS EMPTY'))
@@ -832,7 +832,7 @@ async def _recently_played(ctx, page=1):
         # for song in dq[i:10 * page]:
         #     i += 1
         for i, song in enumerate(dq):
-            if i == 10:
+            if i > 0 and i % 10 == 0:
                 msg += '\n...'
                 break
             msg += f'\n`-{i + 1}` {song.title} `{song.get_length(True)}`'
