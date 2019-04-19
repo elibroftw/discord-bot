@@ -303,7 +303,7 @@ async def games(ctx):
     await ctx.send('We have: Tic-Tac-Toe (!ttt) and Shift (!shift)')
 
 
-@bot.command()
+@bot.command(aliases=['tic_tac_toe'])
 async def ttt(ctx):
     global players_in_game, tic_tac_toe_data
     author: discord.User = ctx.message.author
@@ -345,7 +345,6 @@ async def ttt(ctx):
                         await author.send(temp_msg)
             except asyncio.TimeoutError:
                 tic_tac_toe_data[author]['game_over'] = True
-        # TODO: combine while statements
         while not tic_tac_toe_data[author]['game_over']:
             try:
                 user_msg = await bot.wait_for('message', timeout=120, check=check_digit)
