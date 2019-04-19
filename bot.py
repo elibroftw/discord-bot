@@ -68,10 +68,17 @@ async def on_ready():
     #     with open('save.json') as f:
     #         save = json.load(f)
     #         os.remove('save.json')
-    # for guild_id, guild_data in save['voice_clients'].items():
+    # for guild_id, guild_data in save['data_dict'].items():
     #     channel_id = guild_data['voice_channel']
     #     voice_channel = bot.get_channel(channel_id)
-    #     vc = voice_channel.connect()
+    #     voice_channel.connect()
+    #     mq = guild_data['music']
+    #     guild_data['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in mq]
+    #     dq = guild_data['done']
+    #     guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in dq]
+    #     data_dict[guild_id] = guild_data
+    #     tc = guild_data['text_channel']
+    #     await tc.send('Bot has been restarted use !p to resume playback')
     # TODO: somehow make a ctx object and call play_file
     # todo: set data_dict
     for guild in bot.guilds:
@@ -221,17 +228,22 @@ async def restart(ctx):
     if ctx.author.id == my_user_id:
         print('Restarting')
         await bot.change_presence(activity=discord.Game('Restarting...'))
-        # TODO: save all information to a file
-        save = {'voice_connections': {}, 'downloads': data_dict['downloads']}
+        # save = {'data_dict': {}, 'downloads': data_dict['downloads']}
         for voice_client in bot.voice_clients:
             guild = voice_client.guild
-            guild_data = data_dict[guild.id]
-            guild_data['voice_channel'] = voice_client.channel.id
-            save['voice_connections'][guild.id] = guild_data
+            # guild_data = data_dict[guild.id]
+            # guild_data['voice_channel'] = voice_client.channel.id
+            # mq = guild_data['music']
+            # guild_data['music'] = [s.to_dict() for s in mq]
+            # dq = guild_data['done']
+            # guild_data['done'] = [s.to_dict() for s in dq]
+            # guild_data['next_up'] = [s.to_dict() for s in next_up]
+            # save['data_dict'][guild.id] = guild_data
             if voice_client:
                 if voice_client.is_playing() or voice_client.is_paused():
                     no_after_play(data_dict[guild.id], voice_client)
                 await voice_client.disconnect()
+        # TODO: save all information to a file
         # with open('save.json', 'w') as fp:
         #     json.dump(save, fp, indent=4)
         g = git.cmd.Git(os.getcwd())
@@ -481,7 +493,7 @@ def create_audio_source(guild_data, song, start_at=0.0):
     return audio_source
 
 
-async def play_file(ctx, start_at=0):
+async def play_file(ctx, start_at=None):
     """Plays first (index=0) song in the music queue"""
 
     guild: discord.Guild = ctx.guild
@@ -556,6 +568,9 @@ async def play_file(ctx, start_at=0):
         else:
             m = await download_if_not_exists(ctx, title, video_id, in_background=False)
             # m = await download_if_not_exists(ctx, title, video_id, in_background=True)
+        if start_at is None:
+            start_at = song.get_time_stamp()
+
         vc.play(create_audio_source(guild_data, song, start_at=start_at), after=after_play)
         song.start(start_at)
         time_stamp = song.get_time_stamp(True)
@@ -587,8 +602,8 @@ async def play(ctx):
     ctx_msg_content = ctx.message.content
     play_next = any([cmd in ctx_msg_content for cmd in ('pn', 'play_next', 'playnext')])
     guild_data = data_dict[guild.id]
-    mq = guild_data['music']
     guild_data['text_channel'] = ctx.channel
+    mq = guild_data['music']
     if voice_client is None:
         voice_client = await bot.get_command('summon').callback(ctx)
     url_or_query = ctx.message.content.split()
