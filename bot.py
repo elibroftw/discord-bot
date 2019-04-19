@@ -355,6 +355,7 @@ async def ttt(ctx):
                     else:
                         player_move = int(user_msg.content)
                         temp_msg, d = tictactoe.valid_move(player_move, tic_tac_toe_data[author])
+                        print("dictionary's are equal (line 358): ", d == tic_tac_toe_data[author])
                         tic_tac_toe_data[author] = d
                         if not temp_msg:
                             await author.send('That was an invalid move')
