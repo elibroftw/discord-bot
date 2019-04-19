@@ -357,18 +357,14 @@ async def ttt(ctx):
                         temp_msg, d = tictactoe.valid_move(player_move, tic_tac_toe_data[author])
                         print("dictionary's are equal (line 358): ", d == tic_tac_toe_data[author])
                         tic_tac_toe_data[author] = d
-                        if not temp_msg:
-                            await author.send('That was an invalid move')
+                        if not temp_msg: await author.send('That was an invalid move')
                         else:
                             temp_msg += '\n'
                             tic_tac_toe_data[author]['user_moves'].append(player_move)
                             tempt = tictactoe.tic_tac_toe_move(tic_tac_toe_data[author])[0]
                             if tic_tac_toe_data[author]['game_over']:
-                                tic_tac_toe_data[author]['game_over'] = True
-                                if tic_tac_toe_data[author]['round'] == 5:
-                                    await author.send(f'Your Move{temp_msg + tempt}')
-                                else:
-                                    await author.send(f'Your Move{temp_msg}My Move{tempt}')
+                                if tic_tac_toe_data[author]['round'] == 5: await author.send(f'Your Move{temp_msg + tempt}')
+                                else: await author.send(f'Your Move{temp_msg}My Move{tempt}')
                             else:  # TODO: rich embed???
                                 await author.send(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
                             tic_tac_toe_data[author]['round'] += 1
