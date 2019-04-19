@@ -27,11 +27,10 @@ class Song:
     status = 'NOT_PLAYING'
     length = 'DOWNLOADING'
 
-    def __init__(self, title, video_id, status='NOT_PLAYING', start_at=0):
+    def __init__(self, title, video_id, time_stamp=0):
         self.title = title
         self._video_id = video_id
-        if status == 'PLAYING':
-            self.start(start_at)
+        self._time_stamp = time_stamp
 
     def __hash__(self):
         return hash(self._video_id)
@@ -103,6 +102,10 @@ class Song:
 
     def get_video_id(self):
         return self._video_id
+
+    def to_dict(self):
+        return {'title': self.title, 'video_id': self._video_id, 'status': self.status,
+                'time_stamp': self.get_time_stamp()}
 
 
 try: google_api_key = os.environ['google']
