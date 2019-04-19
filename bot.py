@@ -232,8 +232,8 @@ async def restart(ctx):
                 if voice_client.is_playing() or voice_client.is_paused():
                     no_after_play(data_dict[guild.id], voice_client)
                 await voice_client.disconnect()
-        with open('save.json', 'w') as fp:
-            json.dump(save, fp, indent=4)
+        # with open('save.json', 'w') as fp:
+        #     json.dump(save, fp, indent=4)
         g = git.cmd.Git(os.getcwd())
         g.pull()
         Popen('python bot.py', shell=True)
