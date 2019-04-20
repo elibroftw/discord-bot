@@ -1,5 +1,26 @@
 {
-    "voice_connections": {
-        "278672720042917900": 538473458003345418
+    "data_dict": {
+        "278672720042917900": {
+            "music": [
+                {
+                    "title": "Ercola & Heikki L - Deep At Night (Adam K & Soha Remix)",
+                    "video_id": "yPvCzksn2gQ",
+                    "status": "PLAYING",
+                    "time_stamp": 3.1460964679718018
+                }
+            ],
+            "done": [],
+            "is_stopped": false,
+            "volume": 1,
+            "repeat": false,
+            "repeat_all": false,
+            "auto_play": false,
+            "skip_voters": [],
+            "downloads": {},
+            "invite": null,
+            "output": true,
+            "text_channel": 560086136496586752,
+            "voice_channel": 538473458003345418
+        }
     }
 }

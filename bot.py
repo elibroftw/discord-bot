@@ -62,6 +62,8 @@ async def has_vc(ctx):
 
 @bot.event
 async def on_ready():
+    print('Logged In')
+    await bot.change_presence(activity=discord.Game('Prison Break (!)'))
     # TODO: load data from save file
     #   delete save file after
     # if os.path.exists('save.json'):
@@ -78,14 +80,15 @@ async def on_ready():
     #     guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in dq]
     #     data_dict[guild_id] = guild_data
     #     tc = guild_data['text_channel']
-    #     await tc.send('Bot has been restarted use !p to resume playback')
+    #     m = await tc.send('Bot has been restarted, now resuming music', delete_after=2)
+    #     ctx = await bot.get_context(m)
+    #     await play_file(ctx, guild_data['music'][0].get_time_stamp())
+    # https://discordpy.readthedocs.io/en/rewrite/ext/commands/api.html#discord.ext.commands.Bot.get_context
     for guild in bot.guilds:
         if guild not in data_dict:
             data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1,
                                    'repeat': False, 'repeat_all': False, 'auto_play': False, 'skip_voters': [],
                                    'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
-    print('Logged In')
-    await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
 
 @bot.event
@@ -226,28 +229,29 @@ async def restart(ctx):
     if ctx.author.id == my_user_id:
         print('Restarting')
         await bot.change_presence(activity=discord.Game('Restarting...'))
-        # save = {'data_dict': {}, 'downloads': data_dict['downloads']}
-        for voice_client in bot.voice_clients:
-            guild = voice_client.guild
-            # guild_data = data_dict[guild.id]
-            # guild_data['voice_channel'] = voice_client.channel.id
-            # mq = guild_data['music']
-            # guild_data['music'] = [s.to_dict() for s in mq]
-            # dq = guild_data['done']
-            # guild_data['done'] = [s.to_dict() for s in dq]
-            # guild_data['next_up'] = [s.to_dict() for s in next_up]
-            # save['data_dict'][guild.id] = guild_data
+        save = {'data_dict': {}}
+        for guild in bot.guilds:
+            voice_client = guild.voice_client
+            guild_data = data_dict[guild.id]
             if voice_client:
-                if voice_client.is_playing() or voice_client.is_paused():
-                    no_after_play(data_dict[guild.id], voice_client)
+                no_after_play(deepcopy(guild_data), voice_client)
                 await voice_client.disconnect()
-        # TODO: save all information to a file
-        # with open('save.json', 'w') as fp:
-        #     json.dump(save, fp, indent=4)
+            guild_data['voice_channel'] = voice_client.channel.id
+            mq = guild_data['music']
+            guild_data['music'] = [s.to_dict() for s in mq]
+            dq = guild_data['done']
+            guild_data['done'] = [s.to_dict() for s in dq]
+            # # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
+            save['data_dict'][guild.id] = guild_data
+        try:
+            with open('save.json', 'w') as fp:
+                json.dump(save, fp, indent=4)
+        except Exception as e:
+            print('save.json error', e)
         g = git.cmd.Git(os.getcwd())
         g.pull()
-        Popen('python bot.py', shell=True)
-        # Popen('python bot.py')  # TODO: Test this
+        # Popen('python bot.py', shell=True)
+        Popen('python bot.py')  # TODO: Test this
         await bot.logout()
 
 
@@ -373,7 +377,8 @@ async def ttt(ctx):
                             tic_tac_toe_data[author]['user_moves'].append(player_move)
                             tempt = tictactoe.tic_tac_toe_move(tic_tac_toe_data[author])[0]
                             if tic_tac_toe_data[author]['game_over']:
-                                if tic_tac_toe_data[author]['round'] == 5: await author.send(f'Your Move{temp_msg + tempt}')
+                                if tic_tac_toe_data[author]['round'] == 5:
+                                    await author.send(f'Your Move{temp_msg + tempt}')
                                 else: await author.send(f'Your Move{temp_msg}My Move{tempt}')
                             else:  # TODO: rich embed???
                                 await author.send(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
@@ -491,7 +496,7 @@ def create_audio_source(guild_data, song, start_at=0.0):
     return audio_source
 
 
-async def play_file(ctx, start_at=None):
+async def play_file(ctx, start_at=0):
     """Plays first (index=0) song in the music queue"""
 
     guild: discord.Guild = ctx.guild
@@ -566,8 +571,8 @@ async def play_file(ctx, start_at=None):
         else:
             m = await download_if_not_exists(ctx, title, video_id, in_background=False)
             # m = await download_if_not_exists(ctx, title, video_id, in_background=True)
-        if start_at is None:
-            start_at = song.get_time_stamp()
+        # if start_at is None:
+        #     start_at = song.get_time_stamp()
 
         vc.play(create_audio_source(guild_data, song, start_at=start_at), after=after_play)
         song.start(start_at)
@@ -600,7 +605,7 @@ async def play(ctx):
     ctx_msg_content = ctx.message.content
     play_next = any([cmd in ctx_msg_content for cmd in ('pn', 'play_next', 'playnext')])
     guild_data = data_dict[guild.id]
-    guild_data['text_channel'] = ctx.channel
+    guild_data['text_channel'] = ctx.channel.id
     mq = guild_data['music']
     if voice_client is None:
         voice_client = await bot.get_command('summon').callback(ctx)
@@ -808,26 +813,27 @@ async def clear_queue(ctx):
 @bot.command(aliases=['music_queue', 'mq', 'nu', 'queue', 'que', 'q'])
 @commands.check(in_guild)
 async def next_up(ctx, page=1):
-    # TODO: test page_number parameter
+    # TODO: add reaction emoticons
     guild = ctx.guild
     guild_data = data_dict[guild.id]
     mq = guild_data['music']
     if mq:
-        title = f'MUSIC QUEUE [{len(mq)} Songs]'
+        page = abs(page)
+        title = f'MUSIC QUEUE [{len(mq)} Song(s) | Page {page}]'
         if guild_data['auto_play']: title += ' | AUTO PLAY ENABLED'
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
         msg = ''
-        # page = abs(page)
-        # i = 10 * (page - 1)
-        # for song in mq[i:10 * page]:
-        #     i += 1
-        for i, song in enumerate(mq):
+
+        i = 10 * (page - 1)
+        for song in mq[i:10 * page]:
             if i == 0: msg += f'\n`Playing` {song.title} `{song.get_time_stamp(True)}`'
-            elif i % 10 == 0:
-                msg += '\n...'
-                break
             else: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
+            i += 1
+
+        if len(mq) > i:
+            msg += '\n...'
+
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
     else: await ctx.send(embed=create_embed('MUSIC QUEUE IS EMPTY'))
@@ -836,21 +842,22 @@ async def next_up(ctx, page=1):
 @bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
 @commands.check(in_guild)
 async def _recently_played(ctx, page=1):
-    # TODO: test page_number parameter
+    # TODO: add reaction emoticons
     guild = ctx.guild
     dq = data_dict[guild.id]['done']
     if dq:
-        title = f'RECENTLY PLAYED [{len(dq)} Songs]'
+        page = abs(page)
+        title = f'RECENTLY PLAYED [{len(dq)} Song(s) | Page {page}]'
         msg = ''
-        # page = abs(page)
-        # i = 10 * (page - 1)
-        # for song in dq[i:10 * page]:
-        #     i += 1
-        for i, song in enumerate(dq):
-            if i > 0 and i % 10 == 0:
-                msg += '\n...'
-                break
-            msg += f'\n`-{i + 1}` {song.title} `{song.get_length(True)}`'
+
+        i = 10 * (page - 1)
+        for song in dq[i:i + 10]:
+            i += 1
+            msg += f'\n`-{i}` {song.title} `{song.get_length(True)}`'
+
+        if len(dq) > i:
+            msg += '\n...'
+
         embed = create_embed(title, description=msg)
         await ctx.send(embed=embed)
     else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
@@ -892,26 +899,20 @@ async def rewind(ctx, seconds: int = 5):
 
 @bot.command(aliases=['np', 'currently_playing', 'cp'])
 @commands.check(in_guild)
-async def now_playing(ctx, send_link=False):
-    # TODO: Test rich embed
+async def now_playing(ctx):
     guild = ctx.guild
     mq = data_dict[guild.id]['music']
     song = mq[0]
-    await ctx.send(f'`{song.title}` {song.get_time_stamp(True)}')
-    if send_link:
-        await ctx.send(f'https://www.youtube.com/watch?v={song.get_video_id()}')
-    # embed = discord.Embed(title=song.title, url=f'https://www.youtube.com/watch?v={song.get_video_id()}',
-    #                       description=song.get_time_stamp(True), color=0x0080ff)
-    # embed.set_author(name='Now Playing')
-    # # embed.add_field(name=, value=undefined, inline=False)
-    # await ctx.send(embed=embed)
+    embed = discord.Embed(title=song.title, url=f'https://www.youtube.com/watch?v={song.get_video_id()}',
+                          description=song.get_time_stamp(True), color=0x0080ff)
+    embed.set_author(name='Now Playing')
+    await ctx.send(embed=embed)
     # https://cog-creators.github.io/discord-embed-sandbox/
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
 @commands.check(in_guild)
 async def leave(ctx):
-    # clear music queue
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
@@ -927,11 +928,8 @@ async def leave(ctx):
 async def stop(ctx):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
-    if voice_client and voice_client.is_playing():
-        guild_data = data_dict[guild.id]
-        guild_data['is_stopped'] = True
-        guild_data['music'][0].stop()
-        voice_client.stop()
+    guild_data = data_dict[guild.id]
+    no_after_play(guild_data, voice_client)
 
 
 @bot.command()

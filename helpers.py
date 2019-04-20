@@ -104,6 +104,7 @@ class Song:
         return self._video_id
 
     def to_dict(self):
+        print(self.get_time_stamp())
         return {'title': self.title, 'video_id': self._video_id, 'status': self.status,
                 'time_stamp': self.get_time_stamp()}
 
