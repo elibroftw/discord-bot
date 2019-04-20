@@ -280,13 +280,12 @@ async def thank(ctx):
 @commands.has_permissions(manage_messages=True)
 @bot.command()
 async def clear(ctx, number: int = 1):
+    await ctx.message.delete()
     with suppress(AttributeError):
         channel: discord.TextChannel = ctx.channel
         if ctx.message.author.permissions_in(ctx.channel).manage_messages:
-            # await ctx.send('Clearing messages...')
             await bot.change_presence(activity=discord.Game('Clearing messages...'))
-            if number > 99:
-                number = 99
+            if number > 100: number = 100
             messages = []
             async for m in channel.history(limit=number + 1):
                 date = m.created_at
@@ -295,7 +294,7 @@ async def clear(ctx, number: int = 1):
                 else: messages.append(m)
             await channel.delete_messages(messages)
             print(f'{ctx.message.author} cleared {number + 1} messages')
-        await bot.change_presence(activity=discord.Game('Prison Break (!)'))
+    await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
 
 @bot.command(name='eval')
