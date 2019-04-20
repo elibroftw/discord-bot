@@ -737,7 +737,7 @@ def no_after_play(guild_data, voice_client):
         voice_client.stop()
 
 
-@bot.command(aliases=['next', 'n', 'sk'])
+@bot.command(aliases=['next', 'n', 'N', 'sk'])
 @commands.check(in_guild)
 async def skip(ctx, times=1):
     guild = ctx.guild
