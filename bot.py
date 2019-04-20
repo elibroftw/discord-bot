@@ -239,7 +239,7 @@ async def restart(ctx):
             if voice_client:
                 no_after_play(deepcopy(guild_data), voice_client)
                 await voice_client.disconnect()
-            guild_data['voice_channel'] = voice_client.channel.id
+                guild_data['voice_channel'] = voice_client.channel.id
             mq = guild_data['music']
             guild_data['music'] = [s.to_dict() for s in mq]
             dq = guild_data['done']
@@ -415,6 +415,7 @@ async def created_at(ctx):
 async def summon(ctx):
     guild = ctx.guild
     author: discord.Member = ctx.author
+    data_dict[guild.id]['text_channel'] = ctx.channel.id
     if not author.voice:
         return await discord.utils.get(guild.voice_channels, name='music').connect()
     else:
@@ -608,7 +609,7 @@ async def play(ctx):
     ctx_msg_content = ctx.message.content
     play_next = any([cmd in ctx_msg_content for cmd in ('pn', 'play_next', 'playnext')])
     guild_data = data_dict[guild.id]
-    guild_data['text_channel'] = ctx.channel.id
+
     mq = guild_data['music']
     if voice_client is None:
         voice_client = await bot.get_command('summon').callback(ctx)
