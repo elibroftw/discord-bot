@@ -867,7 +867,7 @@ async def _recently_played(ctx, page=1):
     else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
 
 
-@bot.command(aliases=['start_at'])
+@bot.command(aliases=['start_at', 'st'])
 @commands.check(in_guild)
 async def skip_to(ctx, seconds: int):
     guild = ctx.guild

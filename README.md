@@ -16,9 +16,11 @@ For a list of commands view bot.py
     - Go Back (!back, !b, !previous, !prev)
     - Fast forward (!ff <seconds=5>)
     - Rewind (!rw <seconds=5>)
+    - Skip to (!st <seconds>)
     - Stop (!stop, !s, !end)
     - Autoplay (adds to the music queue when the queue is empty or has only the playing track; !auto_play, !ap)
     - Repeat Options (!repeat, !repeat_all)
+    - View Now Playing (!np)
     - View Upcoming tracks (!q)
     - View Recently Played (!dq)
     - Clear queue (!cq)
@@ -36,8 +38,8 @@ For a list of commands view bot.py
 - Admin uses
     - clearing (!clear int)
     - Can clear up to 100 messages in chat (needs Admin obviously)
-    - banning (!ban nick/username)
-    - get creation date of user (!created_at, !create_date, query is optional)
+    - Banning (!ban nick/username)
+    - Get creation date of user (!created_at, !create_date, query is optional)
 
 # Future
 - Set and get invite codes (currently only gets my invite code)
