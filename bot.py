@@ -34,6 +34,9 @@ tic_tac_toe_data = {}
 ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 data_dict = {'downloads': {}}
 
+if not os.path.exists('Music'):
+    os.mkdir('Music')
+
 with open('help.txt') as h:
     help_message = h.read()
 

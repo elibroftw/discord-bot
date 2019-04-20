@@ -120,9 +120,6 @@ except KeyError:
 
 youtube_api_url = 'https://www.googleapis.com/youtube/v3/'
 
-if not os.path.exists('Music'):
-    os.mkdir('Music')
-
 
 def iso_8061_to_seconds(duration="P1W2DT6H21M32S"):
     """
