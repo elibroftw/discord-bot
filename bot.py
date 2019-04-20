@@ -79,8 +79,6 @@ async def on_ready():
     #     data_dict[guild_id] = guild_data
     #     tc = guild_data['text_channel']
     #     await tc.send('Bot has been restarted use !p to resume playback')
-    # TODO: somehow make a ctx object and call play_file
-    # todo: set data_dict
     for guild in bot.guilds:
         if guild not in data_dict:
             data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1,
@@ -893,7 +891,7 @@ async def rewind(ctx, seconds: int = 5):
 @bot.command(aliases=['np', 'currently_playing', 'cp'])
 @commands.check(in_guild)
 async def now_playing(ctx, send_link=False):
-    # TODO: rich embed
+    # TODO: Test rich embed
     guild = ctx.guild
     mq = data_dict[guild.id]['music']
     song = mq[0]
