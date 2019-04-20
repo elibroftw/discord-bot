@@ -604,6 +604,7 @@ async def play(ctx):
     #   Download video as mp3 if the file does not exist.
     # TODO: use a db to determine which files get constantly queued (db should be title: video_id, times_queued)
     #   if I make a public bot
+    # TODO: !move_track <from> <to> command that can move tracks around in the playlist
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     ctx_msg_content = ctx.message.content
