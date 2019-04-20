@@ -528,6 +528,7 @@ async def play_file(ctx, start_at=0):
                     last_song = mq.pop(0)
                     dq.insert(0, last_song)
                 else: last_song = mq[0]
+                last_song.stop()
 
                 if guild_data['repeat_all'] and not mq and dq:
                     mq = guild_data['music'] = dq[::-1]
