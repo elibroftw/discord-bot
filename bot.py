@@ -808,7 +808,7 @@ async def clear_queue(ctx):
 @bot.command(aliases=['music_queue', 'mq', 'nu', 'queue', 'que', 'q'])
 @commands.check(in_guild)
 async def next_up(ctx, page=1):
-    # TODO: take in a parameter page_number
+    # TODO: test page_number parameter
     guild = ctx.guild
     guild_data = data_dict[guild.id]
     mq = guild_data['music']
@@ -818,6 +818,7 @@ async def next_up(ctx, page=1):
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
         msg = ''
+        page = abs(page)
         # i = 10 * (page - 1)
         # for song in mq[i:10 * page]:
         #     i += 1
@@ -835,7 +836,7 @@ async def next_up(ctx, page=1):
 @bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
 @commands.check(in_guild)
 async def _recently_played(ctx, page=1):
-    # TODO: take in a parameter page_number
+    # TODO: test page_number parameter
     guild = ctx.guild
     dq = data_dict[guild.id]['done']
     if dq:
