@@ -818,7 +818,7 @@ async def next_up(ctx, page=1):
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
         msg = ''
-        page = abs(page)
+        # page = abs(page)
         # i = 10 * (page - 1)
         # for song in mq[i:10 * page]:
         #     i += 1
@@ -842,6 +842,7 @@ async def _recently_played(ctx, page=1):
     if dq:
         title = f'RECENTLY PLAYED [{len(dq)} Songs]'
         msg = ''
+        # page = abs(page)
         # i = 10 * (page - 1)
         # for song in dq[i:10 * page]:
         #     i += 1
