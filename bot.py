@@ -329,11 +329,9 @@ async def ttt(ctx):
         msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
         await author.send(msg)
-        # NOTE: do I really need username in dict??
         # TODO: replace game_over with in_game
         tic_tac_toe_data[author] = {'comp_moves': [], 'user_moves': [], 'danger': None,
                                     'danger2': None, 'game_over': False, 'round': 0}
-        # 'username': str(author)
         user_msg, game_channel = None, author.dm_channel
 
         def check_yn(waited_msg):
