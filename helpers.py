@@ -22,15 +22,17 @@ from mutagen.mp3 import MP3
 
 
 class Song:
-    _time_stamp = 0
-    start_time = None
-    status = 'NOT_PLAYING'
-    length = 'DOWNLOADING'
+
+    __slots__ = ('title', '_video_id', '_time_stamp', 'start_time', 'status', 'length')
 
     def __init__(self, title, video_id, time_stamp=0):
         self.title = title
         self._video_id = video_id
         self._time_stamp = time_stamp
+        self._time_stamp = 0
+        self.start_time = None
+        self.status = 'NOT_PLAYING'
+        self.length = 'DOWNLOADING'
 
     def __hash__(self):
         return hash(self._video_id)
@@ -46,7 +48,8 @@ class Song:
     def __eq__(self, other):
         return self.__class__ == other.__class__ and other.get_video_id() == self._video_id
 
-    def start(self, start_at=_time_stamp):
+    def start(self, start_at=None):
+        if start_at is None: start_at = self._time_stamp
         self.status = 'PLAYING'
         self.start_time = time() - start_at
 
