@@ -521,19 +521,17 @@ async def play_file(ctx, start_at=0):
             dq = guild_data['done']
             guild_data['skip_voters'] = []
 
+            if not guild_data['repeat']:
+                last_song = mq.pop(0)
+                dq.insert(0, last_song)
+            else: last_song = mq[0]
+            last_song.stop()
+
+            if guild_data['repeat_all'] and not mq and dq:
+                mq = guild_data['music'] = dq[::-1]
+                dq.clear()
+
             if len(vc.channel.members) > 1:
-                # mq = guild_data['music']
-                # ph = guild_data['done']
-                if not guild_data['repeat']:
-                    last_song = mq.pop(0)
-                    dq.insert(0, last_song)
-                else: last_song = mq[0]
-                last_song.stop()
-
-                if guild_data['repeat_all'] and not mq and dq:
-                    mq = guild_data['music'] = dq[::-1]
-                    dq.clear()
-
                 setting = guild_data['auto_play']
                 if mq or setting:
                     if setting and not mq:
@@ -572,12 +570,7 @@ async def play_file(ctx, start_at=0):
         if result:
             await result
             return
-        else:
-            m = await download_if_not_exists(ctx, title, video_id, in_background=False)
-            # m = await download_if_not_exists(ctx, title, video_id, in_background=True)
-        # if start_at is None:
-        #     start_at = song.get_time_stamp()
-
+        else: m = await download_if_not_exists(ctx, title, video_id, in_background=False)
         vc.play(create_audio_source(guild_data, song, start_at=start_at), after=after_play)
         song.start(start_at)
         time_stamp = song.get_time_stamp(True)
