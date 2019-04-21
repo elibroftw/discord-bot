@@ -588,11 +588,28 @@ async def play_file(ctx, start_at=0):
         await download_related_video(ctx, guild_data['auto_play'])
 
 
+@bot.command(aliases=['dl'])
+async def download(ctx, index=0):
+    guild = ctx.guild
+    guild_data = data_dict[guild.id]
+
+    if index >= 0: q = guild_data['music']
+    else:
+        q = guild_data['done']
+        index = -index - 1
+    with suppress(IndexError):
+        song = q[index]
+        filename = f'{song.get_video_id()}.mp3'
+        with open(filename, 'rb') as fp:
+            file = discord.File(fp, filename=f'{song.title}.mp3')
+        content = 'Here is the mp3 file. You can rename the file and use my mp3 editor ' \
+                  '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify api) '
+        ctx.author.send(content=content, file=file)
+
+
 @bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
 @commands.check(in_guild)
 async def play(ctx):
-    # TODO: download option, rename file, add metadata and album art and then send it to user in dm.
-    #   Download video as mp3 if the file does not exist.
     # TODO: use a db to determine which files get constantly queued (db should be title: video_id, times_queued)
     #   if I make a public bot
     # TODO: !move_track <from> <to> command that can move tracks around in the playlist
