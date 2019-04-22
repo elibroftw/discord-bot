@@ -67,28 +67,28 @@ async def has_vc(ctx):
 async def on_ready():
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
-    # TODO: load data from save file
-    #   delete save file after
-    # if os.path.exists('save.json'):
-    #     with open('save.json') as f:
-    #         save = json.load(f)
-    #         os.remove('save.json')
-    # for guild_id, guild_data in save['data_dict'].items():
-    #     channel_id = guild_data['voice_channel']
-    #     voice_channel = bot.get_channel(channel_id)
-    #     voice_channel.connect()
-    #     mq = guild_data['music']
-    #     guild_data['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in mq]
-    #     dq = guild_data['done']
-    #     guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in dq]
-    #     data_dict[guild_id] = guild_data
-    #     tc = guild_data['text_channel']
-    #     m = await tc.send('Bot has been restarted, now resuming music', delete_after=2)
-    #     ctx = await bot.get_context(m)
-    #     await play_file(ctx, guild_data['music'][0].get_time_stamp())
+    save = {'data_dict': {}}
+    with suppress(FileNotFoundError):
+        if os.path.exists('save.json'):
+            with open('save.json') as f:
+                save = json.load(f)
+        os.remove('save.json')
+    for guild_id, guild_data in save['data_dict'].items():
+        channel_id = guild_data['voice_channel']
+        voice_channel = bot.get_channel(channel_id)
+        await voice_channel.connect()
+        mq = guild_data['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['music']]
+        guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['done']]
+        # noinspection PyTypeChecker
+        data_dict[int(guild_id)] = guild_data
+        tc = bot.get_channel(guild_data['text_channel'])
+        if mq and tc is not None:
+            m = await tc.send('Bot has been restarted, now resuming music', delete_after=2)
+            ctx = await bot.get_context(m)
+            await play_file(ctx, guild_data['music'][0].get_time_stamp())
     # https://discordpy.readthedocs.io/en/rewrite/ext/commands/api.html#discord.ext.commands.Bot.get_context
     for guild in bot.guilds:
-        if guild not in data_dict:
+        if guild.id not in data_dict:
             data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1,
                                    'repeat': False, 'repeat_all': False, 'auto_play': False, 'skip_voters': [],
                                    'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
@@ -220,6 +220,7 @@ async def youtube(ctx):
 async def _exit(ctx):
     if ctx.author.id == my_user_id:
         await bot.change_presence(activity=discord.Game('Exiting...'))
+        save_to_file()
         for voice_client in bot.voice_clients:
             if voice_client.is_playing() or voice_client.is_paused():
                 no_after_play(data_dict[ctx.guild.id], voice_client)
@@ -227,30 +228,37 @@ async def _exit(ctx):
         await bot.logout()
 
 
+def save_to_file():
+    save = {'data_dict': {}}
+    for guild in bot.guilds:
+        voice_client = guild.voice_client
+        guild_data = deepcopy(data_dict[guild.id])
+        guild_data['voice_channel'] = voice_client.channel.id
+        mq = guild_data['music']
+        guild_data['music'] = [s.to_dict() for s in mq]
+        dq = guild_data['done']
+        guild_data['done'] = [s.to_dict() for s in dq]
+        # # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
+        save['data_dict'][guild.id] = guild_data
+    try:
+        with open('save.json', 'w') as fp:
+            json.dump(save, fp, indent=4)
+    except Exception as e:
+        print('save.json error', e)
+
+
 @bot.command()
 async def restart(ctx):
     if ctx.author.id == my_user_id:
         print('Restarting')
         await bot.change_presence(activity=discord.Game('Restarting...'))
-        save = {'data_dict': {}}
+        save_to_file()
         for guild in bot.guilds:
             voice_client = guild.voice_client
-            guild_data = data_dict[guild.id]
             if voice_client:
-                no_after_play(deepcopy(guild_data), voice_client)
+                no_after_play(data_dict[guild.id], voice_client)
                 await voice_client.disconnect()
-                guild_data['voice_channel'] = voice_client.channel.id
-            mq = guild_data['music']
-            guild_data['music'] = [s.to_dict() for s in mq]
-            dq = guild_data['done']
-            guild_data['done'] = [s.to_dict() for s in dq]
             # # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
-            save['data_dict'][guild.id] = guild_data
-        try:
-            with open('save.json', 'w') as fp:
-                json.dump(save, fp, indent=4)
-        except Exception as e:
-            print('save.json error', e)
         g = git.cmd.Git(os.getcwd())
         g.pull()
         Popen('python bot.py')
@@ -837,7 +845,6 @@ async def next_up(ctx, page=1):
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
         msg = ''
-
         i = 10 * (page - 1)
         for song in mq[i:10 * page]:
             if i == 0: msg += f'\n`Playing` {song.title} `{song.get_time_stamp(True)}`'
