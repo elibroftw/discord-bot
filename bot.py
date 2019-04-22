@@ -607,7 +607,7 @@ async def download(ctx, index=0):
         index = -index - 1
     with suppress(IndexError):
         song = q[index]
-        filename = f'{song.get_video_id()}.mp3'
+        filename = f'Music/{song.get_video_id()}.mp3'
         with open(filename, 'rb') as fp:
             file = discord.File(fp, filename=f'{song.title}.mp3')
         content = 'Here is the mp3 file. You can rename the file and use my mp3 editor ' \
