@@ -82,7 +82,7 @@ async def on_ready():
         # noinspection PyTypeChecker
         data_dict[int(guild_id)] = guild_data
         tc = bot.get_channel(guild_data['text_channel'])
-        if mq and tc is not None:
+        if mq and tc is not None and not guild_data['is_stopped']:
             m = await tc.send('Bot has been restarted, now resuming music', delete_after=2)
             ctx = await bot.get_context(m)
             await play_file(ctx, guild_data['music'][0].get_time_stamp())
