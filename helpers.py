@@ -320,6 +320,7 @@ def get_related_video(video_id, done_queue):
     f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
          'type': 'video', 'key': google_api_key}
     search_response = json.loads(requests.get(f'{youtube_api_url}search?{urlencode(f)}').text)
+    # TODO: use get_video_durations(video_ids)
     for item in search_response['items']:
         title = item['snippet']['title']
         video_id = item['id']['videoId']
