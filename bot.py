@@ -12,8 +12,9 @@ import os
 from subprocess import Popen
 
 import tictactoe
-from helpers import load_opus_lib, update_net_worth, check_net_worth, youtube_search, youtube_download,\
-    get_related_video, Song, format_time_ffmpeg, get_video_id, get_youtube_title, get_video_duration
+from helpers import load_opus_lib, update_net_worth, check_net_worth, youtube_search, youtube_download, \
+    get_related_video, Song, format_time_ffmpeg, get_video_id, get_youtube_title, get_video_duration, \
+    file_friendly_title
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -609,7 +610,7 @@ async def download(ctx, index=0):
         song = q[index]
         filename = f'Music/{song.get_video_id()}.mp3'
         with open(filename, 'rb') as fp:
-            file = discord.File(fp, filename=f'{song.title}.mp3')
+            file = discord.File(fp, filename=f'{file_friendly_title(song.title)}.mp3')
         content = 'Here is the mp3 file. You can rename the file and use my mp3 editor ' \
                   '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify api) '
         await ctx.author.send(content=content, file=file)
