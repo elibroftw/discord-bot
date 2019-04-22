@@ -262,7 +262,7 @@ async def restart(ctx):
             # # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
         g = git.cmd.Git(os.getcwd())
         g.pull()
-        Popen('python bot.py')
+        Popen('python bot.py', shell=True)
         await bot.logout()
 
 
