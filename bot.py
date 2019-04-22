@@ -612,7 +612,7 @@ async def download(ctx, index=0):
             file = discord.File(fp, filename=f'{song.title}.mp3')
         content = 'Here is the mp3 file. You can rename the file and use my mp3 editor ' \
                   '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify api) '
-        ctx.author.send(content=content, file=file)
+        await ctx.author.send(content=content, file=file)
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
