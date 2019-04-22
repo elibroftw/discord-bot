@@ -29,7 +29,6 @@ class Song:
         self.title = title
         self._video_id = video_id
         self._time_stamp = time_stamp
-        self._time_stamp = 0
         self.start_time = None
         self.status = 'NOT_PLAYING'
         self.length = 'DOWNLOADING'
@@ -38,12 +37,10 @@ class Song:
         return hash(self._video_id)
 
     def __repr__(self):
-        return 'Song(' + str({'title': self.title, 'video_id': self._video_id,
-                              'length': self.get_length(), 'status': self.status,
-                              'time_stamp': self.get_time_stamp(), 'start_time': self.start_time}) + ')'
+        return f'Song({self.title}, {self._video_id}, {self.get_time_stamp()})'
 
     def __str__(self):
-        return 'Song(' + str({'title': self.title, 'video_id': self._video_id}) + ')'
+        return f'Song({self.title}, {self._video_id}, {self.get_time_stamp()}, length={self.get_length()})'
 
     def __eq__(self, other):
         return self.__class__ == other.__class__ and other.get_video_id() == self._video_id
