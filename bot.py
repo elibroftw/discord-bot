@@ -576,7 +576,9 @@ async def play_file(ctx, start_at=0):
             await result
             return
         else: m = await download_if_not_exists(ctx, title, video_id, in_background=False)
-        vc.play(create_audio_source(guild_data, song, start_at=start_at), after=after_play)
+        audio_source = create_audio_source(guild_data, song, start_at=start_at)
+
+        vc.play(audio_source, after=after_play)
         song.start(start_at)
         time_stamp = song.get_time_stamp(True)
         guild_data['is_stopped'] = False
