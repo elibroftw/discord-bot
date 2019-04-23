@@ -434,7 +434,7 @@ async def summon(ctx):
 
 @bot.command()
 @commands.check(in_guild)
-async def dl_songs(ctx, playlist_link):
+async def dl_songs(ctx, playlist_link):  # TODO
     if ctx.author.id == my_user_id:
         pass
     # download songs in playlist in background
@@ -820,7 +820,7 @@ async def remove(ctx, position: int = 0):
             mq.pop(0)
             await play_file(ctx)
 
-# TODO: !move_track <from> <to> command that can move tracks around in the playlist
+
 @bot.command()
 @commands.check(in_guild)
 async def move(ctx, _from: int, _to: int):
