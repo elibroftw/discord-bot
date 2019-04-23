@@ -23,6 +23,8 @@ For a list of commands view bot.py
     - View Now Playing (!np)
     - View Upcoming tracks (!q)
     - View Recently Played (!dq)
+    - Remove song (!rm index)
+    - Move song (!move <from> <to>)
     - Clear queue (!cq)
     - Set volume (!volume, !v, prints volume if no int given)
         - !v 100  # this will set volume to 100/100

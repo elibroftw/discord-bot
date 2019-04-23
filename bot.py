@@ -806,7 +806,7 @@ async def previous(ctx, times=1):
             await play_file(ctx)
             
 
-@bot.command()
+@bot.command(aliases=['rm'])
 @commands.check(in_guild)
 async def remove(ctx, position: int = 0):
     guild = ctx.guild
@@ -828,13 +828,15 @@ async def remove(ctx, position: int = 0):
 async def move(ctx, _from: int, _to: int):
     guild_data = data_dict[ctx.guild.id]
     if 0 in (_from, _to) or _from == _to: return
+    if 0 < _from < _to and _to > 0: _to += 1
+    elif _to < _from < 0: _to -= 1
     if _from > 0: from_queue = guild_data['music']
     else:
         from_queue = guild_data['done']
         _from = -_from - 1
     try: song = from_queue[_from]
     except IndexError: return
-    if _to > 0: to_queue = guild_data['music']
+    if _to > 0: to_queue: list = guild_data['music']
     else:
         to_queue = guild_data['done']
         _to = -_to - 1
