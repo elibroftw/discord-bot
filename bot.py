@@ -106,12 +106,9 @@ async def on_member_join(member):
 @bot.event
 async def on_message(message):
     author: discord.User = message.author
-    if author != bot.user:
-        update_net_worth(str(author))
-    if message.content.startswith('!RUN'):
-        await message.channel.send('I GOT EXTRADITED! :(')
-    elif message.content.lower().startswith('!run'):
-        await message.channel.send('N o t  h y p e  e n o u g h')
+    if author != bot.user: update_net_worth(str(author))
+    if message.content.startswith('!RUN'): await message.channel.send('I GOT EXTRADITED! :(')
+    elif message.content.lower().startswith('!run'): await message.channel.send('N o t  h y p e  e n o u g h')
     else:
         with suppress(discord.ext.commands.errors.CommandNotFound): await bot.process_commands(message)
 
@@ -436,6 +433,7 @@ async def summon(ctx):
 
 
 @bot.command()
+@commands.check(in_guild)
 async def dl_songs(ctx, playlist_link):
     if ctx.author.id == my_user_id:
         pass
@@ -598,7 +596,13 @@ async def play_file(ctx, start_at=0):
 
 
 @bot.command(aliases=['dl'])
-async def download(ctx, index=0):
+async def download(ctx):  # TODO: download url/query
+    pass
+
+
+@bot.command(aliases=['dls'])
+@commands.check(in_guild)
+async def download_song(ctx, index=0):
     guild = ctx.guild
     guild_data = data_dict[guild.id]
 
@@ -621,7 +625,6 @@ async def download(ctx, index=0):
 async def play(ctx):
     # TODO: use a db to determine which files get constantly queued (db should be title: video_id, times_queued)
     #   if I make a public bot
-    # TODO: !move_track <from> <to> command that can move tracks around in the playlist
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     ctx_msg_content = ctx.message.content
@@ -817,6 +820,26 @@ async def remove(ctx, position: int = 0):
             mq.pop(0)
             await play_file(ctx)
 
+# TODO: !move_track <from> <to> command that can move tracks around in the playlist
+@bot.command()
+@commands.check(in_guild)
+async def move(ctx, _from: int, _to: int):
+    guild_data = data_dict[ctx.guild.id]
+    if 0 in (_from, _to) or _from == _to: return
+    if _from > 0: from_queue = guild_data['music']
+    else:
+        from_queue = guild_data['done']
+        _from = -_from - 1
+    try: song = from_queue[_from]
+    except IndexError: return
+    if _to > 0: to_queue = guild_data['music']
+    else:
+        to_queue = guild_data['done']
+        _to = -_to - 1
+    to_queue.insert(_to, song)
+    if to_queue == from_queue and _to < _from: _from += 1
+    from_queue.pop(_from)
+
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue', 'queue_clear', 'queueclear'])
 @commands.check(in_guild)
@@ -989,6 +1012,7 @@ async def volume(ctx):
 
 
 @bot.command()
+@commands.check(in_guild)
 async def ban(ctx):
     author = ctx.author
     args = ctx.message.content.split(' ')
