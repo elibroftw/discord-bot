@@ -45,7 +45,6 @@ For a list of commands view bot.py
 
 # Future
 - Set and get invite codes (currently only gets my invite code)
-- repeat mode for music
 - report user for bot abuse
 
 Invitation [url](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
