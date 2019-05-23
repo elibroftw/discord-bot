@@ -1,0 +1,1 @@
+pythonw bot.py
