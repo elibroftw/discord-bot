@@ -76,14 +76,15 @@ async def on_ready():
         os.remove('save.json')
     for guild_id, guild_data in save['data_dict'].items():
         channel_id = guild_data['voice_channel']
-        voice_channel = bot.get_channel(channel_id)
-        await voice_channel.connect()
+        if channel_id != 'False':
+            voice_channel = bot.get_channel(channel_id)
+            await voice_channel.connect()
         mq = guild_data['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['music']]
         guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['done']]
         # noinspection PyTypeChecker
         data_dict[int(guild_id)] = guild_data
         tc = bot.get_channel(guild_data['text_channel'])
-        if mq and tc is not None and not guild_data['is_stopped']:
+        if channel_id != 'False' and mq and tc is not None and not guild_data['is_stopped']:
             m = await tc.send('Bot has been restarted, now resuming music', delete_after=2)
             ctx = await bot.get_context(m)
             await play_file(ctx, guild_data['music'][0].get_time_stamp())
@@ -231,7 +232,8 @@ def save_to_file():
     for guild in bot.guilds:
         voice_client = guild.voice_client
         guild_data = deepcopy(data_dict[guild.id])
-        guild_data['voice_channel'] = voice_client.channel.id
+        if voice_client: guild_data['voice_channel'] = voice_client.channel.id
+        else: guild_data['voice_channel'] = 'False'
         mq = guild_data['music']
         guild_data['music'] = [s.to_dict() for s in mq]
         dq = guild_data['done']
