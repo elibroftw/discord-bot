@@ -136,7 +136,7 @@ async def hi(ctx):
 
 
 @bot.command()
-async def test():
+async def test(ctx):
     print('test called')
 
 
