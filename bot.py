@@ -970,7 +970,7 @@ async def leave(ctx):
         guild_data = data_dict[guild.id]
         guild_data['music'].clear()
         guild_data['auto_play'] = False
-        await ctx.send('Stopped playing music, music que has been emptied')
+        await ctx.send('Stopped playing music, music queue has been emptied')
 
 
 @bot.command(aliases=['s', 'end'])
