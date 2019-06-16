@@ -1011,6 +1011,7 @@ async def volume(ctx):
                 else: amount = float(args[1]) / 100
                 amount = max(0.0, amount)
                 amount = min(1.0, amount)
+                amount = round(amount, 4)
                 vc.source.volume = amount
                 data_dict[guild.id]['volume'] = amount
             except ValueError: await ctx.send('Invalid argument', delete_after=5)
