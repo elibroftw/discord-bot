@@ -17,8 +17,11 @@ import re
 import os
 import json
 from urllib.parse import urlparse, parse_qs, urlencode
-import youtube_dl
 from mutagen.mp3 import MP3
+try: from pip import main as pipmain
+except: from pip._internal import main as pipmain
+pipmain(['install', '--user', '--upgrade', 'youtube-dl'])
+import youtube_dl
 
 
 class Song:
