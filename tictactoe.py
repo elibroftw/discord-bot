@@ -136,7 +136,7 @@ def move_two(data: dict):
         else:
             board[danger - 1] = comp_symbol
             msg = print_board(board) + endgame(True)
-            data['game_over'] = True
+            data['in_game'] = False
             return msg
     else:
         move2 = simple_move(board, data['user_moves'], data['comp_moves'], skip=True)
@@ -162,7 +162,7 @@ def move_three(data: dict):
         if user_move1 != 5:
             if user_move3 == danger: board[int(danger2) - 1] = comp_symbol
             else: board[danger - 1] = comp_symbol
-            data['game_over'] = True
+            data['in_game'] = False
             return print_board(board) + endgame(True), data
         else:
             if user_move3 == danger:
@@ -185,7 +185,7 @@ def move_three(data: dict):
         x = [comp_move1, comp_move2, move3]
         x.sort()
         if x in combos:
-            data['game_over'] = True
+            data['in_game'] = False
             return print_board(board) + endgame(True)
         else:
             data['comp_moves'].append(move3)
@@ -200,7 +200,7 @@ def move_four(data: dict):
     if start:
         if user_move4 == 2: board[2] = comp_symbol
         else: board[1] = comp_symbol
-        data['game_over'] = True
+        data['in_game'] = False
         return print_board(board) + endgame(False), data
     else:
         combos = [[1, 2, 3], [1, 4, 7], [1, 5, 9], [4, 5, 6], [3, 5, 7], [7, 8, 9], [2, 5, 8], [3, 6, 9]]
@@ -217,7 +217,7 @@ def move_four(data: dict):
         for x in win_combos:
             x.sort()
             if x in combos:
-                data['game_over'] = True
+                data['in_game'] = False
                 return print_board(board) + endgame(True), data
         msg = print_board(board)
         data['comp_moves'].append(move4 + 1)
@@ -232,5 +232,5 @@ def tic_tac_toe_move(data: dict, choice=None):
     if ttt_round == 3: return move_three(data)
     if ttt_round == 4: return move_four(data)
     else:  # ttt_move == 5
-        data['game_over'] = True
+        data['in_game'] = False
         return endgame(False)

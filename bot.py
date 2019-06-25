@@ -328,19 +328,17 @@ async def games(ctx):
 
 @bot.command(aliases=['tic_tac_toe'])
 async def ttt(ctx):
-    # todo: add different difficulties
+    # TODO: add different difficulties
     global players_in_game, tic_tac_toe_data
     author: discord.User = ctx.message.author
-    # game_over is synonymous with being in game
-    if not tic_tac_toe_data.get(author, {'game_over': True})['game_over']:
+    if tic_tac_toe_data.get(author, {'in_game': False})['in_game']:
         await author.send('You are already in a game. To end a game enter !end')
     else:
         msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
         await author.send(msg)
-        # TODO: replace game_over with in_game
         author_data = tic_tac_toe_data[author] = {'comp_moves': [], 'user_moves': [], 'danger': None,
-                                    'danger2': None, 'game_over': False, 'round': 0}
+                                    'danger2': None, 'in_game': True, 'round': 0}
         user_msg, game_channel = None, author.dm_channel
 
         def check_yn(waited_msg):
@@ -354,26 +352,26 @@ async def ttt(ctx):
             waited_msg = waited_msg.content
             return (waited_msg.isdigit() or 'end' in waited_msg.lower()) and correct_prereqs
 
-        while user_msg is None and not author_data['game_over']:
+        while user_msg is None and author_data['in_game']:
             try:
                 user_msg = await bot.wait_for('message', timeout=120, check=check_yn)
                 if user_msg:
                     user_msg = user_msg.content.lower()
                     if 'end' in user_msg:
-                        author_data['game_over'] = True
+                        author_data['in_game'] = False
                         await author.send('You have ended your tic-tac-toe game')
                     else:
                         author_data['round'] = 1
                         temp_msg = tictactoe.greeting(author_data, user_msg)  # msg is y or n
                         await author.send(temp_msg)
             except asyncio.TimeoutError:
-                author_data['game_over'] = True
-        while not author_data['game_over']:
+                author_data['in_game'] = False
+        while author_data['in_game']:
             try:
                 user_msg = await bot.wait_for('message', timeout=120, check=check_digit)
                 if user_msg is not None:
                     if 'end' in user_msg.content.lower():
-                        author_data['game_over'] = True
+                        author_data['in_game'] = False
                         await author.send('You have ended your tic-tac-toe game')
                     else:
                         player_move = int(user_msg.content)
@@ -383,7 +381,7 @@ async def ttt(ctx):
                         else:
                             temp_msg += '\n'
                             tempt = tictactoe.tic_tac_toe_move(author_data)
-                            if author_data['game_over']:
+                            if not author_data['in_game']:
                                 if author_data['round'] == 5:
                                     await author.send(f'Your Move{temp_msg + tempt}')
                                 else: await author.send(f'Your Move{temp_msg}My Move{tempt}')
@@ -391,7 +389,7 @@ async def ttt(ctx):
                                 await author.send(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
                             author_data['round'] += 1
             except asyncio.TimeoutError:
-                author_data['game_over'] = True
+                author_data['in_game'] = False
 
 
 @bot.command()
