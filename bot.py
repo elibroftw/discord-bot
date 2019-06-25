@@ -1,5 +1,4 @@
 import asyncio
-import json
 from copy import deepcopy
 from contextlib import suppress
 from datetime import datetime
@@ -7,6 +6,7 @@ import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
 import git
+import json
 import logging
 import os
 from subprocess import Popen
