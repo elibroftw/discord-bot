@@ -52,11 +52,8 @@ def valid_move(move, data):
     board = board_creation(data)
     if move < 1 or move > 9 or board[move - 1] != '   ': return '', data
     board[move - 1] = data['user_symbol']
-    if not data['user_moves']:
-        data['user_moves'].append(move)
-    else:
-        data['user_moves'].append(move)
-    return print_board(board), data
+    data['user_moves'].append(move)
+    return print_board(board)
 
 
 def simple_move(board, user_moves, comp_moves, skip=False):
@@ -73,20 +70,19 @@ def simple_move(board, user_moves, comp_moves, skip=False):
                     return move  # this is the move not the index
     for x in combos:
         for y in user_moves:
-            if y in x:
-                x.remove(y)
+            if y in x: x.remove(y)
             if len(x) == 1 and board[x[0] - 1] == '   ':
                 move = x[0]
                 return move  # this is the move not the index
     # checking for pins eg: 1, 2, 4 where 3 and 7 are open
-    pins = [[1, 2, 4], [2, 3, 6], [4, 7, 8], [6, 8, 9]]
+    pins = ({1, 2, 4}, {2, 3, 6}, {4, 7, 8}, {6, 8, 9})
     if len(user_moves) == 2:
-        for x in pins:
-            for y in user_moves:
-                if y in x: x.remove(y)
-                if len(x) == 1:
-                    move = x[0]
-                    return move
+        user_moves_set = set(user_moves)
+        for pin in pins:
+            res = list(pin ^ user_moves_set)
+            if len(res) == 1:
+                move = res[0]
+                return move
     return None
 
 
@@ -117,7 +113,7 @@ def move_one(data):
         move = 5 if board[4] == '   ' else 7
         data['comp_moves'].append(move)
     board[move - 1] = data['comp_symbol']
-    return print_board(board), data
+    return print_board(board)
 
 
 def move_two(data: dict):
@@ -136,12 +132,12 @@ def move_two(data: dict):
             data['danger'], data['danger2'] = danger, danger2
             data['comp_moves'].append(move2)
             board[move2 - 1] = comp_symbol
-            return print_board(board), data
+            return print_board(board)
         else:
             board[danger - 1] = comp_symbol
             msg = print_board(board) + endgame(True)
             data['game_over'] = True
-            return msg, data
+            return msg
     else:
         move2 = simple_move(board, data['user_moves'], data['comp_moves'], skip=True)
         if move2 is None:
@@ -153,7 +149,7 @@ def move_two(data: dict):
         data['comp_moves'].append(move2)
         board[move2 - 1] = comp_symbol
         msg = print_board(board)
-        return msg, data
+        return msg
 
 
 def move_three(data: dict):
@@ -190,10 +186,10 @@ def move_three(data: dict):
         x.sort()
         if x in combos:
             data['game_over'] = True
-            return print_board(board) + endgame(True), data
+            return print_board(board) + endgame(True)
         else:
             data['comp_moves'].append(move3)
-            return print_board(board), data
+            return print_board(board)
 
 
 def move_four(data: dict):
@@ -225,7 +221,7 @@ def move_four(data: dict):
                 return print_board(board) + endgame(True), data
         msg = print_board(board)
         data['comp_moves'].append(move4 + 1)
-        return msg, data
+        return msg
 
 
 def tic_tac_toe_move(data: dict, choice=None):
@@ -237,4 +233,4 @@ def tic_tac_toe_move(data: dict, choice=None):
     if ttt_round == 4: return move_four(data)
     else:  # ttt_move == 5
         data['game_over'] = True
-        return endgame(False), data
+        return endgame(False)

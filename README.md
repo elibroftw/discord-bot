@@ -5,7 +5,7 @@ A discord bot (called El Chapo) I made using the discord.py module and is self h
 For a list of commands view bot.py
 
 - Uses rewritten version (old_bot.py is the repl.it version)
-- Tic-Tac-Toe (Impossible difficult setting, there is a bug)
+- Tic-Tac-Toe (Difficulty set to impossible)
 - Youtube search
 - Plays music (Working but adding features)
     - Summon (!summon, !play <query/youtube_url>)

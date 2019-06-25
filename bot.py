@@ -294,13 +294,13 @@ async def clear(ctx, number: int = 1):
             await bot.change_presence(activity=discord.Game('Clearing messages...'))
             if number > 100: number = 100
             messages = []
-            async for m in channel.history(limit=number + 1):
+            async for m in channel.history(limit=number):
                 date = m.created_at
                 # delete if older than 14 else add onto msg list
                 if (datetime.now() - date).days > 14: await m.delete()
                 else: messages.append(m)
             await channel.delete_messages(messages)
-            print(f'{ctx.message.author} cleared {number + 1} messages')
+            print(f'{ctx.message.author} cleared {number} messages')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
 
@@ -328,17 +328,18 @@ async def games(ctx):
 
 @bot.command(aliases=['tic_tac_toe'])
 async def ttt(ctx):
+    # todo: add different difficulties
     global players_in_game, tic_tac_toe_data
     author: discord.User = ctx.message.author
     # game_over is synonymous with being in game
-    if author in tic_tac_toe_data and not tic_tac_toe_data[author]['game_over']:
+    if not tic_tac_toe_data.get(author, {'game_over': True})['game_over']:
         await author.send('You are already in a game. To end a game enter !end')
     else:
         msg = 'You have started a Tic-Tac-Toe game\nThe game will end after 2 minutes of' \
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
         await author.send(msg)
         # TODO: replace game_over with in_game
-        tic_tac_toe_data[author] = {'comp_moves': [], 'user_moves': [], 'danger': None,
+        author_data = tic_tac_toe_data[author] = {'comp_moves': [], 'user_moves': [], 'danger': None,
                                     'danger2': None, 'game_over': False, 'round': 0}
         user_msg, game_channel = None, author.dm_channel
 
@@ -353,45 +354,44 @@ async def ttt(ctx):
             waited_msg = waited_msg.content
             return (waited_msg.isdigit() or 'end' in waited_msg.lower()) and correct_prereqs
 
-        while user_msg is None and not tic_tac_toe_data[author]['game_over']:
+        while user_msg is None and not author_data['game_over']:
             try:
                 user_msg = await bot.wait_for('message', timeout=120, check=check_yn)
                 if user_msg:
                     user_msg = user_msg.content.lower()
                     if 'end' in user_msg:
-                        tic_tac_toe_data[author]['game_over'] = True
+                        author_data['game_over'] = True
                         await author.send('You have ended your tic-tac-toe game')
                     else:
-                        tic_tac_toe_data[author]['round'] = 1
-                        temp_msg = tictactoe.greeting(tic_tac_toe_data[author], user_msg)  # msg is y or n
+                        author_data['round'] = 1
+                        temp_msg = tictactoe.greeting(author_data, user_msg)  # msg is y or n
                         await author.send(temp_msg)
             except asyncio.TimeoutError:
-                tic_tac_toe_data[author]['game_over'] = True
-        while not tic_tac_toe_data[author]['game_over']:
+                author_data['game_over'] = True
+        while not author_data['game_over']:
             try:
                 user_msg = await bot.wait_for('message', timeout=120, check=check_digit)
                 if user_msg is not None:
                     if 'end' in user_msg.content.lower():
-                        tic_tac_toe_data[author]['game_over'] = True
+                        author_data['game_over'] = True
                         await author.send('You have ended your tic-tac-toe game')
                     else:
                         player_move = int(user_msg.content)
-                        temp_msg, d = tictactoe.valid_move(player_move, tic_tac_toe_data[author])
-                        tic_tac_toe_data[author] = d
+                        
+                        temp_msg = tictactoe.valid_move(player_move, author_data)
                         if not temp_msg: await author.send('That was an invalid move')
                         else:
                             temp_msg += '\n'
-                            tic_tac_toe_data[author]['user_moves'].append(player_move)
-                            tempt = tictactoe.tic_tac_toe_move(tic_tac_toe_data[author])[0]
-                            if tic_tac_toe_data[author]['game_over']:
-                                if tic_tac_toe_data[author]['round'] == 5:
+                            tempt = tictactoe.tic_tac_toe_move(author_data)
+                            if author_data['game_over']:
+                                if author_data['round'] == 5:
                                     await author.send(f'Your Move{temp_msg + tempt}')
                                 else: await author.send(f'Your Move{temp_msg}My Move{tempt}')
                             else:  # TODO: rich embed???
                                 await author.send(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
-                            tic_tac_toe_data[author]['round'] += 1
+                            author_data['round'] += 1
             except asyncio.TimeoutError:
-                tic_tac_toe_data[author]['game_over'] = True
+                author_data['game_over'] = True
 
 
 @bot.command()
