@@ -18,6 +18,7 @@ import os
 import json
 from urllib.parse import urlparse, parse_qs, urlencode
 from mutagen.mp3 import MP3
+from mutagen import MutagenError
 try: from pip import main as pipmain
 except: from pip._internal import main as pipmain
 pipmain(['install', '--user', '--upgrade', 'youtube-dl'])
@@ -93,7 +94,7 @@ class Song:
             try:
                 audio = MP3(f'Music/{self._video_id}.mp3')
                 self.length = audio.info.length
-            except MutaGenError:
+            except MutagenError:
                 return 'DOWNLOADING'
         if string:
             temp = round(self.length)
