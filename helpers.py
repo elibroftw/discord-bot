@@ -93,7 +93,8 @@ class Song:
             try:
                 audio = MP3(f'Music/{self._video_id}.mp3')
                 self.length = audio.info.length
-            except FileNotFoundError: self.length = 'DOWNLOADING'
+            except MutaGenError:
+                return 'DOWNLOADING'
         if string:
             temp = round(self.length)
             minutes = temp // 60
