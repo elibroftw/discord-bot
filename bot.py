@@ -1068,7 +1068,7 @@ async def save_as(ctx):
         dq = data_dict[guild_id]['done']
         temp = dq[::-1] + mq
         song_ids = [(song.title, song.get_video_id()) for song in temp]
-        post = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids}
+        post = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids, 'type': 'playlist'}
         old_post = posts.find_one_and_update({'playlist_name': playlist_name, 'creator_id': author_id}, {'$set': post}, upsert=True)
         if old_post: await ctx.send(f'Succesfully updated playlist "{playlist_name}"')
         else: await ctx.send(f'Succesfully created playlist "{playlist_name}"!')
@@ -1133,10 +1133,19 @@ async def delete_playlist(ctx):
         await ctx.send(f'Deleted your playlist "{playlist_name}"')
 
 
-@bot.command(aliases=['sp', 'search_pl', 'searchpl'])
-async def search_playlists(ctx):
-    pass
-# TODO: view list of playlists
+@bot.command(aliases=['mp'])
+async def my_playlists(ctx):
+    posts = db.posts
+    result = posts.find({'creator_id': ctx.author.id})
+    msg = ''
+    for playlist in result:
+        number = len(playlist['songs'])
+        print(number)
+        print(playlist['songs'])
+        if number == 1: msg += f"\n`{playlist['playlist_name']}` - 1 Song"
+        else: msg += f"`\n{playlist['playlist_name']}` - {number} Songs"
+    embed = create_embed(f'You have {result.count()} playlists', description=msg)
+    await ctx.send(embed=embed)
 
 
 @bot.command()
