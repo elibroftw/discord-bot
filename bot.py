@@ -12,9 +12,7 @@ import os
 from subprocess import Popen
 
 import tictactoe
-from helpers import load_opus_lib, update_net_worth, check_net_worth, youtube_search, youtube_download, \
-    get_related_video, Song, format_time_ffmpeg, get_video_id, get_youtube_title, get_video_duration, \
-    file_friendly_title
+from helpers import *
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -867,7 +865,8 @@ async def next_up(ctx, page=1):
     mq = guild_data['music']
     if mq:
         page = abs(page)
-        title = f'MUSIC QUEUE [{len(mq)} Song(s) | Page {page}]'
+        mq_length = len(mq)
+        title = f'MUSIC QUEUE [{mq_length} Song(s) | Page {page}]'
         if guild_data['auto_play']: title += ' | AUTO PLAY ENABLED'
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
@@ -878,7 +877,7 @@ async def next_up(ctx, page=1):
             else: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
             i += 1
 
-        if len(mq) > i:
+        if mq_length > i:
             msg += '\n...'
 
         embed = create_embed(title, description=msg)
@@ -894,7 +893,8 @@ async def _recently_played(ctx, page=1):
     dq = data_dict[guild.id]['done']
     if dq:
         page = abs(page)
-        title = f'RECENTLY PLAYED [{len(dq)} Song(s) | Page {page}]'
+        dq_length = len(dq)
+        title = f'RECENTLY PLAYED [{dq_length} Song(s) | Page {page}]'
         msg = ''
 
         i = 10 * (page - 1)
@@ -902,7 +902,7 @@ async def _recently_played(ctx, page=1):
             i += 1
             msg += f'\n`-{i}` {song.title} `{song.get_length(True)}`'
 
-        if len(dq) > i:
+        if dq_length > i:
             msg += '\n...'
 
         embed = create_embed(title, description=msg)
