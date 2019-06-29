@@ -476,19 +476,23 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
     return m
 
 
-async def download_related_video(ctx, auto_play_setting):
-    if auto_play_setting:
-        guild = ctx.guild
-        guild_data = data_dict[guild.id]
-        mq = guild_data['music']
-        if len(mq) == 1:
-            song = mq[0]
-            related_title, related_video_id = get_related_video(song.get_video_id(),  guild_data['done'])[1:]
-            mq.append(Song(related_title, related_video_id))
-            related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
-            related_msg_content = f'Added `{related_title}` to the playing queue'
-            if not related_m: await ctx.send(related_msg_content)
-
+async def download_related_video(ctx):
+    guild = ctx.guild
+    guild_data = data_dict[guild.id]
+    auto_play_setting = guild_data['auto_play']
+    mq = guild_data['music']
+    if len(mq) > 1:
+        next_song = mq[1]
+        await download_if_not_exists(ctx, next_song.title, next_song.get_video_id(), in_background=True)
+    if auto_play_setting and len(mq) == 1:
+        song = mq[0]
+        related_title, related_video_id = get_related_video(song.get_video_id(),  guild_data['done'])[1:]
+        mq.append(Song(related_title, related_video_id))
+        related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
+        related_msg_content = f'Added `{related_title}` to the playing queue'
+        if not related_m: await ctx.send(related_msg_content)
+    
+download_next_song = download_related_video
 
 @bot.command(aliases=['mute'])
 @commands.check(in_guild)
@@ -568,7 +572,7 @@ async def play_file(ctx, start_at=0):
                         if not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
                         if next_m: run_coro(next_m.edit(content=next_msg_content))
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
-                    run_coro(download_related_video(ctx, setting))
+                    run_coro(download_related_video(ctx))
             else:
                 run_coro(bot.change_presence(activity=discord.Game('Prison Break (!)')))
                 if len(vc.channel.members) == 1: run_coro(vc.disconnect())
@@ -600,7 +604,7 @@ async def play_file(ctx, start_at=0):
                     guild_data['music'] = deepcopy(temp_mq)
                     guild_data['done'] = deepcopy(temp_dq)
         await bot.change_presence(activity=discord.Game(title))
-        await download_related_video(ctx, guild_data['auto_play'])
+        await download_related_video(ctx)
 
 
 @bot.command(aliases=['dl'])
@@ -717,7 +721,7 @@ async def auto_play(ctx, setting: bool = None):
             title, video_id, = get_related_video(song_id, dq)[1:]
             mq.append(Song(title, video_id))
             await play_file(ctx)  # takes care of the download
-        await download_related_video(ctx, True)
+        await download_related_video(ctx)
 
 
 @bot.command(name='repeat', aliases=['r'])
