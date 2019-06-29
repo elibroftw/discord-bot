@@ -1055,9 +1055,9 @@ async def save_as(ctx):
         temp = dq[::-1] + mq
         song_ids = [(song.title, song.get_video_id()) for song in temp]
         post = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids, 'type': 'playlist'}
-        old_post = posts.replace_one({'playlist_name': playlist_name, 'creator_id': author_id}, post, upsert=True)
-        if old_post: await ctx.send(f'Successfully updated playlist "{playlist_name}"')
-        else: await ctx.send(f'Successfully created playlist "{playlist_name}"!')
+        result = posts.replace_one({'playlist_name': playlist_name, 'creator_id': author_id}, post, upsert=True)
+        if result.upserted_id:await ctx.send(f'Successfully created playlist "{playlist_name}"!')
+        else: await ctx.send(f'Successfully updated playlist "{playlist_name}"!')
 
 
 @bot.command(aliases=['pp'])
