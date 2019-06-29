@@ -10,7 +10,7 @@ import json
 import logging
 import os
 from subprocess import Popen
-
+from pymongo import MongoClient
 import tictactoe
 from helpers import load_opus_lib, update_net_worth, check_net_worth, youtube_search, youtube_download, \
     get_related_video, Song, format_time_ffmpeg, get_video_id, get_youtube_title, get_video_duration, \
@@ -29,6 +29,9 @@ load_opus_lib()
 invitation_code = os.environ['INVITATION_CODE']
 my_server_id = os.environ['SERVER_ID']
 my_user_id = int(os.environ['MY_USER_ID'])
+
+db_client = MongoClient('localhost', 27017)
+db = db_client.discord_bot
 
 players_in_game = []
 tic_tac_toe_data = {}
@@ -75,6 +78,7 @@ async def on_ready():
                 save = json.load(f)
         os.remove('save.json')
     for guild_id, guild_data in save['data_dict'].items():
+        # create a table for each guild_id
         channel_id = guild_data['voice_channel']
         if channel_id != 'False':
             voice_channel = bot.get_channel(channel_id)
@@ -91,7 +95,7 @@ async def on_ready():
     # https://discordpy.readthedocs.io/en/rewrite/ext/commands/api.html#discord.ext.commands.Bot.get_context
     for guild in bot.guilds:
         if guild.id not in data_dict:
-            data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1,
+            data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 0.2,
                                    'repeat': False, 'repeat_all': False, 'auto_play': False, 'skip_voters': [],
                                    'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
 
@@ -245,6 +249,11 @@ def save_to_file():
             json.dump(save, fp, indent=4)
     except Exception as e:
         print('save.json error', e)
+
+
+@bot.command()
+async def save():
+    save_to_file()
 
 
 @bot.command()
@@ -1015,6 +1024,60 @@ async def volume(ctx):
         else: await ctx.send(f'{vc.source.volume * 100}%')
 
 
+
+@bot.command(aliases=['sa'])
+@commands.check(in_guild)
+async def save_as(ctx):
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        author_id = ctx.author.id
+        guild_id = ctx.guild.id
+        posts = db.posts
+        playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name})
+        mq = data_dict[guild_id]['music']
+        dq = data_dict[guild_id]['done']
+        temp = dq[::-1] + mq
+        song_ids = [song.get_video_id() for song in temp]
+        post = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'Songs': song_ids}
+        old_post = posts.find_one_and_update({'playlist_name': playlist_name, 'creator_id': author_id}, {'$set': post}, upsert=True)
+        if old_post: await ctx.send(f'Succesfully updated playlist "{playlist_name}"')
+        else: await ctx.send(f'Succesfully created playlist "{playlist_name}"!')
+
+
+@bot.command(aliases=['delete_pl', 'dp'])
+@commands.check(in_guild)
+async def delete_playlist(ctx):
+    raise NotImplementedError
+
+
+@bot.command(aliases=['lp', 'load_pl', 'load', 'l'])
+@commands.check(in_guild)
+async def load_playlist(ctx):
+    args = ' '.join(ctx.split()[1:])
+    if args:
+        if args.startswith('http'):
+            # use youtube api to get list of videos, title, etc...
+            pass
+        else:
+            # check db (use sqlite) under guild_id if playlist exists
+            pass
+        raise NotImplementedError
+
+
+@bot.command(aliases=['vp'])
+@commands.check(in_guild)
+async def view_playlist(ctx):
+    args = ' '.join(ctx.split()[1:])
+    if args:
+        if args.startswith('http'):
+            # use youtube api to get list of videos, title, etc...
+            pass
+        else:
+            # check db (use sqlite) under guild_id if playlist exists
+            pass
+        raise NotImplementedError
+
+
 @bot.command()
 @commands.check(in_guild)
 async def ban(ctx):
@@ -1046,6 +1109,8 @@ async def about(ctx):
     ctx.author.send(f'Hi there. Thank you for inquiring about me. I was made by Elijah Lopez.\n'
                     'For more information visit https://github.com/elibroftw/discord-bot.\n'
                     f'Join my server at https://discord.gg/{invitation_code})')
+
+
 
 
 bot.run(os.environ['DISCORD'])
