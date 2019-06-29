@@ -873,6 +873,7 @@ async def shuffle_music(ctx):
 
     guild_data['music'] = shuffled_songs
     guild_data['done'].clear()
+    await ctx.send('Shuffled music!')
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue', 'queue_clear', 'queueclear'])
@@ -1083,9 +1084,7 @@ async def play_playlist(ctx):
             guild_data['music'] = songs
             guild_data['done'].clear()
             await play_file(ctx)
-            await ctx.send('Songs added to queue!')
         else: await ctx.send('No playlist found with that name')
-    
 
 
 # TODO: test if invalid playlist id is given

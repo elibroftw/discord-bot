@@ -47,5 +47,11 @@ For a list of commands view bot.py
 - Set and get invite codes (currently only gets my invite code)
 - report user for bot abuse
 
-Invitation [url](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
-DISCLAIMER: I don't recommend using the bot in your server for music, I will probably make another bot for that.
+# Installation
+- Clone repoistory
+- Have [MongoDB](https://www.mongodb.com/what-is-mongodb) installed
+- Only tested on Windows
+- pip install -r requirements.txt
+
+[Test the bot](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
+DISCLAIMER: This bot is constantly under development and is self hosted.
