@@ -312,7 +312,7 @@ def get_video_id(url):
     return None
 
 
-def get_songs_from_playlist(playlist_name, guild_id, author_id):
+def get_songs_from_playlist(playlist_name, guild_id, author_id, to_play=False):
     songs = []
     if playlist_name.startswith('https://www.youtube.com/playlist?list='):
         playlist_id = playlist_name[38:]
@@ -330,10 +330,20 @@ def get_songs_from_playlist(playlist_name, guild_id, author_id):
     return songs, playlist_name
 
 
-def get_videos_from_playlist(playlist_id, return_title=False):
-    f = {'part': 'snippet',  'playlistId': playlist_id, 'key': google_api_key}
+def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
+    f = {'part': 'snippet',  'playlistId': playlist_id, 'key': google_api_key, 'maxResults': 50}
     response = json.loads(requests.get(f'{youtube_api_url}playlistItems?{urlencode(f)}').text)
-    songs = [Song(item['snippet']['title'], item['snippet']['resourceId']['videoId']) for item in response['items']]
+    if to_play:
+        songs_dict = {item['snippet']['resourceId']['videoId']: item['snippet']['title'] for item in response['items']}
+        video_ids = list(songs_dict.keys())
+        duration_dict = get_video_durations(video_ids)
+        # for video_id, duration in duration_dict.items():
+        #     if duration <= 600:
+        #         songs.append()
+        songs = [Song(songs_dict[video_id], video_id) for video_id, duration in duration_dict.items() if duration <= 600]
+    else:
+        songs = [Song(item['snippet']['title'], item['snippet']['resourceId']['videoId']) for item in response['items']]
+        
     if return_title:
         f = {'part': 'snippet',  'id': playlist_id, 'key': google_api_key}
         response = json.loads(requests.get(f'{youtube_api_url}playlists?{urlencode(f)}').text)
@@ -496,6 +506,7 @@ def format_time_ffmpeg(s):
 
 if __name__ == "__main__":
     # tests go below here
+    print(len(get_videos_from_playlist('PLY4YLSp44QYvmvSNX3Q_0y-mOQ02ZWIbu', to_play=True)))
     # url, title, video_id = youtube_search('Magnolia', return_info=True)
     # youtube_download(url, verbose=True)
     # url = youtube_search('Magnolia')
