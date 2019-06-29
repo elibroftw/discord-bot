@@ -12,9 +12,7 @@ import os
 from subprocess import Popen
 from pymongo import MongoClient
 import tictactoe
-from helpers import load_opus_lib, update_net_worth, check_net_worth, youtube_search, youtube_download, \
-    get_related_video, Song, format_time_ffmpeg, get_video_id, get_youtube_title, get_video_duration, \
-    file_friendly_title
+from helpers import *
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -876,7 +874,8 @@ async def next_up(ctx, page=1):
     mq = guild_data['music']
     if mq:
         page = abs(page)
-        title = f'MUSIC QUEUE [{len(mq)} Song(s) | Page {page}]'
+        mq_length = len(mq)
+        title = f'MUSIC QUEUE [{mq_length} Song(s) | Page {page}]'
         if guild_data['auto_play']: title += ' | AUTO PLAY ENABLED'
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
@@ -887,7 +886,7 @@ async def next_up(ctx, page=1):
             else: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
             i += 1
 
-        if len(mq) > i:
+        if mq_length > i:
             msg += '\n...'
 
         embed = create_embed(title, description=msg)
@@ -1037,45 +1036,54 @@ async def save_as(ctx):
         mq = data_dict[guild_id]['music']
         dq = data_dict[guild_id]['done']
         temp = dq[::-1] + mq
-        song_ids = [song.get_video_id() for song in temp]
-        post = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'Songs': song_ids}
+        song_ids = [(song.title, song.get_video_id()) for song in temp]
+        post = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids}
         old_post = posts.find_one_and_update({'playlist_name': playlist_name, 'creator_id': author_id}, {'$set': post}, upsert=True)
         if old_post: await ctx.send(f'Succesfully updated playlist "{playlist_name}"')
         else: await ctx.send(f'Succesfully created playlist "{playlist_name}"!')
 
 
-@bot.command(aliases=['delete_pl', 'dp'])
-@commands.check(in_guild)
-async def delete_playlist(ctx):
-    raise NotImplementedError
-
-
+# TODO: test if invalid playlist id is given
 @bot.command(aliases=['lp', 'load_pl', 'load', 'l'])
 @commands.check(in_guild)
 async def load_playlist(ctx):
-    args = ' '.join(ctx.split()[1:])
-    if args:
-        if args.startswith('http'):
-            # use youtube api to get list of videos, title, etc...
-            pass
-        else:
-            # check db (use sqlite) under guild_id if playlist exists
-            pass
-        raise NotImplementedError
+    # TODO: maybe include search youtube playlist?
+    # TODO: check duration length either here or in play_file?
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        songs = get_songs_from_playlist(playlist_name, ctx.guild.id, ctx.author.id)[0]
+        if songs:
+            data_dict[ctx.guild.id]['music'].extend(songs)
+            await ctx.send('Songs added to queue!')
+        else: await ctx.send('No playlist found with that name')
 
 
 @bot.command(aliases=['vp'])
 @commands.check(in_guild)
 async def view_playlist(ctx):
-    args = ' '.join(ctx.split()[1:])
-    if args:
-        if args.startswith('http'):
-            # use youtube api to get list of videos, title, etc...
-            pass
-        else:
-            # check db (use sqlite) under guild_id if playlist exists
-            pass
-        raise NotImplementedError
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        songs, playlist_name = get_songs_from_playlist(playlist_name, ctx.guild.id, ctx.author.id)
+        if songs:
+            pl_length = len(songs)
+            msg = ''
+            for i, song in enumerate(songs[:10]):
+                msg += f'\n`{i + 1}.` {song.title}'
+            if pl_length > 10: msg += '\n...'
+            embed = create_embed(f'PLAYLIST "{playlist_name}" | {pl_length} Song(s)', description=msg)
+            await ctx.send(embed=embed)
+        else: await ctx.send('No playlist found with that name')
+
+
+@bot.command(aliases=['delete_pl', 'dp'])
+@commands.check(in_guild)
+async def delete_playlist(ctx):
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        posts = db.posts
+        r = posts.delete_one({'playlist_name': playlist_name, 'creator_id': ctx.author.id})
+        print(r)
+        await ctx.send(f'Deleted your playlist "{playlist_name}"')
 
 
 @bot.command()
