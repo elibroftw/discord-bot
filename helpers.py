@@ -28,6 +28,11 @@ if __name__ != "__main__":
 import youtube_dl
 
 
+db_client = MongoClient('localhost', 27017)
+db = db_client.discord_bot
+posts = db.posts
+
+
 class Song:
 
     __slots__ = ('title', '_video_id', '_time_stamp', 'start_time', 'status', 'length')
@@ -318,9 +323,7 @@ def get_songs_from_playlist(playlist_name, guild_id, author_id, to_play=False):
         playlist_id = playlist_name[38:]
         songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
     else:
-        db_client = MongoClient('localhost', 27017)
-        db = db_client.discord_bot
-        posts = db.posts
+        playlist = None
         try: scope = int(re.compile('--[2-3]').search(playlist_name).group()[2:])
         except AttributeError: scope = 1
         if scope == 1: playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name, 'creator_id': author_id})

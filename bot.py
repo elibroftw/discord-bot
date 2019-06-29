@@ -1,16 +1,12 @@
 import asyncio
 from copy import deepcopy
-from contextlib import suppress
 from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
 import git
-import json
 import logging
-import os
 from subprocess import Popen
-from pymongo import MongoClient
 import tictactoe
 from random import shuffle
 from helpers import *
@@ -29,19 +25,12 @@ invitation_code = os.environ['INVITATION_CODE']
 my_server_id = os.environ['SERVER_ID']
 my_user_id = int(os.environ['MY_USER_ID'])
 
-db_client = MongoClient('localhost', 27017)
-db = db_client.discord_bot
-
-players_in_game = []
 tic_tac_toe_data = {}
 ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 data_dict = {'downloads': {}}
 
 if not os.path.exists('Music'):
     os.mkdir('Music')
-
-with open('help.txt') as h:
-    help_message = h.read()
 
 
 def create_embed(title, description='', color=discord.Color.blue()):
@@ -128,8 +117,7 @@ async def on_command_error(ctx, error):
 
 @bot.command(name='help')
 async def _help(ctx):
-    # TODO: rich embed
-    await ctx.author.send(help_message)
+    await ctx.author.send('Check out my commands here: https://github.com/elibroftw/discord-bot/blob/master/README.md')
 
 
 @bot.command()
@@ -336,7 +324,7 @@ async def games(ctx):
 @bot.command(aliases=['tic_tac_toe'])
 async def ttt(ctx):
     # TODO: add different difficulties
-    global players_in_game, tic_tac_toe_data
+    global tic_tac_toe_data
     author: discord.User = ctx.message.author
     if tic_tac_toe_data.get(author, {'in_game': False})['in_game']:
         await author.send('You are already in a game. To end a game enter !end')
@@ -491,8 +479,8 @@ async def download_related_video(ctx):
         related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
         related_msg_content = f'Added `{related_title}` to the playing queue'
         if not related_m: await ctx.send(related_msg_content)
-    
 download_next_song = download_related_video
+
 
 @bot.command(aliases=['mute'])
 @commands.check(in_guild)
@@ -607,9 +595,9 @@ async def play_file(ctx, start_at=0):
         await download_related_video(ctx)
 
 
-@bot.command(aliases=['dl'])
-async def download(ctx):  # TODO: download url/query
-    pass
+# @bot.command(aliases=['dl'])
+# async def download(ctx):  # TODO: download url/query
+#     pass
 
 
 @bot.command(aliases=['dls'])
@@ -1062,16 +1050,14 @@ async def save_as(ctx):
     if playlist_name:
         author_id = ctx.author.id
         guild_id = ctx.guild.id
-        posts = db.posts
-        playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name})
         mq = data_dict[guild_id]['music']
         dq = data_dict[guild_id]['done']
         temp = dq[::-1] + mq
         song_ids = [(song.title, song.get_video_id()) for song in temp]
         post = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids, 'type': 'playlist'}
-        old_post = posts.find_one_and_update({'playlist_name': playlist_name, 'creator_id': author_id}, {'$set': post}, upsert=True)
-        if old_post: await ctx.send(f'Succesfully updated playlist "{playlist_name}"')
-        else: await ctx.send(f'Succesfully created playlist "{playlist_name}"!')
+        old_post = posts.replace_one({'playlist_name': playlist_name, 'creator_id': author_id}, post, upsert=True)
+        if old_post: await ctx.send(f'Successfully updated playlist "{playlist_name}"')
+        else: await ctx.send(f'Successfully created playlist "{playlist_name}"!')
 
 
 @bot.command(aliases=['pp'])
@@ -1128,22 +1114,21 @@ async def view_playlist(ctx):
 async def delete_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
     if playlist_name:
-        posts = db.posts
         r = posts.delete_one({'playlist_name': playlist_name, 'creator_id': ctx.author.id})
-        await ctx.send(f'Deleted your playlist "{playlist_name}"')
+        if r.deleted_count:
+            await ctx.send(f'Deleted playlist "{playlist_name}"')
+        else:
+            await ctx.send(f'No playlist found with that name')
 
 
 @bot.command(aliases=['mp'])
 async def my_playlists(ctx):
-    posts = db.posts
     result = posts.find({'creator_id': ctx.author.id})
     msg = ''
     for playlist in result:
         number = len(playlist['songs'])
-        print(number)
-        print(playlist['songs'])
         if number == 1: msg += f"\n`{playlist['playlist_name']}` - 1 Song"
-        else: msg += f"`\n{playlist['playlist_name']}` - {number} Songs"
+        else: msg += f"\n`{playlist['playlist_name']}` - {number} Songs"
     embed = create_embed(f'You have {result.count()} playlists', description=msg)
     await ctx.send(embed=embed)
 
