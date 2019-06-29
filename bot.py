@@ -77,21 +77,20 @@ async def on_ready():
                 save = json.load(f)
         os.remove('save.json')
     for guild_id, guild_data in save['data_dict'].items():
-        # create a table for each guild_id
+        mq = guild_data['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['music']]
+        guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['done']]
+        data_dict[int(guild_id)] = guild_data
+
         channel_id = guild_data['voice_channel']
         if channel_id != 'False':
             voice_channel = bot.get_channel(channel_id)
             await voice_channel.connect()
-        mq = guild_data['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['music']]
-        guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['done']]
-        # noinspection PyTypeChecker
-        data_dict[int(guild_id)] = guild_data
-        tc = bot.get_channel(guild_data['text_channel'])
-        if channel_id != 'False' and mq and tc is not None and not guild_data['is_stopped']:
-            m = await tc.send('Bot has been restarted, now resuming music', delete_after=2)
-            ctx = await bot.get_context(m)
-            await play_file(ctx, guild_data['music'][0].get_time_stamp())
-    # https://discordpy.readthedocs.io/en/rewrite/ext/commands/api.html#discord.ext.commands.Bot.get_context
+            tc = bot.get_channel(guild_data['text_channel'])
+            if mq and tc is not None and not guild_data['is_stopped']:
+                m = await tc.send('Bot has been restarted, now resuming music', delete_after=3)
+                ctx = await bot.get_context(m)
+                await play_file(ctx, guild_data['music'][0].get_time_stamp())
+
     for guild in bot.guilds:
         if guild.id not in data_dict:
             data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 0.2,
@@ -686,14 +685,17 @@ async def play(ctx):
 async def pause(ctx):
     voice_client: discord.VoiceClient = ctx.guild.voice_client
     if voice_client:
-        song = data_dict[ctx.guild.id]['music'][0]
+        guild_data = data_dict[ctx.guild.id]
+        song = guild_data['music'][0]
         if voice_client.is_paused():
             voice_client.resume()
             song.start()
+            guild_data['is_stopped'] = False
             await bot.change_presence(activity=discord.Game(song.title))
         else:
             voice_client.pause()
             song.pause()
+            guild_data['is_stopped'] = True
             await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
 
