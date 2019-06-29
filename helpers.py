@@ -97,7 +97,7 @@ class Song:
             try:
                 audio = MP3(f'Music/{self._video_id}.mp3')
                 self.length = audio.info.length
-            except MutaGenError:
+            except MutagenError:
                 return 'DOWNLOADING'
         if string:
             temp = round(self.length)
