@@ -12,6 +12,7 @@ import os
 from subprocess import Popen
 from pymongo import MongoClient
 import tictactoe
+from random import shuffle
 from helpers import *
 
 logger = logging.getLogger('discord')
@@ -852,6 +853,26 @@ async def move(ctx, _from: int, _to: int):
     from_queue.pop(_from)
 
 
+@bot.command(aliases=['sm', 'shuffle'])
+@commands.check(in_guild)
+async def shuffle_music(ctx):
+    guild = ctx.guild
+    guild_data = data_dict[guild.id]
+    voice_client = guild.voice_client
+    song_playing = voice_client.is_playing() or voice_client.is_paused()
+    current_song = guild_data['music'][0]
+        
+    shuffled_songs = guild_data['music'] + guild_data['done']
+    shuffle(shuffled_songs)
+
+    if song_playing:
+        shuffled_songs.remove(current_song)
+        shuffled_songs = [current_song] + shuffled_songs
+
+    guild_data['music'] = shuffled_songs
+    guild_data['done'].clear()
+
+
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue', 'queue_clear', 'queueclear'])
 @commands.check(in_guild)
 async def clear_queue(ctx):
@@ -1043,6 +1064,28 @@ async def save_as(ctx):
         else: await ctx.send(f'Succesfully created playlist "{playlist_name}"!')
 
 
+@bot.command(aliases=['pp'])
+@commands.check(in_guild)
+async def play_playlist(ctx):
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        guild_id = ctx.guild.id
+        playlist_name = playlist_name.replace(' --s', '--s')
+        parsed_out_name = playlist_name.replace('--s', '')
+        songs = get_songs_from_playlist(parsed_out_name, guild_id, ctx.author.id)[0]
+        if songs:
+            voice_client = ctx.guild.voice_client
+            guild_data = data_dict[guild_id]
+            no_after_play(guild_data, voice_client)
+            if parsed_out_name != playlist_name: shuffle(songs)
+            guild_data['music'] = songs
+            guild_data['done'].clear()
+            await play_file(ctx)
+            await ctx.send('Songs added to queue!')
+        else: await ctx.send('No playlist found with that name')
+    
+
+
 # TODO: test if invalid playlist id is given
 @bot.command(aliases=['lp', 'load_pl', 'load', 'l'])
 @commands.check(in_guild)
@@ -1076,7 +1119,6 @@ async def view_playlist(ctx):
 
 
 @bot.command(aliases=['delete_pl', 'dp'])
-@commands.check(in_guild)
 async def delete_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
     if playlist_name:
@@ -1085,9 +1127,10 @@ async def delete_playlist(ctx):
         await ctx.send(f'Deleted your playlist "{playlist_name}"')
 
 
-
+@bot.command(aliases=['sp', 'search_pl', 'searchpl'])
+async def search_playlists(ctx):
+    pass
 # TODO: view list of playlists
-
 
 
 @bot.command()

@@ -94,10 +94,12 @@ class Song:
 
     def get_length(self, string=False):
         if self.length == 'DOWNLOADING':
-            with suppress(MutagenError):
+            try:
                 audio = MP3(f'Music/{self._video_id}.mp3')
                 self.length = audio.info.length
-        elif string:
+            except MutaGenError:
+                return 'DOWNLOADING'
+        if string:
             temp = round(self.length)
             minutes = temp // 60
             seconds = temp % 60
