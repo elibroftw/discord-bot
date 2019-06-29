@@ -12,6 +12,7 @@ from time import time
 
 import requests
 from discord import opus
+from pymongo import MongoClient
 # import tweepy
 import re
 import os
@@ -19,9 +20,11 @@ import json
 from urllib.parse import urlparse, parse_qs, urlencode
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
-try: from pip import main as pipmain
-except: from pip._internal import main as pipmain
-pipmain(['install', '--user', '--upgrade', 'youtube-dl'])
+
+if __name__ != "__main__":
+    try: from pip import main as pipmain
+    except: from pip._internal import main as pipmain
+    pipmain(['install', '--user', '--upgrade', 'youtube-dl'])
 import youtube_dl
 
 
@@ -43,7 +46,7 @@ class Song:
     def __repr__(self):
         return f'Song({self.title}, {self._video_id}, {self.get_time_stamp()})'
 
-    def __str__(self):
+    def __str__(self, show_length=False):
         return f'Song({self.title}, {self._video_id}, {self.get_time_stamp()}, length={self.get_length()})'
 
     def __eq__(self, other):
@@ -309,6 +312,52 @@ def get_video_id(url):
     return None
 
 
+def get_songs_from_playlist(playlist_name, guild_id, author_id, to_play=False):
+    songs = []
+    if playlist_name.startswith('https://www.youtube.com/playlist?list='):
+        playlist_id = playlist_name[38:]
+        songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
+    else:
+        db_client = MongoClient('localhost', 27017)
+        db = db_client.discord_bot
+        posts = db.posts
+        try: scope = int(re.compile('--[2-3]').search(playlist_name).group()[2:])
+        except AttributeError: scope = 1
+        if scope == 1: playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name, 'creator_id': author_id})
+        if scope == 2 or not playlist: playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name})
+        if scope == 3 or not playlist: playlist = posts.find_one({'playlist_name': playlist_name})
+        if playlist: songs = [Song(*item) for item in playlist['songs']]
+    return songs, playlist_name
+
+
+def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
+    f = {'part': 'snippet',  'playlistId': playlist_id, 'key': google_api_key, 'maxResults': 50}
+    response = json.loads(requests.get(f'{youtube_api_url}playlistItems?{urlencode(f)}').text)
+    if to_play:
+        songs_dict = {item['snippet']['resourceId']['videoId']: item['snippet']['title'] for item in response['items']}
+        video_ids = list(songs_dict.keys())
+        duration_dict = get_video_durations(video_ids)
+        # for video_id, duration in duration_dict.items():
+        #     if duration <= 600:
+        #         songs.append()
+        songs = [Song(songs_dict[video_id], video_id) for video_id, duration in duration_dict.items() if duration <= 600]
+    else:
+        songs = [Song(item['snippet']['title'], item['snippet']['resourceId']['videoId']) for item in response['items']]
+        
+    if return_title:
+        f = {'part': 'snippet',  'id': playlist_id, 'key': google_api_key}
+        response = json.loads(requests.get(f'{youtube_api_url}playlists?{urlencode(f)}').text)
+        return songs, response['items'][0]['snippet']['title']
+    return songs
+    
+
+def get_video_titles(video_ids):
+    video_ids = ','.join(video_ids)
+    url = f'{youtube_api_url}videos?part=contentDetails&id={video_ids}&key={google_api_key}'
+    search_response = json.loads(requests.get(url).text)['items']
+    return [item['title'] for item in search_response]
+
+
 def get_youtube_title(video_id):
     f = {'part': 'snippet',  'id': video_id, 'key': google_api_key}
     response = json.loads(requests.get(f'{youtube_api_url}videos?{urlencode(f)}').text)
@@ -456,9 +505,5 @@ def format_time_ffmpeg(s):
 
 
 if __name__ == "__main__":
-    # tests go below here
-    # url, title, video_id = youtube_search('Magnolia', return_info=True)
-    # youtube_download(url, verbose=True)
-    # url = youtube_search('Magnolia')
-    # a = get_related_video(video_id, [])
+    # tests go here
     pass

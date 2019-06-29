@@ -10,8 +10,9 @@ import json
 import logging
 import os
 from subprocess import Popen
-
+from pymongo import MongoClient
 import tictactoe
+from random import shuffle
 from helpers import *
 
 logger = logging.getLogger('discord')
@@ -27,6 +28,9 @@ load_opus_lib()
 invitation_code = os.environ['INVITATION_CODE']
 my_server_id = os.environ['SERVER_ID']
 my_user_id = int(os.environ['MY_USER_ID'])
+
+db_client = MongoClient('localhost', 27017)
+db = db_client.discord_bot
 
 players_in_game = []
 tic_tac_toe_data = {}
@@ -73,23 +77,23 @@ async def on_ready():
                 save = json.load(f)
         os.remove('save.json')
     for guild_id, guild_data in save['data_dict'].items():
+        mq = guild_data['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['music']]
+        guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['done']]
+        data_dict[int(guild_id)] = guild_data
+
         channel_id = guild_data['voice_channel']
         if channel_id != 'False':
             voice_channel = bot.get_channel(channel_id)
             await voice_channel.connect()
-        mq = guild_data['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['music']]
-        guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['done']]
-        # noinspection PyTypeChecker
-        data_dict[int(guild_id)] = guild_data
-        tc = bot.get_channel(guild_data['text_channel'])
-        if channel_id != 'False' and mq and tc is not None and not guild_data['is_stopped']:
-            m = await tc.send('Bot has been restarted, now resuming music', delete_after=2)
-            ctx = await bot.get_context(m)
-            await play_file(ctx, guild_data['music'][0].get_time_stamp())
-    # https://discordpy.readthedocs.io/en/rewrite/ext/commands/api.html#discord.ext.commands.Bot.get_context
+            tc = bot.get_channel(guild_data['text_channel'])
+            if mq and tc is not None and not guild_data['is_stopped']:
+                m = await tc.send('Bot has been restarted, now resuming music', delete_after=3)
+                ctx = await bot.get_context(m)
+                await play_file(ctx, guild_data['music'][0].get_time_stamp())
+
     for guild in bot.guilds:
         if guild.id not in data_dict:
-            data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 1,
+            data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 0.2,
                                    'repeat': False, 'repeat_all': False, 'auto_play': False, 'skip_voters': [],
                                    'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
 
@@ -243,6 +247,11 @@ def save_to_file():
             json.dump(save, fp, indent=4)
     except Exception as e:
         print('save.json error', e)
+
+
+@bot.command()
+async def save():
+    save_to_file()
 
 
 @bot.command()
@@ -467,19 +476,23 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
     return m
 
 
-async def download_related_video(ctx, auto_play_setting):
-    if auto_play_setting:
-        guild = ctx.guild
-        guild_data = data_dict[guild.id]
-        mq = guild_data['music']
-        if len(mq) == 1:
-            song = mq[0]
-            related_title, related_video_id = get_related_video(song.get_video_id(),  guild_data['done'])[1:]
-            mq.append(Song(related_title, related_video_id))
-            related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
-            related_msg_content = f'Added `{related_title}` to the playing queue'
-            if not related_m: await ctx.send(related_msg_content)
-
+async def download_related_video(ctx):
+    guild = ctx.guild
+    guild_data = data_dict[guild.id]
+    auto_play_setting = guild_data['auto_play']
+    mq = guild_data['music']
+    if len(mq) > 1:
+        next_song = mq[1]
+        await download_if_not_exists(ctx, next_song.title, next_song.get_video_id(), in_background=True)
+    if auto_play_setting and len(mq) == 1:
+        song = mq[0]
+        related_title, related_video_id = get_related_video(song.get_video_id(),  guild_data['done'])[1:]
+        mq.append(Song(related_title, related_video_id))
+        related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
+        related_msg_content = f'Added `{related_title}` to the playing queue'
+        if not related_m: await ctx.send(related_msg_content)
+    
+download_next_song = download_related_video
 
 @bot.command(aliases=['mute'])
 @commands.check(in_guild)
@@ -559,7 +572,7 @@ async def play_file(ctx, start_at=0):
                         if not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
                         if next_m: run_coro(next_m.edit(content=next_msg_content))
                     run_coro(bot.change_presence(activity=discord.Game(next_title)))
-                    run_coro(download_related_video(ctx, setting))
+                    run_coro(download_related_video(ctx))
             else:
                 run_coro(bot.change_presence(activity=discord.Game('Prison Break (!)')))
                 if len(vc.channel.members) == 1: run_coro(vc.disconnect())
@@ -591,7 +604,7 @@ async def play_file(ctx, start_at=0):
                     guild_data['music'] = deepcopy(temp_mq)
                     guild_data['done'] = deepcopy(temp_dq)
         await bot.change_presence(activity=discord.Game(title))
-        await download_related_video(ctx, guild_data['auto_play'])
+        await download_related_video(ctx)
 
 
 @bot.command(aliases=['dl'])
@@ -676,14 +689,17 @@ async def play(ctx):
 async def pause(ctx):
     voice_client: discord.VoiceClient = ctx.guild.voice_client
     if voice_client:
-        song = data_dict[ctx.guild.id]['music'][0]
+        guild_data = data_dict[ctx.guild.id]
+        song = guild_data['music'][0]
         if voice_client.is_paused():
             voice_client.resume()
             song.start()
+            guild_data['is_stopped'] = False
             await bot.change_presence(activity=discord.Game(song.title))
         else:
             voice_client.pause()
             song.pause()
+            guild_data['is_stopped'] = True
             await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
 
@@ -705,7 +721,7 @@ async def auto_play(ctx, setting: bool = None):
             title, video_id, = get_related_video(song_id, dq)[1:]
             mq.append(Song(title, video_id))
             await play_file(ctx)  # takes care of the download
-        await download_related_video(ctx, True)
+        await download_related_video(ctx)
 
 
 @bot.command(name='repeat', aliases=['r'])
@@ -812,12 +828,13 @@ async def remove(ctx, position: int = 0):
     dq = guild_data['done']
     voice_client: discord.VoiceClient = guild.voice_client
     with suppress(IndexError):
-        if position < 0: dq.pop(-position - 1)
-        elif position > 0: mq.pop(position)
+        if position < 0: removed_song = dq.pop(-position - 1)
+        elif position > 0: removed_song = mq.pop(position)
         else:
             no_after_play(guild_data, voice_client)
-            mq.pop(0)
+            removed_song = mq.pop(0)
             await play_file(ctx)
+        await ctx.send(f'Removed `{removed_song.title}`')
 
 
 @bot.command()
@@ -840,6 +857,27 @@ async def move(ctx, _from: int, _to: int):
     to_queue.insert(_to, song)
     if to_queue == from_queue and _to < _from: _from += 1
     from_queue.pop(_from)
+
+
+@bot.command(aliases=['sm', 'shuffle'])
+@commands.check(in_guild)
+async def shuffle_music(ctx):
+    guild = ctx.guild
+    guild_data = data_dict[guild.id]
+    voice_client = guild.voice_client
+    song_playing = voice_client.is_playing() or voice_client.is_paused()
+    current_song = guild_data['music'][0]
+        
+    shuffled_songs = guild_data['music'] + guild_data['done']
+    shuffle(shuffled_songs)
+
+    if song_playing:
+        shuffled_songs.remove(current_song)
+        shuffled_songs = [current_song] + shuffled_songs
+
+    guild_data['music'] = shuffled_songs
+    guild_data['done'].clear()
+    await ctx.send('Shuffled music!')
 
 
 @bot.command(aliases=['cq', 'clearque', 'clear_q', 'clear_que', 'clearq', 'clearqueue', 'queue_clear', 'queueclear'])
@@ -1015,6 +1053,90 @@ async def volume(ctx):
         else: await ctx.send(f'{vc.source.volume * 100}%')
 
 
+@bot.command(aliases=['sa'])
+@commands.check(in_guild)
+async def save_as(ctx):
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        author_id = ctx.author.id
+        guild_id = ctx.guild.id
+        posts = db.posts
+        playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name})
+        mq = data_dict[guild_id]['music']
+        dq = data_dict[guild_id]['done']
+        temp = dq[::-1] + mq
+        song_ids = [(song.title, song.get_video_id()) for song in temp]
+        post = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids}
+        old_post = posts.find_one_and_update({'playlist_name': playlist_name, 'creator_id': author_id}, {'$set': post}, upsert=True)
+        if old_post: await ctx.send(f'Succesfully updated playlist "{playlist_name}"')
+        else: await ctx.send(f'Succesfully created playlist "{playlist_name}"!')
+
+
+@bot.command(aliases=['pp'])
+@commands.check(in_guild)
+async def play_playlist(ctx):
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        guild_id = ctx.guild.id
+        playlist_name = playlist_name.replace(' --s', '--s')
+        parsed_out_name = playlist_name.replace('--s', '')
+        songs = get_songs_from_playlist(parsed_out_name, guild_id, ctx.author.id, to_play=True)[0]
+        if songs:
+            voice_client = ctx.guild.voice_client
+            guild_data = data_dict[guild_id]
+            no_after_play(guild_data, voice_client)
+            if parsed_out_name != playlist_name: shuffle(songs)
+            guild_data['music'] = songs
+            guild_data['done'].clear()
+            await play_file(ctx)
+        else: await ctx.send('No playlist found with that name')
+
+
+# TODO: test with invalid playlist_id
+@bot.command(aliases=['lp', 'load_pl', 'load', 'l'])
+@commands.check(in_guild)
+async def load_playlist(ctx):
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        songs = get_songs_from_playlist(playlist_name, ctx.guild.id, ctx.author.id)[0]
+        if songs:
+            data_dict[ctx.guild.id]['music'].extend(songs)
+            await ctx.send('Songs added to queue!')
+        else: await ctx.send('No playlist found with that name')
+
+
+@bot.command(aliases=['vp'])
+@commands.check(in_guild)
+async def view_playlist(ctx):
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        songs, playlist_name = get_songs_from_playlist(playlist_name, ctx.guild.id, ctx.author.id)
+        if songs:
+            pl_length = len(songs)
+            msg = ''
+            for i, song in enumerate(songs[:10]):
+                msg += f'\n`{i + 1}.` {song.title}'
+            if pl_length > 10: msg += '\n...'
+            embed = create_embed(f'PLAYLIST {playlist_name} | {pl_length} Song(s)', description=msg)
+            await ctx.send(embed=embed)
+        else: await ctx.send('No playlist found with that name')
+
+
+@bot.command(aliases=['delete_pl', 'dp'])
+async def delete_playlist(ctx):
+    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    if playlist_name:
+        posts = db.posts
+        r = posts.delete_one({'playlist_name': playlist_name, 'creator_id': ctx.author.id})
+        await ctx.send(f'Deleted your playlist "{playlist_name}"')
+
+
+@bot.command(aliases=['sp', 'search_pl', 'searchpl'])
+async def search_playlists(ctx):
+    pass
+# TODO: view list of playlists
+
+
 @bot.command()
 @commands.check(in_guild)
 async def ban(ctx):
@@ -1046,6 +1168,8 @@ async def about(ctx):
     ctx.author.send(f'Hi there. Thank you for inquiring about me. I was made by Elijah Lopez.\n'
                     'For more information visit https://github.com/elibroftw/discord-bot.\n'
                     f'Join my server at https://discord.gg/{invitation_code})')
+
+
 
 
 bot.run(os.environ['DISCORD'])

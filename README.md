@@ -25,8 +25,16 @@ For a list of commands view bot.py
     - View Recently Played (!dq)
     - Remove song (!rm index)
     - Move song (!move <from> <to>)
+    - Shuffle (!shuffle)
     - Clear queue (!cq)
-    - Set volume (!volume, !v, prints volume if no int given)
+    - Play from Playlist (!pp <playlist_name/url>)  // url untested
+    - Save to playlist (!pp <playlist_name> <--s for shuffle>)
+    - View playlist (!vp <playlist_name/url>)  // use --2/3 for different scopes
+    - Load playlist (!lp <playlist_name/url>)  // adds songs to current queue
+    - Delete playlist (!dp <playlist_name>)
+    - Search playlist (!sp <playlist_name>)
+        - All playlists can be used by other people using the bot
+    - Set volume (!volume, !v)  // prints volume if no int given
         - !v 100  # this will set volume to 100/100
         - !v +20  # increase volume by 20
         - !v -20  # decrease volume by 20
@@ -47,5 +55,12 @@ For a list of commands view bot.py
 - Set and get invite codes (currently only gets my invite code)
 - report user for bot abuse
 
-Invitation [url](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
-DISCLAIMER: I don't recommend using the bot in your server for music, I will probably make another bot for that.
+# Installation
+- Clone repoistory
+- Have [MongoDB](https://www.mongodb.com/what-is-mongodb) installed
+- Only tested on Windows
+- pip install -r requirements.txt
+- [Want to run on Windows boot?](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8)
+
+[Test the bot](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
+DISCLAIMER: This bot is constantly under development and is self hosted.
