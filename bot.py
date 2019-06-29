@@ -1079,11 +1079,15 @@ async def view_playlist(ctx):
 @commands.check(in_guild)
 async def delete_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
-    # TODO: Test this
     if playlist_name:
         posts = db.posts
         r = posts.delete_one({'playlist_name': playlist_name, 'creator_id': ctx.author.id})
         await ctx.send(f'Deleted your playlist "{playlist_name}"')
+
+
+
+# TODO: view list of playlists
+
 
 
 @bot.command()
