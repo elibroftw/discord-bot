@@ -888,9 +888,11 @@ async def clear_queue(ctx):
     if ctx.author.top_role >= moderator:
         voice_client: discord.VoiceClient = guild.voice_client
         mq = data_dict[guild.id]['music']
+        dq = data_dict[guild.id]['done']
         if voice_client.is_playing() or voice_client.is_paused():
             data_dict[guild.id]['music'] = mq[0:1]
         else: mq.clear()
+        dq.clear()
         await ctx.send('Cleared music queue')
 
 
@@ -1168,8 +1170,6 @@ async def about(ctx):
     ctx.author.send(f'Hi there. Thank you for inquiring about me. I was made by Elijah Lopez.\n'
                     'For more information visit https://github.com/elibroftw/discord-bot.\n'
                     f'Join my server at https://discord.gg/{invitation_code})')
-
-
 
 
 bot.run(os.environ['DISCORD'])
