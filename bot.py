@@ -821,12 +821,13 @@ async def remove(ctx, position: int = 0):
     dq = guild_data['done']
     voice_client: discord.VoiceClient = guild.voice_client
     with suppress(IndexError):
-        if position < 0: dq.pop(-position - 1)
-        elif position > 0: mq.pop(position)
+        if position < 0: removed_song = dq.pop(-position - 1)
+        elif position > 0: removed_song = mq.pop(position)
         else:
             no_after_play(guild_data, voice_client)
-            mq.pop(0)
+            removed_song = mq.pop(0)
             await play_file(ctx)
+        await ctx.send(f'Removed `{removed_song.title}`')
 
 
 @bot.command()
@@ -1023,7 +1024,6 @@ async def volume(ctx):
         else: await ctx.send(f'{vc.source.volume * 100}%')
 
 
-
 @bot.command(aliases=['sa'])
 @commands.check(in_guild)
 async def save_as(ctx):
@@ -1070,7 +1070,7 @@ async def view_playlist(ctx):
             for i, song in enumerate(songs[:10]):
                 msg += f'\n`{i + 1}.` {song.title}'
             if pl_length > 10: msg += '\n...'
-            embed = create_embed(f'PLAYLIST "{playlist_name}" | {pl_length} Song(s)', description=msg)
+            embed = create_embed(f'PLAYLIST {playlist_name} | {pl_length} Song(s)', description=msg)
             await ctx.send(embed=embed)
         else: await ctx.send('No playlist found with that name')
 
