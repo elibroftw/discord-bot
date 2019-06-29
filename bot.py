@@ -1075,7 +1075,7 @@ async def play_playlist(ctx):
         guild_id = ctx.guild.id
         playlist_name = playlist_name.replace(' --s', '--s')
         parsed_out_name = playlist_name.replace('--s', '')
-        songs = get_songs_from_playlist(parsed_out_name, guild_id, ctx.author.id)[0]
+        songs = get_songs_from_playlist(parsed_out_name, guild_id, ctx.author.id, to_play=True)[0]
         if songs:
             voice_client = ctx.guild.voice_client
             guild_data = data_dict[guild_id]
@@ -1087,12 +1087,10 @@ async def play_playlist(ctx):
         else: await ctx.send('No playlist found with that name')
 
 
-# TODO: test if invalid playlist id is given
+# TODO: test with invalid playlist_id
 @bot.command(aliases=['lp', 'load_pl', 'load', 'l'])
 @commands.check(in_guild)
 async def load_playlist(ctx):
-    # TODO: maybe include search youtube playlist?
-    # TODO: check duration length either here or in play_file?
     playlist_name = ' '.join(ctx.message.content.split()[1:])
     if playlist_name:
         songs = get_songs_from_playlist(playlist_name, ctx.guild.id, ctx.author.id)[0]

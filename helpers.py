@@ -316,7 +316,7 @@ def get_songs_from_playlist(playlist_name, guild_id, author_id, to_play=False):
     songs = []
     if playlist_name.startswith('https://www.youtube.com/playlist?list='):
         playlist_id = playlist_name[38:]
-        songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True)
+        songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
     else:
         db_client = MongoClient('localhost', 27017)
         db = db_client.discord_bot
@@ -505,10 +505,5 @@ def format_time_ffmpeg(s):
 
 
 if __name__ == "__main__":
-    # tests go below here
-    print(len(get_videos_from_playlist('PLY4YLSp44QYvmvSNX3Q_0y-mOQ02ZWIbu', to_play=True)))
-    # url, title, video_id = youtube_search('Magnolia', return_info=True)
-    # youtube_download(url, verbose=True)
-    # url = youtube_search('Magnolia')
-    # a = get_related_video(video_id, [])
+    # tests go here
     pass
