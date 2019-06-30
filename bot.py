@@ -71,7 +71,7 @@ async def on_ready():
         data_dict[int(guild_id)] = guild_data
 
         channel_id = guild_data['voice_channel']
-        if channel_id != 'False':
+        if channel_id:
             voice_channel = bot.get_channel(channel_id)
             await voice_channel.connect()
             tc = bot.get_channel(guild_data['text_channel'])
@@ -223,12 +223,12 @@ def save_to_file():
         voice_client = guild.voice_client
         guild_data = deepcopy(data_dict[guild.id])
         if voice_client: guild_data['voice_channel'] = voice_client.channel.id
-        else: guild_data['voice_channel'] = 'False'
+        else: guild_data['voice_channel'] = None
         mq = guild_data['music']
         guild_data['music'] = [s.to_dict() for s in mq]
         dq = guild_data['done']
         guild_data['done'] = [s.to_dict() for s in dq]
-        # # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
+        # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
         save['data_dict'][guild.id] = guild_data
     try:
         with open('save.json', 'w') as fp:
