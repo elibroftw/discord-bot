@@ -759,6 +759,7 @@ def no_after_play(guild_data, voice_client):
         guild_data['is_stopped'] = True
         guild_data['music'][0].stop()
         voice_client.stop()
+        # TODO: move the song to the dq? Check ever no_after_play
 
 
 @bot.command(aliases=['next', 'n', 'N', 'sk'])
@@ -769,18 +770,21 @@ async def skip(ctx, times=1):
     if voice_client:
         guild_data = data_dict[guild.id]
         mq = guild_data['music']
-        dq = guild_data['done']
+        dq: list = guild_data['done']
         guild_data['repeat'] = False
-        if mq:
-            no_after_play(guild_data, voice_client)
-            times = min(times, len(mq))
-            # TODO: if times > len(mq) see if repeat_all is enabled
-            # guild_data['done'] = reversed(mq[:times]) + dq
-            # guild_data['music'] = mq[times:]
-            for _ in range(times): dq.insert(0, mq.pop(0))
+        no_after_play(guild_data, voice_client)
+        if len(mq) > 1:
+            times = min(times, len(mq) - 1)
+            guild_data['done'] = mq[:times][::-1] + dq
+            guild_data['music'] = mq[times:]
             await play_file(ctx)
-        # if dq and guild_data['repeat_all']:
-        #     pass
+        elif len(mq) == 1:
+            dq.insert(0, mq.pop(0))
+            if guild_data['repeat_all']:
+                times = min(times - 1, len(dq) - 2)
+                guild_data['music'] = dq[:-times][::-1]
+                guild_data['done'] = dq[-times:]
+                await play_file(ctx)
 
 
 @bot.command(aliases=['back', 'b', 'prev', 'go_back', 'gb'])
@@ -793,16 +797,15 @@ async def previous(ctx, times=1):
         mq = guild_data['music']
         dq = guild_data['done']
         guild_data['repeat'] = False
+        no_after_play(guild_data, voice_client)
         if dq:
-            no_after_play(guild_data, voice_client)
             times = min(times, len(dq))
-            # TODO: if times > len(dq) see if repeat_all is enabled
-            # data_dict['music'] = reversed(dq[:times]) + mq  # todo: test this
-            # data_dict['done'] = dq[times:]
-            for _ in range(times): mq.insert(0, dq.pop(0))
+            guild_data['music'] = dq[:times][::-1] + mq
+            guild_data['done'] = dq[times:]
             await play_file(ctx)
         elif mq and guild_data['repeat_all']:
-            dq += reversed(mq[:-times])
+            times = min(len(mq) - 1, times)
+            dq += mq[:-times][::-1]
             guild_data['music'] = mq[-times:]
             await play_file(ctx)
             
