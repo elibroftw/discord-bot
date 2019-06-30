@@ -894,7 +894,7 @@ async def next_up(ctx, page=1):
     if mq:
         page = abs(page)
         mq_length = len(mq)
-        title = f'MUSIC QUEUE [{mq_length} Song(s) | Page {page}]'
+        title = f"MUSIC QUEUE [{mq_length} Song{'s' if mq_length > 1 else ''}| Page {page}]"
         if guild_data['auto_play']: title += ' | AUTO PLAY ENABLED'
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
@@ -922,7 +922,7 @@ async def _recently_played(ctx, page=1):
     if dq:
         page = abs(page)
         dq_length = len(dq)
-        title = f'RECENTLY PLAYED [{dq_length} Song(s) | Page {page}]'
+        title = f"RECENTLY PLAYED [{dq_length} Song{'s' if dq_length > 1 else ''} | Page {page}]"
         msg = ''
 
         i = 10 * (page - 1)
@@ -1105,7 +1105,8 @@ async def view_playlist(ctx):
             for i, song in enumerate(songs[:10]):
                 msg += f'\n`{i + 1}.` {song.title}'
             if pl_length > 10: msg += '\n...'
-            embed = create_embed(f'PLAYLIST {playlist_name} | {pl_length} Song(s)', description=msg)
+            title = f"PLAYLIST {playlist_name} | {pl_length} Song{'s' if pl_length > 1 else ''}"
+            embed = create_embed(title, description=msg)
             await ctx.send(embed=embed)
         else: await ctx.send('No playlist found with that name')
 
