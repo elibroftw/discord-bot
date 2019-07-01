@@ -1074,6 +1074,8 @@ async def play_playlist(ctx):
         songs = get_songs_from_playlist(parsed_out_name, guild_id, ctx.author.id, to_play=True)[0]
         if songs:
             voice_client = ctx.guild.voice_client
+            if voice_client is None:
+                voice_client = await bot.get_command('summon').callback(ctx)
             guild_data = data_dict[guild_id]
             no_after_play(guild_data, voice_client)
             if parsed_out_name != playlist_name: shuffle(songs)
