@@ -632,8 +632,7 @@ async def play(ctx):
     guild_data = data_dict[guild.id]
 
     mq = guild_data['music']
-    if voice_client is None:
-        voice_client = await bot.get_command('summon').callback(ctx)
+    if voice_client is None: voice_client = await bot.get_command('summon').callback(ctx)
     url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
@@ -1074,8 +1073,7 @@ async def play_playlist(ctx):
         songs = get_songs_from_playlist(parsed_out_name, guild_id, ctx.author.id, to_play=True)[0]
         if songs:
             voice_client = ctx.guild.voice_client
-            if voice_client is None:
-                voice_client = await bot.get_command('summon').callback(ctx)
+            if voice_client is None: voice_client = await bot.get_command('summon').callback(ctx)
             guild_data = data_dict[guild_id]
             no_after_play(guild_data, voice_client)
             if parsed_out_name != playlist_name: shuffle(songs)
