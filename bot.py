@@ -1062,10 +1062,12 @@ async def save_as(ctx):
         else: await ctx.send(f'Successfully updated playlist "{playlist_name}"!')
 
 
-@bot.command(aliases=['pp'])
+@bot.command(aliases=['pp', 'sp'])
 @commands.check(in_guild)
 async def play_playlist(ctx):
-    playlist_name = ' '.join(ctx.message.content.split()[1:])
+    split_content = ctx.message.content.split()
+    key_word = split_content[0]
+    playlist_name = ' '.join(split_content[1:])
     if playlist_name:
         guild_id = ctx.guild.id
         playlist_name = playlist_name.replace(' --s', '--s')
@@ -1076,7 +1078,7 @@ async def play_playlist(ctx):
             if voice_client is None: voice_client = await bot.get_command('summon').callback(ctx)
             guild_data = data_dict[guild_id]
             no_after_play(guild_data, voice_client)
-            if parsed_out_name != playlist_name: shuffle(songs)
+            if parsed_out_name != playlist_name or key_word == '!sp': shuffle(songs)
             guild_data['music'] = songs
             guild_data['done'].clear()
             await play_file(ctx)
