@@ -108,7 +108,7 @@ async def on_message(message):
 # noinspection PyUnusedLocal
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.errors.CommandNotFound): return
+    if isinstance(error, commands.errors.CommandNotFound, discord.Permisions.MissingPermissions): return
     if error == KeyboardInterrupt:
         await bot.logout()
         return
@@ -132,10 +132,9 @@ async def test(ctx):
 
 @bot.command()
 async def sleep(ctx):
-    if ctx.message.author == 'eli#4591':
+    if ctx.message.author.id == my_user_id:
         try: secs = int(ctx.message.content[7:])
         except ValueError: secs = 5
-        print(f'Sleeping for {secs} seconds')
         await asyncio.sleep(secs)
         await ctx.send('Done sleeping')
 
@@ -159,24 +158,31 @@ async def create_role(ctx):
             print(f'{m.author} created role {role_name}')
 
 
-@bot.command()
+# @bot.command()
+# async def delete_role(ctx):  # TODO
+#     raise NotImplementedError
+
+
+@bot.command(aliases=['addrole', 'giverole'])
+@has_permissions(manage_roles=True)
 async def add_role(ctx):
-    m = ctx.message
-    if str(m.author.top_role) == 'Admin':
-        mark = m.content.index(' ')
+    message = ctx.message.content.split()[1:]
+    if len(message) > 1:
         guild = ctx.guild
-        role_name = m.content.split(' ')
-        if len(role_name) > 1:
-            role_name = ' '.join(role_name[1:])
-            role = discord.utils.get(guild.roles, name=role_name)
-            member = ctx.message.content[12:mark - 1]
-            member = guild.get_member(member)
-            await guild.add_roles(member, role)
-            print(f'{ctx.message.author} gave {member} role {role_name}')
+        
+        member = message[-1]
+        member = guild.get_member(member)
+        
+        role_name = ' '.join(message[:-1])
+        role = discord.utils.get(guild.roles, name=role_name)
+
+        if not member: await ctx.send('Member not found')
+        elif not role: await ctx.send('That role could not be found')
+        else: await guild.add_roles(member, role)
 
 
 # @bot.command()
-# async def delete_role(ctx):  # TODO
+# async def remove_role(ctx):  # TODO
 #     raise NotImplementedError
 
 
@@ -205,18 +211,6 @@ async def youtube(ctx):
     await ctx.send(url)
 
 
-@bot.command(name='exit', aliases=['quit'])
-async def _exit(ctx):
-    if ctx.author.id == my_user_id:
-        await bot.change_presence(activity=discord.Game('Exiting...'))
-        save_to_file()
-        for voice_client in bot.voice_clients:
-            if voice_client.is_playing() or voice_client.is_paused():
-                no_after_play(data_dict[ctx.guild.id], voice_client)
-            await voice_client.disconnect()
-        await bot.logout()
-
-
 def save_to_file():
     save = {'data_dict': {}}
     for guild in bot.guilds:
@@ -234,12 +228,24 @@ def save_to_file():
         with open('save.json', 'w') as fp:
             json.dump(save, fp, indent=4)
     except Exception as e:
-        print('save.json error', e)
+        print('Error while writing to save.json', e)
 
 
 @bot.command()
 async def save():
     save_to_file()
+
+
+@bot.command(name='exit', aliases=['quit'])
+async def _exit(ctx):
+    if ctx.author.id == my_user_id:
+        await bot.change_presence(activity=discord.Game('Exiting...'))
+        save_to_file()
+        for voice_client in bot.voice_clients:
+            if voice_client.is_playing() or voice_client.is_paused():
+                no_after_play(data_dict[ctx.guild.id], voice_client)
+            await voice_client.disconnect()
+        await bot.logout()
 
 
 @bot.command()
@@ -301,7 +307,7 @@ async def clear(ctx, number: int = 1):
 
 @bot.command(name='eval')
 async def _eval(ctx):
-    if str(ctx.author) == 'eli#4591':
+    if ctx.author.id == my_user_id:
         await ctx.send(str(eval(ctx.message.content[6:])))
         print(f'{ctx.message.author} used eval')
 
