@@ -450,11 +450,12 @@ async def download_song(ctx, index=0):
     with suppress(IndexError):
         song = q[index]
         filename = f'Music/{song.get_video_id()}.mp3'
+        msg = await ctx.author.send('Sending you the song')
         with open(filename, 'rb') as fp:
             file = discord.File(fp, filename=f'{file_friendly_title(song.title)}.mp3')
         content = 'Here is the mp3 file. You can rename the file and use my mp3 editor ' \
                   '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify api) '
-        await ctx.author.send(content=content, file=file)
+        await msg.edit(content=content, file=file)
 
 
 async def download_if_not_exists(ctx, title, video_id, in_background=False, play_next=False):
