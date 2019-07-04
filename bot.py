@@ -4,6 +4,7 @@ from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
+from discord.ext.commands import has_permissions, MissingPermissions
 import git
 import logging
 from subprocess import Popen
@@ -108,7 +109,7 @@ async def on_message(message):
 # noinspection PyUnusedLocal
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.errors.CommandNotFound, discord.Permisions.MissingPermissions): return
+    if isinstance(error, (commands.errors.CommandNotFound,)): return
     if error == KeyboardInterrupt:
         await bot.logout()
         return
@@ -153,7 +154,7 @@ async def create_role(ctx):
         if len(role_name) > 1:
             role_name = ' '.join(role_name[1:])
             guild: discord.guild = ctx.guild
-            await guild.create_role(guild, name=role_name)
+            await guild.create_role(name=role_name)
             await ctx.send(f'Role {role_name} created')
             print(f'{m.author} created role {role_name}')
 
@@ -166,19 +167,24 @@ async def create_role(ctx):
 @bot.command(aliases=['addrole', 'giverole'])
 @has_permissions(manage_roles=True)
 async def add_role(ctx):
+    # TODO: must be comma separated values
     message = ctx.message.content.split()[1:]
     if len(message) > 1:
         guild = ctx.guild
         
         member = message[-1]
-        member = guild.get_member(member)
-        
+        member = discord.utils.get(guild.members, name=member)
+        if not member:
+            member = discord.utils.get(guild.members, nick=member)
+
         role_name = ' '.join(message[:-1])
         role = discord.utils.get(guild.roles, name=role_name)
 
         if not member: await ctx.send('Member not found')
         elif not role: await ctx.send('That role could not be found')
-        else: await guild.add_roles(member, role)
+        else:
+            await member.add_roles(role)
+            await ctx.send(f'{member} is now part of {role}')
 
 
 # @bot.command()
