@@ -432,12 +432,30 @@ async def summon(ctx):
         return voice_client
 
 
-@bot.command()
+# @bot.command(aliases=['dl'])
+# async def download(ctx):  # TODO: download url/query
+#     pass
+
+
+@bot.command(aliases=['dls'])
 @commands.check(in_guild)
-async def dl_songs(ctx, playlist_link):  # TODO
-    if ctx.author.id == my_user_id:
-        pass
-    # download songs in playlist in background
+async def download_song(ctx, index=0):
+    guild = ctx.guild
+    guild_data = data_dict[guild.id]
+
+    if index >= 0: q = guild_data['music']
+    else:
+        q = guild_data['done']
+        index = -index - 1
+    with suppress(IndexError):
+        song = q[index]
+        filename = f'Music/{song.get_video_id()}.mp3'
+        # maybe use my mp3 autoset metadata?
+        with open(filename, 'rb') as fp:
+            file = discord.File(fp, filename=f'{file_friendly_title(song.title)}.mp3')
+        content = 'Here is the mp3 file. You can rename the file and use my mp3 editor ' \
+                  '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify api) '
+        await ctx.author.send(content=content, file=file)
 
 
 async def download_if_not_exists(ctx, title, video_id, in_background=False, play_next=False):
@@ -599,31 +617,6 @@ async def play_file(ctx, start_at=0):
                     guild_data['done'] = deepcopy(temp_dq)
         await bot.change_presence(activity=discord.Game(title))
         await download_related_video(ctx)
-
-
-# @bot.command(aliases=['dl'])
-# async def download(ctx):  # TODO: download url/query
-#     pass
-
-
-@bot.command(aliases=['dls'])
-@commands.check(in_guild)
-async def download_song(ctx, index=0):
-    guild = ctx.guild
-    guild_data = data_dict[guild.id]
-
-    if index >= 0: q = guild_data['music']
-    else:
-        q = guild_data['done']
-        index = -index - 1
-    with suppress(IndexError):
-        song = q[index]
-        filename = f'Music/{song.get_video_id()}.mp3'
-        with open(filename, 'rb') as fp:
-            file = discord.File(fp, filename=f'{file_friendly_title(song.title)}.mp3')
-        content = 'Here is the mp3 file. You can rename the file and use my mp3 editor ' \
-                  '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify api) '
-        await ctx.author.send(content=content, file=file)
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
