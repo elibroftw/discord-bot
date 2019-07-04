@@ -450,7 +450,6 @@ async def download_song(ctx, index=0):
     with suppress(IndexError):
         song = q[index]
         filename = f'Music/{song.get_video_id()}.mp3'
-        # maybe use my mp3 autoset metadata?
         with open(filename, 'rb') as fp:
             file = discord.File(fp, filename=f'{file_friendly_title(song.title)}.mp3')
         content = 'Here is the mp3 file. You can rename the file and use my mp3 editor ' \
