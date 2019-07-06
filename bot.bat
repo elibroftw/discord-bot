@@ -1,2 +1,2 @@
-pip install --user --upgrade youtube-dl
+:: pip install --user --upgrade youtube-dl
 pythonw bot.py
