@@ -83,7 +83,7 @@ async def on_ready():
 
     for guild in bot.guilds:
         if guild.id not in data_dict:
-            data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 0.2,
+            data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 0.3,
                                    'repeat': False, 'repeat_all': False, 'auto_play': False, 'skip_voters': [],
                                    'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
 
