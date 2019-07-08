@@ -284,8 +284,6 @@ async def restart(ctx):
                 no_after_play(data_dict[guild.id], voice_client)
                 await voice_client.disconnect()
             # # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
-        g = git.cmd.Git(os.getcwd())
-        g.pull()
         Popen('python bot.py')
         await bot.logout()
 
