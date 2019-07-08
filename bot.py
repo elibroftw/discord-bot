@@ -9,7 +9,7 @@ import git
 import logging
 from subprocess import Popen
 import tictactoe
-from random import shuffle
+from random import shuffle, randint
 from helpers import *
 
 logger = logging.getLogger('discord')
@@ -23,8 +23,8 @@ bot.command()
 load_opus_lib()
 
 invitation_code = os.environ['INVITATION_CODE']
-my_server_id = os.environ['SERVER_ID']
-my_user_id = int(os.environ['MY_USER_ID'])
+my_guild_id = int(os.environ['GUILD_ID'])
+my_user_id = int(os.environ['USER_ID'])
 
 tic_tac_toe_data = {}
 ffmpeg_path = 'ffmpeg/bin/ffmpeg'
@@ -118,6 +118,24 @@ async def on_command_error(ctx, error):
 
 @bot.command(name='help')
 async def _help(ctx):
+    # TODO: rich embed
+    # embed = discord.Embed(title="Showing All Commands:", color=0x267d28)
+    # # DM Command
+    # embed.add_field(
+    #     name="dm", value="Sends anonymous message to a user\n***Usage***: !dm 'username#0000' 'message'", inline=False)
+    # # Reply Command
+    # embed.add_field(
+    #     name="reply", value="Replies a message you received\n***Usage***: !reply 'thread id' 'message'", inline=False)
+    # # Enable Messages Command
+    # embed.add_field(
+    #     name="enable", value="Enables anonymous messaging\n***Usage***: !enable", inline=False)
+    # # Disable Messages
+    # embed.add_field(
+    #     name="disable", value="Disables anonymous messaging\n***Usage***: !disable", inline=False)
+    # # Checks the status of anon messaging
+    # embed.add_field(
+    #     name="status", value="Checks the status of anonymous messaging\n***Usage***: !status", inline=False)
+    # await ctx.send(embed=embed)
     await ctx.author.send('Check out my commands here: https://github.com/elibroftw/discord-bot/blob/master/README.md')
 
 
@@ -320,8 +338,7 @@ async def _eval(ctx):
 
 @bot.command(aliases=['invite', 'invitecode', 'invite_link', 'invitelink'])
 async def invite_code(ctx):
-    # await ctx.send(discord.Invite(channel=ctx.message.channel, code=invitation_code).url)
-    if ctx.guild.id == my_server_id:
+    if ctx.guild.id == my_guild_id:
         await ctx.send(f'https://discord.gg/{invitation_code}')
     else:
         with suppress(IndexError):
@@ -1061,8 +1078,8 @@ async def save_as(ctx):
         dq = data_dict[guild_id]['done']
         temp = dq[::-1] + mq
         song_ids = [(song.title, song.get_video_id()) for song in temp]
-        post = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids, 'type': 'playlist'}
-        result = posts.replace_one({'playlist_name': playlist_name, 'creator_id': author_id}, post, upsert=True)
+        document = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids, 'type': 'playlist'}
+        result = posts.replace_one({'playlist_name': playlist_name, 'creator_id': author_id}, document, upsert=True)
         if result.upserted_id:await ctx.send(f'Successfully created playlist `{playlist_name}`!')
         else: await ctx.send(f'Successfully updated playlist `{playlist_name}`!')
 
@@ -1142,6 +1159,128 @@ async def my_playlists(ctx):
         else: msg += f"\n`{playlist['playlist_name']}` - {number} Songs"
     embed = create_embed(f'You have {result.count()} playlists', description=msg)
     await ctx.send(embed=embed)
+
+
+# The following code is modified from https://github.com/LaughingLove/anon-bot
+# A project that I contriibuted to 
+
+
+@bot.command(aliases=['DM', 'Dm', 'msg', 'MSG'])
+async def dm(ctx):
+    if isinstance(ctx.channel, discord.DMChannel):
+        args = ctx.message.content.split()
+        if len(args) > 2:
+            receiver, message = args[1], ' '.join(args[2:])
+            # checks if a user id was supplied
+            if receiver.isdigit(): receiver = discord.utils.get(bot.users, id=receiver)
+            else:
+                # nope, user is a string. check if it includes a discriminator for accuracy
+                # remove any @ if there is one
+                receiver = receiver.replace('@', '')
+                if '#' in receiver: receiver = discord.utils.get(bot.users, receiver[:-5], discriminator=receiver[-4:])
+                else: receiver = discord.utils.get(bot.users, name=receiver)
+                # search for user by name, returns first match, people can use at their own disgrestion
+                if receiver:
+                    receiver_id = receiver.id
+                    # check if user has anonymous messaging enabled
+                    user_settings = posts.find_one({'user_id': receiver, 'type': 'user_settings'})
+                    if user_settings:
+                        allows_messages = user_settings['allows_messages']
+                    else:
+                        
+                        posts.insert_one({'user_id': receiver_id, 'type': 'user_settings', 'allows_messages': True})
+                        allows_messages = True
+
+                    if allows_messages:
+                        sender_id = ctx.author.id
+                        message_thread = None
+                        while message_thread is None:
+                            thread_id = ''.join((str(randint(0, 9)) for _ in range(6)))
+                            message_thread = posts.find_one({'thread_id': thread_id, 'type': 'message_thread'})
+                        
+                        # TODO: stop storing messages
+                        posts.insert('thread_id': thread_id, 'sender': sender_id, 'receiver': receiver, 'messages': [(sender, receiver, message)], 'type': 'message_thread')
+                        embed = discord.Embed(title='Anonymous message received!', color=0x267d28, description=f'Reply with `!reply {thread_id} <msg>`')
+                        embed.add_field(name='Thread ID:', value=thread_id, inline=True)
+                        embed.add_field(name='Message:', value=message, inline=True)
+                        await user.send(embed=embed)
+                        await ctx.send(f'Message sent to {receiver}! :mailbox_with_mail:\nThread ID: {thread_id}')
+                    else:
+                        await ctx.send(f'{receiver.name} is not accepting anonymous messages at this time.')
+                else:
+                    await ctx.send(f'A user with that name could not be found. Names are case specific.')
+        else:
+            await ctx.send('You must have at least 2 arguments! Refer to !help for more information.')
+    else:
+        await ctx.send(f'!dm can only be used in a DM with me!')
+        await ctx.message.delete()
+        
+
+@bot.command(aliases=['re', 'RE'])
+async def reply(ctx):
+    if isinstance(ctx.channel, discord.DMChannel)
+        args = ctx.message.content.split()
+        if len(args) > 2:
+            thread_id, message = args[1], ' '.join(args[2:])
+            user = ctx.author
+            sender_id = user.id
+            message_thread = posts.find_one({'thread_id': thread_id, 'type': 'message_thread'})
+            if message_thread:
+                receiver_id = message_thread['receiver']
+                if receiver_id == user.id:
+                    embed_title = f'{user} replied to your message!'
+                    receiver_id = message_thread['sender']
+                else:
+                    embed_title = 'You got another message'
+                
+                messages = mesesage_thread['messages']
+                messages.append((sender_id, receiver_id, message))
+                posts.update_one({'thread_id': thread_id, 'type': 'message_thread'}, {'$set': {'message': messages}})
+
+                embed = discord.Embed(
+                    title=embed_title, color=0x267d28,
+                    description=f'Use `!reply {thread_id} <msg>` to respond')
+                embed.add_field(name='Thread ID:', value=thread_id, inline=True)
+                embed.add_field(name='Message:', value=message, inline=True)
+                
+                receiver = bot.get_user(receiver_id)
+                await receiver.send(embed=embed)
+                await ctx.send('Reply sent! :mailbox_with_mail:')
+            else:
+                await ctx.send(f'Unknown message thread!')
+        else:
+            await ctx.send("You must have at least 2 arguments in your command! Refer to !help for more information.")
+    else:
+        await ctx.send(f'Send your message to the bots DMs!')
+        await ctx.message.delete()
+
+
+@bot.command(aliases=['enable'])
+async def enablemessages(ctx):
+    user_id = ctx.author.id
+    old_settings = posts.find_one_and_update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': True}})
+    await ctx.send('Anonymous messaging has been **ENABLED**')
+
+
+@bot.command(aliases=['disable'])
+async def disablemessages(ctx):
+    user_id = ctx.author.id
+    old_settings = posts.find_one_and_update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': False}})
+    await ctx.send('Anonymous messaging has been **DISABLED**')
+
+
+@bot.command()
+async def anonstatus(ctx):
+    user_id = ctx.author.id
+
+    user_settings = posts.find_one({'user_id': user_id, 'type': 'user_settings'})
+    if user_settings: allows_messages = user_settings['allows_messages']
+    else:
+        posts.insert_one({'user_id': user_id, 'type': 'user_settings', 'allows_messages': True})
+        allows_messages = True
+    
+    setting = '**ENABLED**' if allows_messages else '**DISABLED**' 
+    await ctx.send(f'Anonymous messaging is {setting}')
 
 
 @bot.command()

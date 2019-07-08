@@ -1,5 +1,5 @@
-# Discord Bot (Private)
-A discord bot (called El Chapo) I made using the discord.py module and is self hosted and is also hosted on AWS (for now). This bot is tailored towards being a custom bot for your server rather than one bot for a bunch of servers (music system is not meant to be used on more than the owners server).
+# Discord Bot (Works best self hosted)
+A discord bot (called El Chapo) I made using the discord.py module and is self hosted. This bot is tailored towards being a custom bot for your server rather than one bot for a bunch of servers (music system is not meant to be used on more than the owners server). I am not liable for any illegal activities one conducts using my bot or my code.
 
 # Features
 For a list of commands view bot.py
