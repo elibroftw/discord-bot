@@ -1254,14 +1254,14 @@ async def reply(ctx):
 @bot.command(aliases=['enable'])
 async def enablemessages(ctx):
     user_id = ctx.author.id
-    old_settings = posts.find_one_and_update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': True}})
+    posts.update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': True}}, upsert=True)
     await ctx.send('Anonymous messaging has been **ENABLED**')
 
 
 @bot.command(aliases=['disable'])
 async def disablemessages(ctx):
     user_id = ctx.author.id
-    old_settings = posts.find_one_and_update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': False}})
+    posts.update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': False}}, upsert=True)
     await ctx.send('Anonymous messaging has been **DISABLED**')
 
 
