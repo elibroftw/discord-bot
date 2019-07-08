@@ -1187,15 +1187,14 @@ async def dm(ctx):
                     else:
                         posts.insert_one({'user_id': receiver_id, 'type': 'user_settings', 'allows_messages': True})
                         allows_messages = True
-
                     if allows_messages:
                         sender_id = ctx.author.id
-                        message_thread = None
-                        while message_thread is None:
+                        message_thread = True
+                        while message_thread:
                             thread_id = ''.join((str(randint(0, 9)) for _ in range(6)))
                             message_thread = posts.find_one({'thread_id': thread_id, 'type': 'message_thread'})
+                            
                         # TODO: stop storing messages
-
                         posts.insert({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'messages': [(sender_id, receiver_id, message)], 'type': 'message_thread'})
                         embed = discord.Embed(title='Anonymous message received!', color=0x267d28, description=f'Reply with `!reply {thread_id} <msg>`')
                         embed.add_field(name='Thread ID:', value=thread_id, inline=True)
