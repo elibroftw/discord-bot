@@ -288,13 +288,13 @@ async def restart(ctx):
         await bot.logout()
 
 
-# @bot.command(, aliases=['gettweet', 'get_tweet'])
+# @bot.command(aliases=['gettweet', 'get_tweet'])
 # async def twitter(ctx, statuses=1):
 #     msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])
 #     await ctx.send(msg)
 #
 #
-# @bot.command(, aliases=['searchuser' 'search_user'])
+# @bot.command(aliases=['searchuser' 'search_user'])
 # async def search_twitter_user(ctx):
 #     text = ctx.message.content[ctx.message.content.index(' ') + 1:]  #  except ValueError
 #     bot_message = discord_search_twitter_user(text)
