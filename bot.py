@@ -1197,13 +1197,13 @@ async def dm(ctx):
                         while message_thread is None:
                             thread_id = ''.join((str(randint(0, 9)) for _ in range(6)))
                             message_thread = posts.find_one({'thread_id': thread_id, 'type': 'message_thread'})
-                        
                         # TODO: stop storing messages
-                        posts.insert('thread_id': thread_id, 'sender': sender_id, 'receiver': receiver, 'messages': [(sender, receiver, message)], 'type': 'message_thread')
+
+                        posts.insert({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver, 'messages': [(sender_id, receiver_id, message)], 'type': 'message_thread'})
                         embed = discord.Embed(title='Anonymous message received!', color=0x267d28, description=f'Reply with `!reply {thread_id} <msg>`')
                         embed.add_field(name='Thread ID:', value=thread_id, inline=True)
                         embed.add_field(name='Message:', value=message, inline=True)
-                        await user.send(embed=embed)
+                        await receiver.send(embed=embed)
                         await ctx.send(f'Message sent to {receiver}! :mailbox_with_mail:\nThread ID: {thread_id}')
                     else:
                         await ctx.send(f'{receiver.name} is not accepting anonymous messages at this time.')
@@ -1218,7 +1218,7 @@ async def dm(ctx):
 
 @bot.command(aliases=['re', 'RE'])
 async def reply(ctx):
-    if isinstance(ctx.channel, discord.DMChannel)
+    if isinstance(ctx.channel, discord.DMChannel):
         args = ctx.message.content.split()
         if len(args) > 2:
             thread_id, message = args[1], ' '.join(args[2:])
@@ -1233,7 +1233,7 @@ async def reply(ctx):
                 else:
                     embed_title = 'You got another message'
                 
-                messages = mesesage_thread['messages']
+                messages = message_thread['messages']
                 messages.append((sender_id, receiver_id, message))
                 posts.update_one({'thread_id': thread_id, 'type': 'message_thread'}, {'$set': {'message': messages}})
 
