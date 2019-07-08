@@ -1181,7 +1181,7 @@ async def dm(ctx):
                 if receiver:
                     receiver_id = receiver.id
                     # check if user has anonymous messaging enabled
-                    user_settings = posts.find_one({'user_id': receiver, 'type': 'user_settings'})
+                    user_settings = posts.find_one({'user_id': receiver_id, 'type': 'user_settings'})
                     if user_settings:
                         allows_messages = user_settings['allows_messages']
                     else:
