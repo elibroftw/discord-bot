@@ -139,102 +139,6 @@ async def _help(ctx):
     await ctx.author.send('Check out my commands here: https://github.com/elibroftw/discord-bot/blob/master/README.md')
 
 
-@bot.command()
-async def hi(ctx):
-    await ctx.send("Hey there" + " " + ctx.message.author.name + "!")
-
-
-@bot.command()
-async def test(ctx):
-    print('test called')
-
-
-@bot.command()
-async def sleep(ctx):
-    if ctx.message.author.id == my_user_id:
-        try: secs = int(ctx.message.content[7:])
-        except ValueError: secs = 5
-        await asyncio.sleep(secs)
-        await ctx.send('Done sleeping')
-
-
-@bot.command(aliases=['bal'])
-async def balance(ctx):
-    await ctx.message.author.send(check_net_worth(str(ctx.message.author)))
-    await ctx.message.delete()
-
-
-@bot.command(aliases=['createrole'])
-async def create_role(ctx):
-    m = ctx.message
-    if str(m.author.top_role) == 'Admin':
-        role_name = m.content.split(' ')
-        if len(role_name) > 1:
-            role_name = ' '.join(role_name[1:])
-            guild: discord.guild = ctx.guild
-            await guild.create_role(name=role_name)
-            await ctx.send(f'Role {role_name} created')
-            print(f'{m.author} created role {role_name}')
-
-
-# @bot.command()
-# async def delete_role(ctx):  # TODO
-#     raise NotImplementedError
-
-
-@bot.command(aliases=['addrole', 'giverole'])
-@has_permissions(manage_roles=True)
-async def add_role(ctx):
-    # TODO: must be comma separated values
-    message = ctx.message.content.split()[1:]
-    if len(message) > 1:
-        guild = ctx.guild
-        
-        member = message[-1]
-        member = discord.utils.get(guild.members, name=member)
-        if not member:
-            member = discord.utils.get(guild.members, nick=member)
-
-        role_name = ' '.join(message[:-1])
-        role = discord.utils.get(guild.roles, name=role_name)
-
-        if not member: await ctx.send('Member not found')
-        elif not role: await ctx.send('That role could not be found')
-        else:
-            await member.add_roles(role)
-            await ctx.send(f'{member} is now part of {role}')
-
-
-# @bot.command()
-# async def remove_role(ctx):  # TODO
-#     raise NotImplementedError
-
-
-@bot.command()
-async def delete_channel(ctx):
-    if str(ctx.message.author.top_role) == 'Admin':
-        msg_content = ctx.message.content[16:]
-        guild: discord.Guild = ctx.message.guild
-        guild_channels = guild.channels
-        if msg_content.count(', ') > 0:
-            channels_to_delete = msg_content.split(', ')
-            for channel_name in channels_to_delete:
-                await discord.utils.get(guild_channels, name=channel_name).delete(reason='N/A')
-            print(f'{ctx.message.author} deleted channels: {channels_to_delete}')
-        else:
-            await discord.utils.get(guild_channels, name=msg_content).delete(reason='N/A')
-            print(f'{ctx.message.author} deleted channel {msg_content}')
-
-
-@bot.command(aliases=['yt'])
-async def youtube(ctx):
-    try:
-        url = youtube_search(' '.join(ctx.message.content.split(' ')[1:]))
-    except IndexError:
-        url = 'No Video Found'
-    await ctx.send(url)
-
-
 def save_to_file():
     save = {'data_dict': {}}
     for guild in bot.guilds:
@@ -288,6 +192,146 @@ async def restart(ctx, save=True):
         await bot.logout()
 
 
+@commands.has_permissions(manage_messages=True)
+@bot.command()
+async def clear(ctx, number: int = 1):
+    await ctx.message.delete()
+    with suppress(AttributeError):
+        channel: discord.TextChannel = ctx.channel
+        await bot.change_presence(activity=discord.Game('Clearing messages...'))
+        if number > 100: number = 100
+        messages = []
+        async for m in channel.history(limit=number):
+            date = m.created_at
+            # delete if older than 14 else add onto msg list
+            if (datetime.now() - date).days > 14: await m.delete()
+            else: messages.append(m)
+        await channel.delete_messages(messages)
+        print(f'{ctx.message.author} cleared {number} messages')
+    await bot.change_presence(activity=discord.Game('Prison Break (!)'))
+
+
+@commands.check(in_guild)
+@commands.has_permissions(ban_members=True)
+@bot.command()
+async def ban(ctx):
+    author = ctx.author
+    args = ctx.message.content.split(' ')[1:]
+    if args:
+        name = ' '.join(args)
+        user = discord.utils.get(ctx.guild.members, nick=name)
+        if not user:
+            user = discord.utils.get(ctx.guild.members, name=name)
+
+        if user:
+            def check_yn(waited_msg):
+                correct_prereqs = waited_msg.channel == ctx.channel and author == waited_msg.author
+                waited_msg = waited_msg.content.lower()
+                bool_value = waited_msg in ('y', 'ye', 'yes', 'n', 'no', 'na', 'nah')
+                return bool_value and correct_prereqs
+
+            await ctx.guild.ban(user)
+            await ctx.send(f'{user.mention} has been banished to the shadow realm.\nDo you want to undo the ban (Y/n)?')
+            user_msg = await bot.wait_for('message', check=check_yn, timeout=60)
+            if user_msg:
+                await ctx.guild.unban(user)
+                await ctx.send(f'{user.mention} has been unbanned')
+
+
+@bot.command(name='eval')
+async def _eval(ctx):
+    if ctx.author.id == my_user_id:
+        await ctx.send(str(eval(ctx.message.content[6:])))
+        print(f'{ctx.message.author} used eval')
+
+
+@bot.command(aliases=['createrole'])
+async def create_role(ctx):
+    m = ctx.message
+    if str(m.author.top_role) == 'Admin':
+        role_name = m.content.split(' ')
+        if len(role_name) > 1:
+            role_name = ' '.join(role_name[1:])
+            guild: discord.guild = ctx.guild
+            await guild.create_role(name=role_name)
+            await ctx.send(f'Role {role_name} created')
+            print(f'{m.author} created role {role_name}')
+
+
+# @bot.command()
+# async def delete_role(ctx):  # TODO
+#     raise NotImplementedError
+
+
+@bot.command(aliases=['addrole', 'giverole'])
+@has_permissions(manage_roles=True)
+async def add_role(ctx):
+    # TODO: must be comma separated values
+    message = ctx.message.content.split()[1:]
+    if len(message) > 1:
+        guild = ctx.guild
+        
+        member = message[-1]
+        member = discord.utils.get(guild.members, name=member)
+        if not member:
+            member = discord.utils.get(guild.members, nick=member)
+
+        role_name = ' '.join(message[:-1])
+        role = discord.utils.get(guild.roles, name=role_name)
+
+        if not member: await ctx.send('Member not found')
+        elif not role: await ctx.send('That role could not be found')
+        else:
+            await member.add_roles(role)
+            await ctx.send(f'{member} is now part of {role}')
+
+
+# @bot.command()
+# async def remove_role(ctx):  # TODO
+#     raise NotImplementedError
+
+
+@bot.command()  # TODO: create_channel
+async def delete_channel(ctx):
+    if str(ctx.message.author.top_role) == 'Admin':
+        msg_content = ctx.message.content[16:]
+        guild: discord.Guild = ctx.message.guild
+        guild_channels = guild.channels
+        if msg_content.count(', ') > 0:
+            channels_to_delete = msg_content.split(', ')
+            for channel_name in channels_to_delete:
+                await discord.utils.get(guild_channels, name=channel_name).delete(reason='N/A')
+            print(f'{ctx.message.author} deleted channels: {channels_to_delete}')
+        else:
+            await discord.utils.get(guild_channels, name=msg_content).delete(reason='N/A')
+            print(f'{ctx.message.author} deleted channel {msg_content}')
+
+
+@bot.command()
+async def hi(ctx):
+    await ctx.send("Hey there" + " " + ctx.message.author.name + "!")
+
+
+@bot.command()
+async def test(ctx):
+    print('test called')
+
+
+@bot.command()
+async def sleep(ctx):
+    if ctx.message.author.id == my_user_id:
+        try: secs = int(ctx.message.content[7:])
+        except ValueError: secs = 5
+        await asyncio.sleep(secs)
+        await ctx.send('Done sleeping')
+
+
+@bot.command(aliases=['bal'])
+async def balance(ctx):
+    await ctx.message.author.send(check_net_worth(str(ctx.message.author)))
+    await ctx.message.delete()
+
+
 # @bot.command(aliases=['gettweet', 'get_tweet'])
 # async def twitter(ctx, statuses=1):
 #     msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])
@@ -302,36 +346,18 @@ async def restart(ctx, save=True):
 # search_users()
 
 
+@bot.command(aliases=['yt'])
+async def youtube(ctx):
+    try:
+        url = youtube_search(' '.join(ctx.message.content.split(' ')[1:]))
+    except IndexError:
+        url = 'No Video Found'
+    await ctx.send(url)
+
+
 @bot.command()
 async def thank(ctx):
     await ctx.send(f"You're welcome {ctx.author.mention}")
-
-
-@commands.has_permissions(manage_messages=True)
-@bot.command()
-async def clear(ctx, number: int = 1):
-    await ctx.message.delete()
-    with suppress(AttributeError):
-        channel: discord.TextChannel = ctx.channel
-        if ctx.message.author.permissions_in(ctx.channel).manage_messages:
-            await bot.change_presence(activity=discord.Game('Clearing messages...'))
-            if number > 100: number = 100
-            messages = []
-            async for m in channel.history(limit=number):
-                date = m.created_at
-                # delete if older than 14 else add onto msg list
-                if (datetime.now() - date).days > 14: await m.delete()
-                else: messages.append(m)
-            await channel.delete_messages(messages)
-            print(f'{ctx.message.author} cleared {number} messages')
-    await bot.change_presence(activity=discord.Game('Prison Break (!)'))
-
-
-@bot.command(name='eval')
-async def _eval(ctx):
-    if ctx.author.id == my_user_id:
-        await ctx.send(str(eval(ctx.message.content[6:])))
-        print(f'{ctx.message.author} used eval')
 
 
 @bot.command(aliases=['invite', 'invitecode', 'invite_link', 'invitelink'])
@@ -1177,6 +1203,7 @@ async def has_nick(ctx):
 
 @bot.command(aliases=['DM', 'Dm', 'msg', 'MSG'])
 async def dm(ctx):
+    # TODO: in chat dm
     if isinstance(ctx.channel, discord.DMChannel):
         args = ctx.message.content.split()
         if len(args) > 2:
@@ -1297,32 +1324,6 @@ async def anonstatus(ctx):
     
     setting = '**ENABLED**' if allows_messages else '**DISABLED**' 
     await ctx.send(f'Anonymous messaging is {setting}')
-
-
-@bot.command()
-@commands.check(in_guild)
-async def ban(ctx):
-    author = ctx.author
-    args = ctx.message.content.split(' ')
-    if author.guild_permissions.ban_members and len(args) > 1:
-        name = ' '.join(args[1:])
-        user = discord.utils.get(ctx.guild.members, nick=name)
-        if not user:
-            user = discord.utils.get(ctx.guild.members, name=name)
-
-        if user:
-            def check_yn(waited_msg):
-                correct_prereqs = waited_msg.channel == ctx.channel and author == waited_msg.author
-                waited_msg = waited_msg.content.lower()
-                bool_value = waited_msg in ('y', 'ye', 'yes', 'n', 'no', 'na', 'nah')
-                return bool_value and correct_prereqs
-
-            await ctx.guild.ban(user)
-            await ctx.send(f'{user.mention} has been banished to the shadow realm.\nDo you want to undo the ban (Y/n)?')
-            user_msg = await bot.wait_for('message', check=check_yn, timeout=60)
-            if user_msg:
-                await ctx.guild.unban(user)
-                await ctx.send(f'{user.mention} has been unbanned')
 
 
 @bot.command(aliases=['source'])
