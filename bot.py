@@ -479,7 +479,7 @@ async def download_song(ctx, index=0):
         await msg.edit(content=content, file=file)
 
 
-async def download_if_not_exists(ctx, title, video_id, in_background=False, play_next=False):
+async def download_if_not_exists(ctx, title, video_id, play_next=False):
     """
     Checks if file corresponding to title and video_id exists
     If it doesn't exist, download it
@@ -490,23 +490,20 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
     m = None
     if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
+        def callback(_):
+            data_dict['downloads'].pop(video_id)
+            if data_dict[ctx.guild.id]['music'][0].get_video_id() == video_id:
+                bot.loop.create_task(m.edit(content=f'Downloaded `{title}`', delete_after=5))
+                bot.loop.create_task(play_file(ctx))
+                # run_coro
+                return
+            elif play_next: msg_content = f'Added `{title}` to next up'
+            else: msg_content = f'Added `{title}` to the playing queue'
+            bot.loop.create_task(m.edit(content=msg_content))
 
-        if in_background:
-            def callback(_):
-                data_dict['downloads'].pop(video_id)
-                if data_dict[ctx.guild.id]['music'][0].get_video_id() == video_id:
-                    bot.loop.create_task(m.edit(content=f'Downloaded `{title}`', delete_after=5))
-                    bot.loop.create_task(play_file(ctx))
-                    # run_coro
-                    return
-                elif play_next: msg_content = f'Added `{title}` to next up'
-                else: msg_content = f'Added `{title}` to the playing queue'
-                bot.loop.create_task(m.edit(content=msg_content))
-
-            result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
-            result.add_done_callback(callback)
-            data_dict['downloads'][video_id] = (result, m)
-        else: youtube_download(video_id)
+        result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
+        result.add_done_callback(callback)
+        data_dict['downloads'][video_id] = (result, m)
     return m
 
 
@@ -517,12 +514,12 @@ async def download_related_video(ctx):
     mq = guild_data['music']
     if len(mq) > 1:
         next_song = mq[1]
-        await download_if_not_exists(ctx, next_song.title, next_song.get_video_id(), in_background=True)
+        await download_if_not_exists(ctx, next_song.title, next_song.get_video_id())
     if auto_play_setting and len(mq) == 1:
         song = mq[0]
         related_title, related_video_id = get_related_video(song.get_video_id(),  guild_data['done'])[1:]
         mq.append(Song(related_title, related_video_id))
-        related_m = await download_if_not_exists(ctx, related_title, related_video_id, in_background=True)
+        related_m = await download_if_not_exists(ctx, related_title, related_video_id)
         related_msg_content = f'Added `{related_title}` to the playing queue'
         if not related_m: await ctx.send(related_msg_content)
 download_next_song = download_related_video
@@ -585,27 +582,30 @@ async def play_file(ctx, start_at=0):
                     if setting and not mq:
                         next_title, next_video_id = get_related_video(last_song.get_video_id(), dq)[1:]
                         next_song = Song(next_title, next_video_id)
-                        next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id, in_background=False))
                         mq.append(next_song)
+                        next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id))
                     else:  # if mq, check if the next song is downloading
                         next_song = mq[0]
                         next_video_id = next_song.get_video_id()
                         next_title = next_song.title
                         next_result, next_m = data_dict['downloads'].get(next_video_id, (None, None))
-                        if next_result: run_coro(next_result)
+                        if next_result:
+                            # run_coro(next_result)
+                            return
                         else:
-                            coro = download_if_not_exists(ctx, next_title, next_video_id, in_background=False)
-                            next_m = run_coro(coro)
-                    vc.play(create_audio_source(guild_data, next_song), after=after_play)
-                    next_song.start(0)
-                    next_time_stamp = next_song.get_time_stamp(True)
-                    guild_data['is_stopped'] = False
-                    if guild_data['output']:
-                        next_msg_content = f'Now playing `{next_title}` {next_time_stamp}'
-                        if not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
-                        if next_m: run_coro(next_m.edit(content=next_msg_content))
-                    run_coro(bot.change_presence(activity=discord.Game(next_title)))
-                    run_coro(download_related_video(ctx))
+                            next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id))
+                        if next_m is None:
+                            vc.play(create_audio_source(guild_data, next_song), after=after_play)
+                            next_song.start(0)
+                            next_time_stamp = next_song.get_time_stamp(True)
+                            guild_data['is_stopped'] = False
+                            if guild_data['output']:
+                                next_msg_content = f'Now playing `{next_title}` {next_time_stamp}'
+                                if next_m: run_coro(next_m.edit(content=next_msg_content))
+                                elif not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
+                                
+                            run_coro(bot.change_presence(activity=discord.Game(next_title)))
+                            run_coro(download_related_video(ctx))
             else:
                 run_coro(bot.change_presence(activity=discord.Game('Prison Break (!)')))
                 if len(vc.channel.members) == 1: run_coro(vc.disconnect())
@@ -619,14 +619,14 @@ async def play_file(ctx, start_at=0):
             # TODO: test this
             # await result
             return
-        m = await download_if_not_exists(ctx, title, video_id, in_background=True)
+        m = await download_if_not_exists(ctx, title, video_id)
         if m is None:
             audio_source = create_audio_source(guild_data, song, start_at=start_at)
             vc.play(audio_source, after=after_play)
             song.start(start_at)
             time_stamp = song.get_time_stamp(True)
             guild_data['is_stopped'] = False
-            guild_data['skip_voters'] = []
+            # guild_data['skip_voters'] = []
             if guild_data['output']:
                 msg_content = f'Now playing `{title}` {time_stamp}'
                 if m: await m.edit(content=msg_content)
@@ -679,7 +679,7 @@ async def play(ctx):
         # download the song if something is playing
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
-            m = await download_if_not_exists(ctx, title, video_id, in_background=True, play_next=play_next)
+            m = await download_if_not_exists(ctx, title, video_id, play_next=play_next)
             if play_next: m_content = f'Added `{title}` to next up'
             else: m_content = f'Added `{title}` to the playing queue'
             if not m: await ctx.send(m_content)
