@@ -78,7 +78,6 @@ class Song:
             try:
                 audio = MP3(f'Music/{self._video_id}.mp3')
                 self.length = audio.info.length
-                print('oi')
             except MutagenError:
                 return 'DOWNLOADING'
         if string:

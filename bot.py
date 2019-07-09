@@ -1010,7 +1010,9 @@ async def fast_forward(ctx, seconds: int = 5):
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():
         guild_data = data_dict[guild.id]
-        start_at = guild_data['music'][0].get_time_stamp() + seconds
+        current_song = guild_data['music'][0]
+        start_at = current_song.get_time_stamp() + seconds
+        start_at = min(current_song.get_length(), seconds)
         no_after_play(guild_data, voice_client)
         await play_file(ctx, start_at)
 
@@ -1023,6 +1025,7 @@ async def rewind(ctx, seconds: int = 5):
     if voice_client.is_playing() or voice_client.is_paused():
         guild_data = data_dict[guild.id]
         start_at = guild_data['music'][0].get_time_stamp() - seconds
+        start_at = max(0, start_at)
         no_after_play(guild_data, voice_client)
         await play_file(ctx, start_at)
 
