@@ -256,7 +256,7 @@ def save_to_file():
 
 
 @bot.command()
-async def save():
+async def save(ctx):
     save_to_file()
 
 
@@ -1159,6 +1159,11 @@ async def my_playlists(ctx):
     await ctx.send(embed=embed)
 
 
+@bot.command()
+async def has_nick(ctx):
+    await ctx.send(discord.utils.get(ctx.guild.members, nick=ctx.message.content.split()[1]))
+
+
 # The following code is modified from https://github.com/LaughingLove/anon-bot
 # A project that I contriibuted to 
 
@@ -1176,7 +1181,15 @@ async def dm(ctx):
                 # remove any @ if there is one
                 receiver = receiver.replace('@', '')
                 if '#' in receiver: receiver = discord.utils.get(bot.users, receiver[:-5], discriminator=receiver[-4:])
-                else: receiver = discord.utils.get(bot.users, name=receiver)
+                else:
+                    temp = receiver
+                    receiver = discord.utils.get(bot.users, name=receiver)
+                    if receiver is None:
+                        for guild in bot.guilds:
+                            if ctx.author in guild.members:
+                                receiver = discord.utils.get(guild.members, nick=temp)
+                                break
+                                
                 # search for user by name, returns first match, people can use at their own disgrestion
                 if receiver:
                     receiver_id = receiver.id
@@ -1195,7 +1208,7 @@ async def dm(ctx):
                             message_thread = posts.find_one({'thread_id': thread_id, 'type': 'message_thread'})
                             
                         # TODO: stop storing messages
-                        posts.insert({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'messages': [(sender_id, receiver_id, message)], 'type': 'message_thread'})
+                        posts.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'messages': [(sender_id, receiver_id, message)], 'type': 'message_thread'})
                         embed = discord.Embed(title='Anonymous message received!', color=0x267d28, description=f'Reply with `!reply {thread_id} <msg>`')
                         embed.add_field(name='Thread ID:', value=thread_id, inline=True)
                         embed.add_field(name='Message:', value=message, inline=True)
