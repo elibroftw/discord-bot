@@ -562,7 +562,7 @@ def create_audio_source(guild_data, song, start_at=0.0):
     # -af silenceremove=start_periods=1:stop_periods=1:detection=peak
     music_filepath = f'Music/{song.get_video_id()}.mp3'
     start_at = max(0.0, start_at)
-    start_at = min(song.get_length(), start_at)
+    start_at = min(song.get_length() - 1, start_at)
     audio_source = FFmpegPCMAudio(music_filepath, executable=ffmpeg_path,
                                   before_options=f'-nostdin -ss {format_time_ffmpeg(start_at)}',
                                   options='-vn -b:a 128k')
@@ -1012,7 +1012,6 @@ async def fast_forward(ctx, seconds: int = 5):
         guild_data = data_dict[guild.id]
         current_song = guild_data['music'][0]
         start_at = current_song.get_time_stamp() + seconds
-        start_at = min(current_song.get_length(), seconds)
         no_after_play(guild_data, voice_client)
         await play_file(ctx, start_at)
 
@@ -1025,7 +1024,6 @@ async def rewind(ctx, seconds: int = 5):
     if voice_client.is_playing() or voice_client.is_paused():
         guild_data = data_dict[guild.id]
         start_at = guild_data['music'][0].get_time_stamp() - seconds
-        start_at = max(0, start_at)
         no_after_play(guild_data, voice_client)
         await play_file(ctx, start_at)
 
