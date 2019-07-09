@@ -516,12 +516,23 @@ async def download_if_not_exists(ctx, title, video_id, play_next=False):
     m = None
     if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
-        def callback(_):
+        def callback(future):
             data_dict['downloads'].pop(video_id)
-            if data_dict[ctx.guild.id]['music'][0].get_video_id() == video_id:
+            exc = future.exception()
+            music_queue = data_dict[ctx.guild.id]['music']
+            latest_id = music_queue[0].get_video_id()
+            
+            if exc:
+                if latest_id == video_id:
+                    music_queue.pop(0)
+                    bot.loop.create_task(play_file(ctx))
+                else:
+                    music_queue.remove(Song(title, video_id))
+                bot.loop.create_task(m.edit(f'Video `{title}` with id `{video_id}` was deleted', delete_after=5))
+                return
+            elif latest_id == video_id:
                 bot.loop.create_task(m.edit(content=f'Downloaded `{title}`', delete_after=5))
                 bot.loop.create_task(play_file(ctx))
-                # run_coro
                 return
             elif play_next: msg_content = f'Added `{title}` to next up'
             else: msg_content = f'Added `{title}` to the playing queue'
@@ -617,6 +628,7 @@ async def play_file(ctx, start_at=0):
                             # run_coro(next_result)
                             return
                         else:
+                            # TODO TEST 
                             next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id))
                         if next_m is None:
                             vc.play(create_audio_source(guild_data, next_song), after=after_play)
