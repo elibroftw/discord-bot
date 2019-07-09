@@ -620,7 +620,7 @@ async def play_file(ctx, start_at=0):
             # await result
             return
         else:
-            download_if_not_exists(ctx, title, video_id, in_background=True)
+            await download_if_not_exists(ctx, title, video_id, in_background=True)
             return
         audio_source = create_audio_source(guild_data, song, start_at=start_at)
 
