@@ -42,7 +42,7 @@ class Song:
         self._video_id = video_id
         self._time_stamp = time_stamp
         self.start_time = None
-        self.status = 'NOT_PLAYING'
+        self.status = 'NOT PLAYING'
         self.length = 'DOWNLOADING'
 
     def __hash__(self):
@@ -70,12 +70,14 @@ class Song:
         self._time_stamp = time() - self.start_time
 
     def stop(self):
-        self.status = 'NOT_PLAYING'
+        self.status = 'NOT PLAYING'
         self._time_stamp = 0
 
     def get_time_stamp(self, string=False):
         if self.status == 'PLAYING':
             self._time_stamp = time() - self.start_time
+        if self.status == 'DOWNLOADING':
+            return ''
         if string:
             temp = round(self._time_stamp)
             minutes = temp // 60

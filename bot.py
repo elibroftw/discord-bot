@@ -497,6 +497,7 @@ async def download_if_not_exists(ctx, title, video_id, in_background=False, play
                 if data_dict[ctx.guild.id]['music'][0].get_video_id() == video_id:
                     bot.loop.create_task(m.edit(content=f'Downloaded `{title}`', delete_after=5))
                     bot.loop.create_task(play_file(ctx))
+                    # run_coro
                     return
                 elif play_next: msg_content = f'Added `{title}` to next up'
                 else: msg_content = f'Added `{title}` to the playing queue'
@@ -549,7 +550,6 @@ def create_audio_source(guild_data, song, start_at=0.0):
 
 async def play_file(ctx, start_at=0):
     """Plays first (index=0) song in the music queue"""
-
     guild: discord.Guild = ctx.guild
     vc: discord.VoiceClient = guild.voice_client
     # noinspection PyTypeChecker
@@ -619,28 +619,26 @@ async def play_file(ctx, start_at=0):
             # TODO: test this
             # await result
             return
-        else:
-            await download_if_not_exists(ctx, title, video_id, in_background=True)
-            return
-        
-        audio_source = create_audio_source(guild_data, song, start_at=start_at)
-        vc.play(audio_source, after=after_play)
-        song.start(start_at)
-        time_stamp = song.get_time_stamp(True)
-        guild_data['is_stopped'] = False
-        guild_data['skip_voters'] = []
-        if guild_data['output']:
-            msg_content = f'Now playing `{title}` {time_stamp}'
-            if m: await m.edit(content=msg_content)
-            else:
-                temp_mq = deepcopy(upcoming_tracks)
-                temp_dq = deepcopy(play_history)
-                await ctx.send(msg_content)
-                if temp_mq != upcoming_tracks:
-                    guild_data['music'] = deepcopy(temp_mq)
-                    guild_data['done'] = deepcopy(temp_dq)
-        await bot.change_presence(activity=discord.Game(title))
-        await download_related_video(ctx)
+        m = await download_if_not_exists(ctx, title, video_id, in_background=True)
+        if m is None:
+            audio_source = create_audio_source(guild_data, song, start_at=start_at)
+            vc.play(audio_source, after=after_play)
+            song.start(start_at)
+            time_stamp = song.get_time_stamp(True)
+            guild_data['is_stopped'] = False
+            guild_data['skip_voters'] = []
+            if guild_data['output']:
+                msg_content = f'Now playing `{title}` {time_stamp}'
+                if m: await m.edit(content=msg_content)
+                else:
+                    temp_mq = deepcopy(upcoming_tracks)
+                    temp_dq = deepcopy(play_history)
+                    await ctx.send(msg_content)
+                    if temp_mq != upcoming_tracks:
+                        guild_data['music'] = deepcopy(temp_mq)
+                        guild_data['done'] = deepcopy(temp_dq)
+            await bot.change_presence(activity=discord.Game(title))
+            await download_related_video(ctx)
 
 
 @bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
@@ -926,7 +924,7 @@ async def next_up(ctx, page=1):
         msg = ''
         i = 10 * (page - 1)
         for song in mq[i:10 * page]:
-            if i == 0: msg += f'\n`Playing` {song.title} `{song.get_time_stamp(True)}`'
+            if i == 0: msg += f'\n`{song.status}` {song.title} `{song.get_time_stamp(True)}`'
             else: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
             i += 1
 
