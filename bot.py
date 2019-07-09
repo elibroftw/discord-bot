@@ -261,10 +261,10 @@ async def save(ctx):
 
 
 @bot.command(name='exit', aliases=['quit'])
-async def _exit(ctx):
+async def _exit(ctx, save=True):
     if ctx.author.id == my_user_id:
         await bot.change_presence(activity=discord.Game('Exiting...'))
-        save_to_file()
+        if save: save_to_file()
         for voice_client in bot.voice_clients:
             if voice_client.is_playing() or voice_client.is_paused():
                 no_after_play(data_dict[ctx.guild.id], voice_client)
@@ -273,11 +273,11 @@ async def _exit(ctx):
 
 
 @bot.command()
-async def restart(ctx):
+async def restart(ctx, save=True):
     if ctx.author.id == my_user_id:
         print('Restarting')
         await bot.change_presence(activity=discord.Game('Restarting...'))
-        save_to_file()
+        if save: save_to_file()
         for guild in bot.guilds:
             voice_client = guild.voice_client
             if voice_client:
@@ -917,14 +917,20 @@ async def next_up(ctx, page=1):
     if mq:
         page = abs(page)
         mq_length = len(mq)
-        title = f"MUSIC QUEUE [{mq_length} Song{'s' if mq_length > 1 else ''}| Page {page}]"
+        title = f"MUSIC QUEUE [{mq_length} Song{'s' if mq_length > 1 else ''} | Page {page}]"
         if guild_data['auto_play']: title += ' | AUTO PLAY ENABLED'
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
         msg = ''
         i = 10 * (page - 1)
         for song in mq[i:10 * page]:
-            if i == 0: msg += f'\n`{song.status}` {song.title} `{song.get_time_stamp(True)}`'
+            if i == 0:
+                song_status = song.get_length()
+                if isinstance(song_status, float):
+                    song_status = song.status
+                    msg += f'`{song_status}` {song.title} `{song.get_time_stamp(True)}`'
+                else:
+                    msg += f'`{song_status}` {song.title}'
             else: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
             i += 1
 

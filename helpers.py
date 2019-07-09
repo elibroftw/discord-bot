@@ -73,37 +73,12 @@ class Song:
         self.status = 'NOT PLAYING'
         self._time_stamp = 0
 
-    def get_time_stamp(self, string=False):
-        if self.status == 'PLAYING':
-            self._time_stamp = time() - self.start_time
-        if self.status == 'DOWNLOADING':
-            return ''
-        if string:
-            temp = round(self._time_stamp)
-            minutes = temp // 60
-            seconds = temp % 60
-            if minutes < 10: minutes = f'0{minutes}'
-            if seconds < 10: seconds = f'0{seconds}'
-            return f'[{minutes}:{seconds} - {self.get_length(True)}]'
-        return self._time_stamp
-
-    def set_time_stamp(self, seconds):
-        self._time_stamp = seconds
-
-    def fwd(self, seconds):
-        self.start_time -= seconds
-
-    def rwd(self, seconds):
-        self.start_time += seconds
-
-    def get_status(self):
-        return self.status
-
     def get_length(self, string=False):
         if self.length == 'DOWNLOADING':
             try:
                 audio = MP3(f'Music/{self._video_id}.mp3')
                 self.length = audio.info.length
+                print('oi')
             except MutagenError:
                 return 'DOWNLOADING'
         if string:
@@ -114,6 +89,34 @@ class Song:
             if seconds < 10: seconds = f'0{seconds}'
             return f'{minutes}:{seconds}'
         return self.length
+
+    def get_time_stamp(self, string=False):
+        if self.status == 'PLAYING':
+            self._time_stamp = time() - self.start_time
+        if string:
+            song_length = self.get_length(True)
+            if song_length in ('DOWNLOADING', '00:00'): return ''
+            temp = round(self._time_stamp)
+            minutes = temp // 60
+            seconds = temp % 60
+            if minutes < 10: minutes = f'0{minutes}'
+            if seconds < 10: seconds = f'0{seconds}'
+            return f'[{minutes}:{seconds} - {song_length}]'
+        return self._time_stamp
+
+    def set_time_stamp(self, seconds):
+        self._time_stamp = seconds
+
+    def forward(self, seconds):
+        self.start_time -= seconds
+    fwd = forward
+
+    def rewind(self, seconds):
+        self.start_time += seconds
+    rwd = rewind
+
+    def get_status(self):
+        return self.status
 
     def get_video_id(self):
         return self._video_id
