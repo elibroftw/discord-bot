@@ -216,7 +216,7 @@ async def clear(ctx, number: int = 1):
 @bot.command()
 async def ban(ctx):
     author = ctx.author
-    args = ctx.message.content.split(' ')[1:]
+    args = ctx.message.content.split()[1:]
     if args:
         name = ' '.join(args)
         user = discord.utils.get(ctx.guild.members, nick=name)
@@ -249,7 +249,7 @@ async def _eval(ctx):
 async def create_role(ctx):
     m = ctx.message
     if str(m.author.top_role) == 'Admin':
-        role_name = m.content.split(' ')
+        role_name = m.content.split()
         if len(role_name) > 1:
             role_name = ' '.join(role_name[1:])
             guild: discord.guild = ctx.guild
@@ -349,7 +349,7 @@ async def balance(ctx):
 @bot.command(aliases=['yt'])
 async def youtube(ctx):
     try:
-        url = youtube_search(' '.join(ctx.message.content.split(' ')[1:]))
+        url = youtube_search(' '.join(ctx.message.content.split()[1:]))
     except IndexError:
         url = 'No Video Found'
     await ctx.send(url)
@@ -447,7 +447,7 @@ async def shift(ctx):
 
 @bot.command(aliases=['create_date', 'createdat', 'createdate'])
 async def created_at(ctx):
-    args = ctx.message.content.split(' ')
+    args = ctx.message.content.split()
     if len(args) > 1:
         name = ' '.join(args[1:])
         user = discord.utils.get(ctx.guild.members, nick=name)
