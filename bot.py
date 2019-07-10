@@ -528,7 +528,7 @@ async def download_if_not_exists(ctx, title, video_id, play_next=False):
                     bot.loop.create_task(play_file(ctx))
                 else:
                     music_queue.remove(Song(title, video_id))
-                bot.loop.create_task(m.edit(f'Video `{title}` with id `{video_id}` was deleted', delete_after=5))
+                bot.loop.create_task(m.edit(content=f'Video `{title}` with id `{video_id}` was deleted', delete_after=5))
                 return
             elif latest_id == video_id:
                 bot.loop.create_task(m.edit(content=f'Downloaded `{title}`', delete_after=5))
@@ -962,11 +962,12 @@ async def next_up(ctx, page=1):
         for song in mq[i:10 * page]:
             if i == 0:
                 song_status = song.get_length()
-                if isinstance(song_status, float):
+                if song_status == 'DOWNLOADING':
+                    msg += f'`{song_status}` {song.title}'
+                else:
                     song_status = song.status
                     msg += f'`{song_status}` {song.title} `{song.get_time_stamp(True)}`'
-                else:
-                    msg += f'`{song_status}` {song.title}'
+                    
             else: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
             i += 1
 
