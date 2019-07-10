@@ -963,7 +963,7 @@ async def next_up(ctx, page=1):
             if i == 0:
                 song_status = song.get_length()
                 if song_status == 'DOWNLOADING':
-                    msg += f'`{song_status}` {song.title}'
+                    msg += f'`DOWNLOADING` {song.title}'
                 else:
                     song_status = song.status
                     msg += f'`{song_status}` {song.title} `{song.get_time_stamp(True)}`'
