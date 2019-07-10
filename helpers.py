@@ -80,8 +80,7 @@ class Song:
                 temp = audio.info.length
                 if temp == 0: raise MutagenError
                 self.length = temp
-            except MutagenError:
-                return 'DOWNLOADING'
+            except MutagenError: return 'DOWNLOADING'
         if string:
             temp = round(self.length)
             minutes = temp // 60
