@@ -20,18 +20,13 @@ import json
 from urllib.parse import urlparse, parse_qs, urlencode
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
-
-if __name__ != "__main__":
-    try: from pip import main as pipmain
-    except: from pip._internal import main as pipmain
-    pipmain(['install', '--user', '--upgrade', 'youtube-dl'])
+from subprocess import Popen
+if __name__ != '__main__': Popen('pip install --user --upgrade youtube-dl')
 import youtube_dl
-
 
 db_client = MongoClient('localhost', 27017)
 db = db_client.discord_bot
 posts = db.posts
-
 
 class Song:
 
