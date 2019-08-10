@@ -20,8 +20,11 @@ import json
 from urllib.parse import urlparse, parse_qs, urlencode
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
-from subprocess import Popen
-if __name__ != '__main__': Popen('pip install --user --upgrade youtube-dl')
+import subprocess
+if __name__ != '__main__':
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    subprocess.Popen('pip install --user --upgrade youtube-dl', startupinfo=startupinfo).wait()
 import youtube_dl
 
 db_client = MongoClient('localhost', 27017)

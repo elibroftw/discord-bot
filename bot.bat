@@ -1,1 +1,2 @@
-pythonw bot.py
+start pythonw bot.py
+exit
