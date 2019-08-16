@@ -15,11 +15,13 @@ from winerror import ERROR_ALREADY_EXISTS
 from helpers import *
 import psutil
 
-# Check if bot is already running
+# Check if script is already running
+script = os.path.basename(__file__) # or basename
 for q in psutil.process_iter():
     if q.name().startswith('python'):
-        if len(q.cmdline())>1 and script in q.cmdline()[1] and q.pid !=os.getpid():
-            print("'{}' Process is already running".format(script))
+        script_in_items = [item for item in q.cmdline() if script in item]
+        if q.pid != os.getpid() and script_in_items:
+            print(f"'Process is already running!")
             sys.exit()
 
 logger = logging.getLogger('discord')
