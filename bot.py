@@ -21,7 +21,7 @@ for q in psutil.process_iter():
     if q.name().startswith('python'):
         script_in_items = [item for item in q.cmdline() if script in item]
         if q.pid != os.getpid() and script_in_items:
-            print(f"Process is already running!")
+            print(f"Bot is already running!")
             sys.exit()
 
 logger = logging.getLogger('discord')
