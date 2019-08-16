@@ -11,17 +11,16 @@ from subprocess import Popen
 import tictactoe
 from random import shuffle, randint
 import sys
-import win32api
-import win32com.client
-import win32event
 from winerror import ERROR_ALREADY_EXISTS
-
 from helpers import *
+import psutil
 
 # Check if bot is already running
-mutex = win32event.CreateMutex(None, False, 'name')
-last_error = win32api.GetLastError()
-if last_error == ERROR_ALREADY_EXISTS: sys.exit()
+for q in psutil.process_iter():
+    if q.name().startswith('python'):
+        if len(q.cmdline())>1 and script in q.cmdline()[1] and q.pid !=os.getpid():
+            print("'{}' Process is already running".format(script))
+            sys.exit()
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -199,7 +198,7 @@ async def restart(ctx, save=True):
                 no_after_play(data_dict[guild.id], voice_client)
                 await voice_client.disconnect()
             # # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
-        Popen('python bot.py')
+        Popen('pythonw bot.py')
         await bot.logout()
 
 

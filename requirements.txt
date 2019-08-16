@@ -9,4 +9,4 @@ requests
 simplejson
 tweepy
 youtube_dl
-pypiwin32
+psutil
