@@ -10,7 +10,18 @@ import logging
 from subprocess import Popen
 import tictactoe
 from random import shuffle, randint
+import sys
+import win32api
+import win32com.client
+import win32event
+from winerror import ERROR_ALREADY_EXISTS
+
 from helpers import *
+
+# Check if bot is already running
+mutex = win32event.CreateMutex(None, False, 'name')
+last_error = win32api.GetLastError()
+if last_error == ERROR_ALREADY_EXISTS: sys.exit()
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
