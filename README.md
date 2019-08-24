@@ -60,7 +60,7 @@ For a list of commands view bot.py
 - Have [MongoDB](https://www.mongodb.com/what-is-mongodb) installed
 - Only tested on Windows
 - pip install -r requirements.txt
-- [Want to run on Windows boot?](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8)
+- [Want to run on Windows boot?](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8) (OUTDATED)
 
 [Test the bot](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
 DISCLAIMER: This bot is constantly under development and is self hosted.
