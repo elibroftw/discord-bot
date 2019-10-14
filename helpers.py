@@ -31,8 +31,8 @@ db_client = MongoClient('localhost', 27017)
 db = db_client.discord_bot
 posts = db.posts
 
-class Song:
 
+class Song:
     __slots__ = ('title', '_video_id', '_time_stamp', 'start_time', 'status', 'length')
 
     def __init__(self, title, video_id, time_stamp=0):
