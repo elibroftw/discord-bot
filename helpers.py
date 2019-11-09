@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
-
 import glob
+import isodate
 import smtplib
 from collections import OrderedDict
 from contextlib import suppress
@@ -136,31 +136,6 @@ except KeyError:
 youtube_api_url = 'https://www.googleapis.com/youtube/v3/'
 
 
-def iso_8061_to_seconds(duration="P1W2DT6H21M32S"):
-    """
-    Converts YouTube duration (ISO 8061)
-    into Seconds
-
-    see http://en.wikipedia.org/wiki/ISO_8601#Durations
-    """
-    iso_8601 = re.compile(
-        'P'  # designates a period
-        '(?:(?P<years>\d+)Y)?'  # years
-        '(?:(?P<months>\d+)M)?'  # months
-        '(?:(?P<weeks>\d+)W)?'  # weeks
-        '(?:(?P<days>\d+)D)?'  # days
-        '(?:T'  # time part must begin with a T
-        '(?:(?P<hours>\d+)H)?'  # hours
-        '(?:(?P<minutes>\d+)M)?'  # minutes
-        '(?:(?P<seconds>\d+)S)?'  # seconds
-        ')?')  # end of time part
-    # Convert regex matches into a short list of time units
-    units = list(iso_8601.match(duration).groups()[-3:])
-    # Put list in ascending order & remove 'None' types
-    units = list(reversed([int(x) if x is not None else 0 for x in units]))
-    # Do the maths
-    return sum([x * 60 ** units.index(x) for x in units])
-
 # twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
 # twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
 # twitter_api = tweepy.API(twitter_auth)
@@ -195,7 +170,6 @@ def youtube_search(text, return_info=False, limit_duration=False, duration_limit
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
     for search_result in search_response.get('items', []):
-        # print(search_result['id']['kind'])
         if search_result['id']['kind'] == 'youtube#video':
             if search_result['snippet']['liveBroadcastContent'] == 'none' or not return_info:
                 title = search_result['snippet']['title']
@@ -239,8 +213,9 @@ def get_video_duration(video_id):
     r = requests.get(f'{youtube_api_url}videos?{query_string}')
     search_response = json.loads(r.text)
     item = search_response.get('items', [])[0]
-    is_live = item['snippet']['liveBroadcastContent'] == 'live'
-    return 2088000 if is_live else iso_8061_to_seconds(item['contentDetails']['duration'])
+    if item['snippet']['liveBroadcastContent'] == 'live': duration = 2088000
+    else:  duration = int(isodate.parse_duration(item['contentDetails']['duration']).total_seconds())
+    return duration
 
 
 def get_video_durations(video_ids):
@@ -249,7 +224,7 @@ def get_video_durations(video_ids):
     search_response = json.loads(requests.get(url).text)
     return_dict = {}
     for item in search_response.get('items', []):
-        return_dict[item['id']] = iso_8061_to_seconds(item['contentDetails']['duration'])
+        return_dict[item['id']] = int(isodate.parse_duration(item['contentDetails']['duration']).total_seconds())
     return return_dict
 
 
@@ -294,7 +269,6 @@ def youtube_download(url_or_video_id, verbose=False):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url_or_video_id])
         # info_dict = ydl.extract_info(url_or_video_id, download=False)
-        # pprint(info_dict)
         # video_id = info_dict['display_id']
         # input_file = f'Music/{video_id}.mp3'
         # output_file = f'Music/{video_id}.mp3'
@@ -508,4 +482,9 @@ def format_time_ffmpeg(s):
 
 if __name__ == "__main__":
     # tests go here
-    pass
+    assert get_video_id('https://www.youtube.com/watch?v=JnIO6AQRS2k') == 'JnIO6AQRS2k'
+    assert get_video_id('https:/test.ca') == None
+    assert get_video_id('This is a test') == None
+    assert get_video_id('youtube') == None
+    assert get_video_duration('JnIO6AQRS2k') == 3682
+    print('ALL TESTS PASSED')

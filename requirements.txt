@@ -2,6 +2,7 @@ asyncio
 discord.py[voice]
 environs
 GitPython
+isodate
 mutagen
 pymongo
 PyNaCl

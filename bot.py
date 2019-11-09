@@ -186,7 +186,7 @@ async def _exit(ctx, save=True):
                 no_after_play(data_dict[ctx.guild.id], voice_client)
             await voice_client.disconnect()
         await bot.logout()
-
+        
 
 @bot.command()
 async def restart(ctx, save=True):
@@ -705,16 +705,15 @@ async def play(ctx):
     url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
-        if url_or_query.startswith('https://y'):
+        video_id = get_video_id(url_or_query)
+        if video_id is not None:
             # TODO: playlist support
-            url = url_or_query
-            video_id = get_video_id(url)
             title = get_youtube_title(video_id)
             if get_video_duration(video_id) > 1800:
                 await ctx.send('That song is too long! (> 30 minutes)')
                 return
-        else:  # get url
-            try: url, title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)
+        else:
+            try: title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)[1:]
             except (ValueError, IndexError):
                 await ctx.send(f'No valid video found with query `{url_or_query}`')
                 return
