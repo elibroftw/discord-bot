@@ -294,19 +294,23 @@ def get_video_id(url):
     return None
 
 
+def get_songs_from_youtube_playlist(url):
+    playlist_id = parse_qs(url)['list']
+    songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
+    return songs, playlist_name
+
+
 def get_songs_from_playlist(playlist_name, guild_id, author_id, to_play=False):
     songs = []
-    if playlist_name.startswith('https://www.youtube.com/playlist?list='):
-        playlist_id = playlist_name[38:]
-        songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
-    else:
-        playlist = None
-        try: scope = int(re.compile('--[2-3]').search(playlist_name).group()[2:])
-        except AttributeError: scope = 1
-        if scope == 1: playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name, 'creator_id': author_id})
-        if scope == 2 or not playlist: playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name})
-        if scope == 3 or not playlist: playlist = posts.find_one({'playlist_name': playlist_name})
-        if playlist: songs = [Song(*item) for item in playlist['songs']]
+    if playlist_name.startswith('https://www.youtube.com/playlist'):
+        return get_songs_from_youtube_playlist(playlist_name)
+    playlist = None
+    try: scope = int(re.compile('--[2-3]').search(playlist_name).group()[2:])
+    except AttributeError: scope = 1
+    if scope == 1: playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name, 'creator_id': author_id})
+    if scope == 2 or not playlist: playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name})
+    if scope == 3 or not playlist: playlist = posts.find_one({'playlist_name': playlist_name})
+    if playlist: songs = [Song(*item) for item in playlist['songs']]
     return songs, playlist_name
 
 

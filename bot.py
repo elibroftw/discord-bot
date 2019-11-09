@@ -712,6 +712,14 @@ async def play(ctx):
             if get_video_duration(video_id) > 1800:
                 await ctx.send('That song is too long! (> 30 minutes)')
                 return
+        elif url_or_query.startswith('https://www.youtube.com/playlist'):
+            songs = get_songs_from_youtube_playlist(url_or_query)[0]
+            if songs:
+                mq.extend(songs)
+                await ctx.send('Songs added to queue!')
+            if len(songs) == len(mq):
+                await play_file(ctx)
+            return
         else:
             try: title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)[1:]
             except (ValueError, IndexError):
