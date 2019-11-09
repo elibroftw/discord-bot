@@ -501,6 +501,7 @@ async def summon(ctx):
 async def download_song(ctx, index=0):
     guild = ctx.guild
     guild_data = data_dict[guild.id]
+    # TODO: firefox send?
 
     if index >= 0: q = guild_data['music']
     else:
