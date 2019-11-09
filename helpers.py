@@ -503,7 +503,6 @@ def format_time_ffmpeg(s):
     sec = int(total_seconds % 60 - (msec / 3600000))
     mins = int(total_minutes % 60 - (sec / 3600) - (msec / 3600000))
     hours = int(total_hours - (mins / 60) - (sec / 3600) - (msec / 3600000))
-
     return "{:02d}:{:02d}:{:02d}".format(hours, mins, sec)
 
 
