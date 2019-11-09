@@ -343,7 +343,7 @@ def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
         songs_dict = {item['snippet']['resourceId']['videoId']: item['snippet']['title'] for item in response['items']}
         video_ids = list(songs_dict.keys())
         durations = get_video_durations(video_ids).items()
-        songs = [Song(songs_dict[video_id], video_id) for video_id, duration in durations if duration <= 600]
+        songs = [Song(songs_dict[video_id], video_id) for video_id, duration in durations if duration <= 1800]
     else:
         songs = [Song(item['snippet']['title'], item['snippet']['resourceId']['videoId']) for item in response['items']]
         
