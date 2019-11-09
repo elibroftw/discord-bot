@@ -710,8 +710,8 @@ async def play(ctx):
             url = url_or_query
             video_id = get_video_id(url)
             title = get_youtube_title(video_id)
-            if get_video_duration(video_id) > 600:
-                await ctx.send('That song is too long! (> 10 minutes)')
+            if get_video_duration(video_id) > 1800:
+                await ctx.send('That song is too long! (> 30 minutes)')
                 return
         else:  # get url
             try: url, title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)
