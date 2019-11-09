@@ -379,7 +379,7 @@ def get_related_video(video_id, done_queue):
         title = item['snippet']['title']
         video_id = item['id']['videoId']
         related_song = Song(title, video_id)
-        if related_song not in dq and get_video_duration(video_id) <= 600:
+        if related_song not in dq and get_video_duration(video_id) <= 1800:
             related_url = f'https://www.youtube.com/watch?v={video_id}'
             return related_url, fix_youtube_title(title), video_id
     raise Exception('No related videos found :(')
