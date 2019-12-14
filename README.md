@@ -1,11 +1,11 @@
 # Discord Bot (Works best self hosted)
-A discord bot (called El Chapo) I made using the discord.py module and is self hosted. 
+A discord bot (called El Chapo) I made using the `discord.py` module and is self hosted. 
 This bot is tailored towards being a custom bot for one server rather than one bot for 
 multiple servers (edge cases where downloading songs is blocking).
 I am not liable for any illegal activities one conducts using my bot or my code.
 
 # Features
-For a list of commands view bot.py
+For more info, view [bot.py](../discord-bot/bot.py)
 
 - Tic-Tac-Toe (Difficulty set to impossible)
 - Youtube search
@@ -45,8 +45,8 @@ For a list of commands view bot.py
     - Leave Voice chat (!leave, !disconnect, !unsummon, !desummon, !dismiss)
     
 
-- Twitter search (going to rework this)
-- Virtual currency (not done yet)
+- Twitter search (rework pending)
+- Virtual currency (pending)
 - Admin uses
     - clearing (!clear int)
     - Can clear up to 100 messages in chat (needs Admin obviously)
@@ -58,11 +58,12 @@ For a list of commands view bot.py
 - report user for bot abuse
 
 # Installation
-- Clone repoistory
-- Have [MongoDB](https://www.mongodb.com/what-is-mongodb) installed
-- Only tested on Windows
-- pip install -r requirements.txt
-- [Want to run on Windows boot?](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8) (OUTDATED)
+1. Clone repoistory
+2. Have [MongoDB](https://www.mongodb.com/what-is-mongodb) installed
+3. Have [FFmpeg](https://www.ffmpeg.org/download.html) binaries in `discord-bot/ffmpeg/bin`
+4. Only tested on Windows
+5. `pip install -r requirements.txt`
+6. [Want to run on Windows boot?](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8) (OUTDATED)
 
 [Test the bot](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
 DISCLAIMER: This bot is constantly under development and is self hosted.
