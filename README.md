@@ -63,7 +63,8 @@ For more info, view [bot.py](../discord-bot/bot.py)
 3. Have [FFmpeg](https://www.ffmpeg.org/download.html) binaries in `discord-bot/ffmpeg/bin`
 4. Only tested on Windows
 5. `pip install -r requirements.txt`
-6. [Want to run on Windows boot?](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8) (OUTDATED)
+6. If you want to run on Windows boot, import and edit "Discord Bot.xml" in Task Scheduler. OR
+7. Click [here](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8) to start from scratch
 
 [Test the bot](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
-DISCLAIMER: This bot is constantly under development and is self hosted.
+WARNING: bot is not always online

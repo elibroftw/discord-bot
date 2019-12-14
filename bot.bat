@@ -1,1 +1,1 @@
-start pythonw bot.py
+python bot.py
