@@ -9,6 +9,13 @@ For more info, view [bot.py](../discord-bot/bot.py)
 
 - Tic-Tac-Toe (Difficulty set to impossible)
 - Youtube search
+- Anonymous DM's
+    - Send a dm to a user (!dm <user/nick> <message>) // send it to the bot
+    - Reply to a dm (!re <thread_id> <message>)
+    - Enable anonymous messages (!enable)
+    - Disable anonymous messages (!disable)
+    - Toggle status (!anontoggle, !anon)  // Future replacement
+    - See if you are opted in or out of the messages (!anonstatus)
 - Plays music (Working but adding features)
     - Summon (!summon, !play <query/youtube_url>)
     - Play or Add to queue (!play, !p)
@@ -29,8 +36,8 @@ For more info, view [bot.py](../discord-bot/bot.py)
     - Move song (!move <from> <to>)
     - Shuffle (!shuffle)
     - Clear queue (!cq)
-    - Play from Playlist (!pp <playlist_name/url>)  // url untested
-    - Save to playlist (!pp <playlist_name> <--s for shuffle>)
+    - Play from Playlist (!pp <playlist_name/url> <--s for shuffle>)
+    - Save to playlist (!sa <playlist_name>)
     - View playlist (!vp <playlist_name/url>)  // use --2/3 for different scopes
     - Load playlist (!lp <playlist_name/url>)  // adds songs to current queue
     - Delete playlist (!dp <playlist_name>)

@@ -14,6 +14,7 @@ import sys
 from winerror import ERROR_ALREADY_EXISTS
 from helpers import *
 import psutil
+from math import ceil
 
 # Check if script is already running
 script = os.path.basename(__file__) # or basename
@@ -895,13 +896,13 @@ async def remove(ctx, position: int = 0):
     dq = guild_data['done']
     voice_client: discord.VoiceClient = guild.voice_client
     with suppress(IndexError):
+        await ctx.send(f'Removed `{removed_song.title}`')
         if position < 0: removed_song = dq.pop(-position - 1)
         elif position > 0: removed_song = mq.pop(position)
         else:
             no_after_play(guild_data, voice_client)
             removed_song = mq.pop(0)
             await play_file(ctx)
-        await ctx.send(f'Removed `{removed_song.title}`')
 
 
 @bot.command()
@@ -973,7 +974,8 @@ async def next_up(ctx, page=1):
     if mq:
         page = abs(page)
         mq_length = len(mq)
-        title = f"MUSIC QUEUE [{mq_length} Song{'s' if mq_length > 1 else ''} | Page {page}]"
+        max_pages = ceil(mq_length / 10)
+        title = f"MUSIC QUEUE [{mq_length} Song{'s' if mq_length > 1 else ''} | Page {page} of {max_pages}]"
         if guild_data['auto_play']: title += ' | AUTO PLAY ENABLED'
         if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
         if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
@@ -1144,11 +1146,14 @@ async def save_as(ctx):
         temp = dq[::-1] + mq
         song_ids = [(song.title, song.get_video_id()) for song in temp]
         document = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids, 'type': 'playlist'}
-        result = posts.replace_one({'playlist_name': playlist_name, 'creator_id': author_id}, document, upsert=True)
+        result = playlists_coll.replace_one({'playlist_name': playlist_name, 'creator_id': author_id}, document, upsert=True)
         if result.upserted_id:await ctx.send(f'Successfully created playlist `{playlist_name}`!')
         else: await ctx.send(f'Successfully updated playlist `{playlist_name}`!')
 
 
+# TODO: add options so that a person can play someone elses playlist
+# for example, --creator <name/id>
+# and also !pp <post_id>
 @bot.command(aliases=['pp', 'sp'])
 @commands.check(in_guild)
 async def play_playlist(ctx):
@@ -1173,6 +1178,7 @@ async def play_playlist(ctx):
 
 
 # TODO: test with invalid playlist_id
+# TODO: add options so that a person can load someone elses playlist
 @bot.command(aliases=['lp', 'load_pl', 'load', 'l'])
 @commands.check(in_guild)
 async def load_playlist(ctx):
@@ -1203,11 +1209,34 @@ async def view_playlist(ctx):
         else: await ctx.send('No playlist found with that name')
 
 
+@bot.command(aliases=['bp'])
+@commands.check(in_guild)
+async def browse_playlists(ctx):
+    try: page = ctx.message.content.split()[1]
+    except: page = 1
+    # 10 playlists per page
+    playlists = sorted(get_all_playlists(), key=lambda p: p['playlist_name'])[10 * (page - 1): 10 * page]
+    max_pages = ceil(len(playlists) / 10)
+    members = bot.get_all_members()
+    formatted_playlists = []
+    msg = ''
+    temp_creators = {}
+    for playlist in playlists:
+        creator_id = playlist['creator_id']
+        if creator_id not in temp_creators:
+            creator = discord.utils.find(lambda m: m.id == creator_id, members)
+            temp_creators[creator_id] = creator
+        msg += f"`{playlist['playlist_name']}` by {creator if creator is not None else 'Unknown'}\n"
+    msg.strip()
+    embed = create_embed(f'PLAYLISTS INDEX | Page {page} of {max_pages}', description=msg)
+    await ctx.send(embed=embed)
+
+
 @bot.command(aliases=['delete_pl', 'dp'])
 async def delete_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
     if playlist_name:
-        r = posts.delete_one({'playlist_name': playlist_name, 'creator_id': ctx.author.id})
+        r = playlists_coll.delete_one({'playlist_name': playlist_name, 'creator_id': ctx.author.id})
         if r.deleted_count:
             await ctx.send(f'Deleted playlist "{playlist_name}"')
         else:
@@ -1216,7 +1245,7 @@ async def delete_playlist(ctx):
 
 @bot.command(aliases=['mp'])
 async def my_playlists(ctx):
-    result = posts.find({'creator_id': ctx.author.id})
+    result = playlists_coll.find({'creator_id': ctx.author.id})
     msg = ''
     for playlist in result:
         number = len(playlist['songs'])
@@ -1231,8 +1260,9 @@ async def has_nick(ctx):
     await ctx.send(discord.utils.get(ctx.guild.members, nick=ctx.message.content.split()[1]))
 
 
-# The following code is modified from https://github.com/LaughingLove/anon-bot
-# A project that I contriibuted to 
+# The following code is modified version of https://github.com/LaughingLove/anon-bot
+#  A project that I contriibuted to
+# modifications: supporting mongoDB + removal of reporting tool 
 
 
 @bot.command(aliases=['DM', 'Dm', 'msg', 'MSG'])
@@ -1262,21 +1292,21 @@ async def dm(ctx):
                 if receiver:
                     receiver_id = receiver.id
                     # check if user has anonymous messaging enabled
-                    user_settings = posts.find_one({'user_id': receiver_id, 'type': 'user_settings'})
+                    user_settings = dm_coll.find_one({'user_id': receiver_id, 'type': 'user_settings'})
                     if user_settings:
                         allows_messages = user_settings['allows_messages']
                     else:
-                        posts.insert_one({'user_id': receiver_id, 'type': 'user_settings', 'allows_messages': True})
+                        dm_coll.insert_one({'user_id': receiver_id, 'type': 'user_settings', 'allows_messages': True})
                         allows_messages = True
                     if allows_messages:
                         sender_id = ctx.author.id
                         message_thread = True
                         while message_thread:
                             thread_id = ''.join((str(randint(0, 9)) for _ in range(6)))
-                            message_thread = posts.find_one({'thread_id': thread_id, 'type': 'message_thread'})
+                            message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
                             
                         # TODO: stop storing messages
-                        posts.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'messages': [(sender_id, receiver_id, message)], 'type': 'message_thread'})
+                        dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'messages': [(sender_id, receiver_id, message)], 'type': 'message_thread'})
                         embed = discord.Embed(title='Anonymous message received!', color=0x267d28, description=f'Reply with `!reply {thread_id} <msg>`')
                         embed.add_field(name='Thread ID:', value=thread_id, inline=True)
                         embed.add_field(name='Message:', value=message, inline=True)
@@ -1301,7 +1331,7 @@ async def reply(ctx):
             thread_id, message = args[1], ' '.join(args[2:])
             user = ctx.author
             sender_id = user.id
-            message_thread = posts.find_one({'thread_id': thread_id, 'type': 'message_thread'})
+            message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
             if message_thread:
                 receiver_id = message_thread['receiver']
                 if receiver_id == user.id:
@@ -1312,7 +1342,7 @@ async def reply(ctx):
                 
                 messages = message_thread['messages']
                 messages.append((sender_id, receiver_id, message))
-                posts.update_one({'thread_id': thread_id, 'type': 'message_thread'}, {'$set': {'message': messages}})
+                dm_coll.update_one({'thread_id': thread_id, 'type': 'message_thread'}, {'$set': {'message': messages}})
 
                 embed = discord.Embed(
                     title=embed_title, color=0x267d28,
@@ -1335,14 +1365,14 @@ async def reply(ctx):
 @bot.command(aliases=['enable'])
 async def enablemessages(ctx):
     user_id = ctx.author.id
-    posts.update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': True}}, upsert=True)
+    dm_coll.update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': True}}, upsert=True)
     await ctx.send('Anonymous messaging has been **ENABLED**')
 
 
 @bot.command(aliases=['disable'])
 async def disablemessages(ctx):
     user_id = ctx.author.id
-    posts.update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': False}}, upsert=True)
+    dm_coll.update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': False}}, upsert=True)
     await ctx.send('Anonymous messaging has been **DISABLED**')
 
 
@@ -1350,14 +1380,15 @@ async def disablemessages(ctx):
 async def anonstatus(ctx):
     user_id = ctx.author.id
 
-    user_settings = posts.find_one({'user_id': user_id, 'type': 'user_settings'})
+    user_settings = dm_coll.find_one({'user_id': user_id, 'type': 'user_settings'})
     if user_settings: allows_messages = user_settings['allows_messages']
     else:
-        posts.insert_one({'user_id': user_id, 'type': 'user_settings', 'allows_messages': True})
+        dm_coll.insert_one({'user_id': user_id, 'type': 'user_settings', 'allows_messages': True})
         allows_messages = True
     
     setting = '**ENABLED**' if allows_messages else '**DISABLED**' 
     await ctx.send(f'Anonymous messaging is {setting}')
+# END of modified code
 
 
 @bot.command(aliases=['source'])

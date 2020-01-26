@@ -25,11 +25,13 @@ if __name__ != '__main__':
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     subprocess.Popen('pip install --user --upgrade youtube-dl', startupinfo=startupinfo).wait()
+
 import youtube_dl
 
 db_client = MongoClient('localhost', 27017)
 db = db_client.discord_bot
-posts = db.posts
+playlists_coll = db.playlists
+dm_coll = db.anon_messages
 
 
 class Song:
@@ -307,9 +309,9 @@ def get_songs_from_playlist(playlist_name, guild_id, author_id, to_play=False):
     playlist = None
     try: scope = int(re.compile('--[2-3]').search(playlist_name).group()[2:])
     except AttributeError: scope = 1
-    if scope == 1: playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name, 'creator_id': author_id})
-    if scope == 2 or not playlist: playlist = posts.find_one({'guild_id': guild_id, 'playlist_name': playlist_name})
-    if scope == 3 or not playlist: playlist = posts.find_one({'playlist_name': playlist_name})
+    if scope == 1: playlist = playlists_coll.find_one({'guild_id': guild_id, 'playlist_name': playlist_name, 'creator_id': author_id})
+    if scope == 2 or not playlist: playlist = playlists_coll.find_one({'guild_id': guild_id, 'playlist_name': playlist_name})
+    if scope == 3 or not playlist: playlist = playlists_coll.find_one({'playlist_name': playlist_name})
     if playlist: songs = [Song(*item) for item in playlist['songs']]
     return songs, playlist_name
 
@@ -330,6 +332,11 @@ def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
         response = json.loads(requests.get(f'{youtube_api_url}playlists?{urlencode(f)}').text)
         return songs, response['items'][0]['snippet']['title']
     return songs
+
+
+def get_all_playlists():
+    playlists = playlists_coll.find({'type': 'playlist'}, {'_id': 0, 'playlist_name': 1, 'creator_id': 1})
+    return playlists
     
 
 def get_video_titles(video_ids):
