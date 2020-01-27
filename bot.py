@@ -1357,8 +1357,9 @@ async def reply(ctx):
                 
                 receiver = bot.get_user(receiver_id)
                 await receiver.send(embed=embed)
-                await ctx.send('Reply sent! :mailbox_with_mail:')
+                await ctx.send('Reply sent! :airplane:')
             else:
+                # TODO: get last thread_id in the chat with the user
                 await ctx.send(f'Unknown message thread!')
         else:
             await ctx.send("You must have at least 2 arguments in your command! Refer to !help for more information.")
