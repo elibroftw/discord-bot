@@ -79,26 +79,26 @@ async def on_ready():
             with open('save.json') as f:
                 save = json.load(f)
         os.remove('save.json')
-    for guild_id, guild_data in save['data_dict'].items():
-        mq = guild_data['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['music']]
-        guild_data['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in guild_data['done']]
-        data_dict[int(guild_id)] = guild_data
-
-        channel_id = guild_data['voice_channel']
-        if channel_id:
-            voice_channel = bot.get_channel(channel_id)
-            await voice_channel.connect()
-            tc = bot.get_channel(guild_data['text_channel'])
-            if mq and tc is not None and not guild_data['is_stopped']:
-                m = await tc.send('Bot has been restarted, now resuming music', delete_after=3)
-                ctx = await bot.get_context(m)
-                await play_file(ctx, guild_data['music'][0].get_time_stamp())
+    for k, v in save['data_dict'].items():
+        if k != 'downloads':
+            mq = v['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in v['music']]
+            v['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in v['done']]
+            data_dict[int(k)] = v
+            channel_id = v['voice_channel']
+            if channel_id:
+                voice_channel = bot.get_channel(channel_id)
+                await voice_channel.connect()
+                tc = bot.get_channel(v['text_channel'])
+                if mq and tc is not None and not v['is_stopped']:
+                    m = await tc.send('Bot has been restarted, now resuming music', delete_after=3)
+                    ctx = await bot.get_context(m)
+                    await play_file(ctx, v['music'][0].get_time_stamp())
 
     for guild in bot.guilds:
         if guild.id not in data_dict:
             data_dict[guild.id] = {'music': [], 'done': [], 'is_stopped': False, 'volume': 0.3,
                                    'repeat': False, 'repeat_all': False, 'auto_play': False, 'skip_voters': [],
-                                   'downloads': {}, 'invite': None, 'output': True, 'text_channel': None}
+                                   'invite': None, 'output': True, 'text_channel': None}
 
 
 @bot.event
@@ -187,6 +187,7 @@ async def _exit(ctx, save=True):
                 no_after_play(data_dict[ctx.guild.id], voice_client)
             await voice_client.disconnect()
         await bot.logout()
+        sys.exit()
         
 
 @bot.command()
@@ -203,6 +204,7 @@ async def restart(ctx, save=True):
             # # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
         Popen('pythonw bot.py')
         await bot.logout()
+        sys.exit()
 
 
 @commands.has_permissions(manage_messages=True)
@@ -896,13 +898,13 @@ async def remove(ctx, position: int = 0):
     dq = guild_data['done']
     voice_client: discord.VoiceClient = guild.voice_client
     with suppress(IndexError):
-        await ctx.send(f'Removed `{removed_song.title}`')
         if position < 0: removed_song = dq.pop(-position - 1)
         elif position > 0: removed_song = mq.pop(position)
         else:
             no_after_play(guild_data, voice_client)
             removed_song = mq.pop(0)
-            await play_file(ctx)
+        await ctx.send(f'Removed `{removed_song.title}`')
+        if position == 0: play_file(ctx)
 
 
 @bot.command()
