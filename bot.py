@@ -1303,17 +1303,20 @@ async def dm(ctx):
                     if allows_messages:
                         sender_id = ctx.author.id
                         message_thread = True
-                        while message_thread:
-                            thread_id = ''.join((str(randint(0, 9)) for _ in range(6)))
+                        while message_thread is not None:
+                            thread_id = randint(1, 9999999)
                             message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
-                            
                         # TODO: stop storing messages
+                        # TODO: make thead_id the color? how cool would that be?
                         dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'messages': [(sender_id, receiver_id, message)], 'type': 'message_thread'})
-                        embed = discord.Embed(title='Anonymous message received!', color=0x267d28, description=f'Reply with `!reply {thread_id} <msg>`')
+                        embed = discord.Embed(title='Message Received :mailbox_with_mail:', color=0xe74c3c, description=f'Reply with `!reply {thread_id} <msg>`')
                         embed.add_field(name='Thread ID:', value=thread_id, inline=True)
                         embed.add_field(name='Message:', value=message, inline=True)
                         await receiver.send(embed=embed)
-                        await ctx.send(f'Message sent to {receiver}! :mailbox_with_mail:\nThread ID: {thread_id}')
+                        embed = discord.Embed(title='Message Sent :airplane:', color=0x2ecc71)
+                        embed.add_field(name='To:', value=str(receiver))
+                        embed.add_field(name='Thread ID:', value=thread_id)
+                        await ctx.send(embed=embed)
                     else:
                         await ctx.send(f'{receiver.name} is not accepting anonymous messages at this time.')
                 else:
