@@ -904,7 +904,7 @@ async def remove(ctx, position: int = 0):
             no_after_play(guild_data, voice_client)
             removed_song = mq.pop(0)
         await ctx.send(f'Removed `{removed_song.title}`')
-        if position == 0: play_file(ctx)
+        if position == 0: await play_file(ctx)
 
 
 @bot.command()
