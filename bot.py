@@ -1308,7 +1308,7 @@ async def dm(ctx):
                             message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
                         # TODO: stop storing messages
                         # TODO: make thead_id the color? how cool would that be?
-                        dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'messages': [(sender_id, receiver_id, message)], 'type': 'message_thread'})
+                        dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'type': 'message_thread'})
                         embed = discord.Embed(title='Message Received :mailbox_with_mail:', color=0xe74c3c, description=f'Reply with `!reply {thread_id} <msg>`')
                         embed.add_field(name='Thread ID:', value=thread_id, inline=True)
                         embed.add_field(name='Message:', value=message, inline=True)
@@ -1344,17 +1344,10 @@ async def reply(ctx):
                     receiver_id = message_thread['sender']
                 else:
                     embed_title = 'You got another message'
-                
-                messages = message_thread['messages']
-                messages.append((sender_id, receiver_id, message))
-                dm_coll.update_one({'thread_id': thread_id, 'type': 'message_thread'}, {'$set': {'message': messages}})
-
-                embed = discord.Embed(
-                    title=embed_title, color=0x267d28,
-                    description=f'Use `!reply {thread_id} <msg>` to respond')
+                embed = discord.Embed(title=embed_title, color=0x267d28,
+                                      description=f'Use `!reply {thread_id} <msg>` to respond')
                 embed.add_field(name='Thread ID:', value=thread_id, inline=True)
                 embed.add_field(name='Message:', value=message, inline=True)
-                
                 receiver = bot.get_user(receiver_id)
                 await receiver.send(embed=embed)
                 await ctx.send('Reply sent! :airplane:')
