@@ -1270,61 +1270,60 @@ async def has_nick(ctx):
 @bot.command(aliases=['DM', 'Dm', 'msg', 'MSG'])
 async def dm(ctx):
     # TODO: in chat dm
-    if isinstance(ctx.channel, discord.DMChannel):
-        args = ctx.message.content.split()
-        if len(args) > 2:
-            receiver, message = args[1], ' '.join(args[2:])
-            # checks if a user id was supplied
-            if receiver.isdigit(): receiver = discord.utils.get(bot.users, id=receiver)
+    
+    args = ctx.message.content.split()
+    if len(args) > 2:
+        receiver, message = args[1], ' '.join(args[2:])
+        # checks if a user id was supplied
+        if receiver.isdigit(): receiver = discord.utils.get(bot.users, id=receiver)
+        else:
+            # nope, user is a string. check if it includes a discriminator for accuracy
+            # remove any @ if there is one
+            receiver = receiver.replace('@', '')
+            if '#' in receiver: receiver = discord.utils.get(bot.users, receiver[:-5], discriminator=receiver[-4:])
             else:
-                # nope, user is a string. check if it includes a discriminator for accuracy
-                # remove any @ if there is one
-                receiver = receiver.replace('@', '')
-                if '#' in receiver: receiver = discord.utils.get(bot.users, receiver[:-5], discriminator=receiver[-4:])
+                temp = receiver
+                receiver = discord.utils.get(bot.users, name=receiver)
+                if receiver is None:
+                    for guild in bot.guilds:
+                        if ctx.author in guild.members:
+                            receiver = discord.utils.get(guild.members, nick=temp)
+                            break
+                            
+            # search for user by name, returns first match, people can use at their own disgrestion
+            if receiver:
+                receiver_id = receiver.id
+                # check if user has anonymous messaging enabled
+                user_settings = dm_coll.find_one({'user_id': receiver_id, 'type': 'user_settings'})
+                if user_settings:
+                    allows_messages = user_settings['allows_messages']
                 else:
-                    temp = receiver
-                    receiver = discord.utils.get(bot.users, name=receiver)
-                    if receiver is None:
-                        for guild in bot.guilds:
-                            if ctx.author in guild.members:
-                                receiver = discord.utils.get(guild.members, nick=temp)
-                                break
-                                
-                # search for user by name, returns first match, people can use at their own disgrestion
-                if receiver:
-                    receiver_id = receiver.id
-                    # check if user has anonymous messaging enabled
-                    user_settings = dm_coll.find_one({'user_id': receiver_id, 'type': 'user_settings'})
-                    if user_settings:
-                        allows_messages = user_settings['allows_messages']
-                    else:
-                        dm_coll.insert_one({'user_id': receiver_id, 'type': 'user_settings', 'allows_messages': True})
-                        allows_messages = True
-                    if allows_messages:
-                        sender_id = ctx.author.id
-                        message_thread = True
-                        while message_thread is not None:
-                            thread_id = randint(1, 9999999)
-                            message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
-                        # TODO: stop storing messages
-                        # TODO: make thead_id the color? how cool would that be?
-                        dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'type': 'message_thread'})
-                        embed = discord.Embed(title='Message Received :mailbox_with_mail:', color=0xe74c3c, description=f'Reply with `!reply {thread_id} <msg>`')
-                        embed.add_field(name='Thread ID:', value=thread_id, inline=True)
-                        embed.add_field(name='Message:', value=message, inline=True)
-                        await receiver.send(embed=embed)
-                        embed = discord.Embed(title='Message Sent :airplane:', color=0x2ecc71)
-                        embed.add_field(name='To:', value=str(receiver))
-                        embed.add_field(name='Thread ID:', value=thread_id)
-                        await ctx.send(embed=embed)
-                    else:
-                        await ctx.send(f'{receiver.name} is not accepting anonymous messages at this time.')
+                    dm_coll.insert_one({'user_id': receiver_id, 'type': 'user_settings', 'allows_messages': True})
+                    allows_messages = True
+                if allows_messages:
+                    sender_id = ctx.author.id
+                    message_thread = True
+                    while message_thread is not None:
+                        thread_id = randint(1, 9999999)
+                        message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
+                    # TODO: make thead_id the color? how cool would that be?
+                    dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'type': 'message_thread'})
+                    embed = discord.Embed(title='Message Received :mailbox_with_mail:', color=0xe74c3c, description=f'Reply with `!reply {thread_id} <msg>`')
+                    embed.add_field(name='Thread ID:', value=thread_id, inline=True)
+                    embed.add_field(name='Message:', value=message, inline=True)
+                    await receiver.send(embed=embed)
+                    embed = discord.Embed(title='Message Sent :airplane:', color=0x2ecc71)
+                    embed.add_field(name='To:', value=str(receiver))
+                    embed.add_field(name='Thread ID:', value=thread_id)
+                    await ctx.author.send(embed=embed)
                 else:
-                    await ctx.send(f'A user with that name could not be found. Names are case specific.')
+                    await ctx.author.send(f'{receiver.name} is not accepting anonymous messages at this time.')
+            else:
+                await ctx.author.send(f'A user with that name could not be found. Names are case sensitive.')
         else:
             await ctx.send('You must have at least 2 arguments! Refer to !help for more information.')
-    else:
-        await ctx.send(f'!dm can only be used in a DM with me!')
+    if not isinstance(ctx.channel, discord.DMChannel):
+        await ctx.author.send(f'TIP: use `!dm` in a DM chat with me')
         await ctx.message.delete()
         
 
@@ -1350,14 +1349,14 @@ async def reply(ctx):
                 embed.add_field(name='Message:', value=message, inline=True)
                 receiver = bot.get_user(receiver_id)
                 await receiver.send(embed=embed)
-                await ctx.send('Reply sent! :airplane:')
+                await ctx.author.send('Reply sent! :airplane:')
             else:
                 # TODO: get last thread_id in the chat with the user
-                await ctx.send(f'Unknown message thread!')
+                await ctx.author.send(f'Unknown message thread!')
         else:
-            await ctx.send("You must have at least 2 arguments in your command! Refer to !help for more information.")
+            await ctx.author.send("You must have at least 2 arguments in your command! Refer to !help for more information.")
     else:
-        await ctx.send(f'Send your message to the bots DMs!')
+        await ctx.author.send(f'TIP: use `!dm` in a DM chat with me')
         await ctx.message.delete()
 
 
@@ -1378,13 +1377,11 @@ async def disablemessages(ctx):
 @bot.command()
 async def anonstatus(ctx):
     user_id = ctx.author.id
-
     user_settings = dm_coll.find_one({'user_id': user_id, 'type': 'user_settings'})
     if user_settings: allows_messages = user_settings['allows_messages']
     else:
         dm_coll.insert_one({'user_id': user_id, 'type': 'user_settings', 'allows_messages': True})
         allows_messages = True
-    
     setting = '**ENABLED**' if allows_messages else '**DISABLED**' 
     await ctx.send(f'Anonymous messaging is {setting}')
 # END of modified code
