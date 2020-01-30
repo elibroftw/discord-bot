@@ -801,7 +801,7 @@ async def _repeat(ctx, setting: bool = None):
     if setting is None: setting = not guild_data['repeat']
     data_dict[guild.id]['repeat'] = setting
     if setting:
-        await ctx.send('Repeating song set to True')
+        await ctx.send('Repeating the current song')
         if voice_client and not voice_client.is_playing() and not voice_client.is_paused():
             mq = data_dict[guild.id]['music']
             dq = data_dict[guild.id]['done']
@@ -809,7 +809,7 @@ async def _repeat(ctx, setting: bool = None):
                 mq.append(dq.pop(0))
                 await play_file(ctx)
     else:
-        await ctx.send('Repeating song set to False')
+        await ctx.send('Not repeating the current song')
 
 
 @bot.command(name='repeat_all', aliases=['ra'])
