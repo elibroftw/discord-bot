@@ -504,7 +504,8 @@ async def summon(ctx):
 async def download_song(ctx, index=0):
     guild = ctx.guild
     guild_data = data_dict[guild.id]
-    # TODO: firefox send?
+    # TODO: firefox send
+    # TODO: get file size
 
     if index >= 0: q = guild_data['music']
     else:
@@ -1072,7 +1073,7 @@ async def now_playing(ctx):
     mq = data_dict[guild.id]['music']
     song = mq[0]
     embed = discord.Embed(title=song.title, url=f'https://www.youtube.com/watch?v={song.get_video_id()}',
-                          description=song.get_time_stamp(True), color=0x0080ff)
+                          description=song.get_time_stamp(True), color=0xff0000)
     embed.set_author(name='Now Playing')
     await ctx.send(embed=embed)
     # https://cog-creators.github.io/discord-embed-sandbox/
@@ -1320,8 +1321,8 @@ async def dm(ctx):
                     await ctx.author.send(f'{receiver.name} is not accepting anonymous messages at this time.')
             else:
                 await ctx.author.send(f'A user with that name could not be found. Names are case sensitive.')
-        else:
-            await ctx.send('You must have at least 2 arguments! Refer to !help for more information.')
+    else:
+        await ctx.send('You must have at least 2 arguments! Refer to !help for more information.')
     if not isinstance(ctx.channel, discord.DMChannel):
         await ctx.author.send(f'TIP: use `!dm` in a DM chat with me')
         await ctx.message.delete()
