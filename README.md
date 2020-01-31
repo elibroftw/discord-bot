@@ -5,7 +5,7 @@ multiple servers (edge cases where downloading songs is blocking).
 I am not liable for any illegal activities one conducts using my bot or my code.
 
 # Features
-For more info, view [bot.py](../discord-bot/bot.py)
+For more info, view [bot.py](../master/bot.py)
 
 - Tic-Tac-Toe (Difficulty set to impossible)
 - Youtube search
