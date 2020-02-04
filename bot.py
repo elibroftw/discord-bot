@@ -5,6 +5,7 @@ import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
 from discord.ext.commands import has_permissions, MissingPermissions
+import ffsend
 import git
 import logging
 from subprocess import Popen
@@ -513,12 +514,11 @@ async def download_song(ctx, index=0):
         index = -index - 1
     with suppress(IndexError):
         song = q[index]
-        filename = f'Music/{song.get_video_id()}.mp3'
-        msg = await ctx.author.send('Sending you the song')
-        with open(filename, 'rb') as fp:
-            file = discord.File(fp, filename=f'{file_friendly_title(song.title)}.mp3')
-        content = 'Here is the mp3 file. You can rename the file and use my mp3 editor ' \
-                  '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify api) '
+        file = f'Music/{song.get_video_id()}.mp3'
+        url = ffsend.upload('https://send.firefox.com/', file)[0]
+        msg = await ctx.author.send('Uploading the song')
+        content = f'Here is the download link <{url}>. You can rename the file and use this metadata editor ' \
+                  '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify API)'
         await msg.edit(content=content, file=file)
 
 

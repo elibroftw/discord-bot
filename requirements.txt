@@ -1,14 +1,15 @@
 asyncio
 discord.py[voice]
 environs
+ffsend
 GitPython
 isodate
 mutagen
+psutil
+pypiwin32
 pymongo
 PyNaCl
 requests
 simplejson
 tweepy
 youtube_dl
-psutil
-pypiwin32
