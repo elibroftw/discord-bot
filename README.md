@@ -41,8 +41,6 @@ For more info, view [bot.py](../master/bot.py)
     - View playlist (!vp <playlist_name/url>)  // use --2/3 for different scopes
     - Load playlist (!lp <playlist_name/url>)  // adds songs to current queue
     - Delete playlist (!dp <playlist_name>)
-    - Search playlist (!sp <playlist_name>)
-        - All playlists can be used by other people using the bot
     - Set volume (!volume, !v)  // prints volume if no int given
         - !v 100  # this will set volume to 100/100
         - !v +20  # increase volume by 20
@@ -63,6 +61,8 @@ For more info, view [bot.py](../master/bot.py)
 # Future
 - Set and get invite codes (currently only gets my invite code)
 - report user for bot abuse
+- Search playlist (!sp <playlist_name>)
+    - All playlists can be used by other people using the bot
 
 # Installation
 1. Clone repoistory

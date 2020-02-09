@@ -1241,7 +1241,7 @@ async def delete_playlist(ctx):
     if playlist_name:
         r = playlists_coll.delete_one({'playlist_name': playlist_name, 'creator_id': ctx.author.id})
         if r.deleted_count:
-            await ctx.send(f'Deleted playlist "{playlist_name}"')
+            await ctx.send(f'Deleted playlist `{playlist_name}``')
         else:
             await ctx.send(f'No playlist found with that name')
 
