@@ -505,9 +505,6 @@ async def summon(ctx):
 async def download_song(ctx, index=0):
     guild = ctx.guild
     guild_data = data_dict[guild.id]
-    # TODO: firefox send
-    # TODO: get file size
-
     if index >= 0: q = guild_data['music']
     else:
         q = guild_data['done']
@@ -515,6 +512,7 @@ async def download_song(ctx, index=0):
     with suppress(IndexError):
         song = q[index]
         file = f'Music/{song.get_video_id()}.mp3'
+        # TODO: rename file
         url = ffsend.upload('https://send.firefox.com/', file)[0]
         msg = await ctx.author.send('Uploading the song')
         content = f'Here is the download link <{url}>. You can rename the file and use this metadata editor ' \
@@ -708,6 +706,7 @@ async def play(ctx):
     mq = guild_data['music']
     if voice_client is None: voice_client = await bot.get_command('summon').callback(ctx)
     url_or_query = ctx.message.content.split()
+    # TODO: test https://www.youtube.com/watch?v=oEAjv2vgUGc
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
         video_id = get_video_id(url_or_query)
