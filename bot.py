@@ -505,15 +505,14 @@ async def summon(ctx):
 async def download_song(ctx, index=0):
     guild = ctx.guild
     guild_data = data_dict[guild.id]
-    if index >= 0: q = guild_data['music']
+    if index >= 0: que = guild_data['music']
     else:
-        q = guild_data['done']
+        que = guild_data['done']
         index = -index - 1
     with suppress(IndexError):
-        song = q[index]
+        song = que[index]
         file = f'Music/{song.get_video_id()}.mp3'
-        # TODO: rename file
-        url = ffsend.upload('https://send.firefox.com/', file)[0]
+        url = ffsend.upload('https://send.firefox.com/', song.title + '.mp3', file)[0]
         msg = await ctx.author.send('Uploading the song')
         content = f'Here is the download link <{url}>. You can rename the file and use this metadata editor ' \
                   '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify API)'
@@ -531,6 +530,7 @@ async def download_if_not_exists(ctx, title, video_id, play_next=False):
     m = None
     if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
+
         def callback(future):
             data_dict['downloads'].pop(video_id)
             exc = future.exception()
