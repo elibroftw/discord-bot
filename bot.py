@@ -514,8 +514,8 @@ async def download_song(ctx, index=0):
         file = f'Music/{song.get_video_id()}.mp3'
         url = ffsend.upload('https://send.firefox.com/', song.title + '.mp3', file)[0]
         msg = await ctx.author.send('Uploading the song')
-        content = f'Here is the download link <{url}>. You can rename the file and use this metadata editor ' \
-                  '<https://github.com/elibroftw/mp3-editor> to set the metadata and album art (needs spotify API)'
+        content = f'Here is the download link <{url}>. You can rename the file and set the metadata and album art ' \
+                  '(Spotify API) using this metadata editor <https://github.com/elibroftw/mp3-editor>'
         await msg.edit(content=content, file=file)
 
 
