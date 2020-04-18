@@ -32,13 +32,14 @@ For more info, view [bot.py](../master/bot.py)
     - View Now Playing (!np)
     - View Upcoming tracks (!q)
     - View Recently Played (!dq)
-    - Remove song (!rm index)
+    - Remove song (!rm <index>)
     - Move song (!move <from> <to>)
     - Shuffle (!shuffle)
     - Clear queue (!cq)
     - Play from Playlist (!pp <playlist_name/url> <--s for shuffle>)
     - Save to playlist (!sa <playlist_name>)
     - View playlist (!vp <playlist_name/url>)  // use --2/3 for different scopes
+    - Browse playlists (!bp <page=1>)  // alphabetically sorted
     - Load playlist (!lp <playlist_name/url>)  // adds songs to current queue
     - Delete playlist (!dp <playlist_name>)
     - Set volume (!volume, !v)  // prints volume if no int given
@@ -48,8 +49,8 @@ For more info, view [bot.py](../master/bot.py)
         - !v +  # increase volume by 10
         - !v -  # decrease volume by 10
     - Leave Voice chat (!leave, !disconnect, !unsummon, !desummon, !dismiss)
-    
-
+- Investing Tools
+    - Get price of a ticker (!ticker <ticker>)
 - Twitter search (rework pending)
 - Virtual currency (pending)
 - Admin uses

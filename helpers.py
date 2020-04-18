@@ -24,8 +24,8 @@ import subprocess
 if __name__ != '__main__':
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    subprocess.Popen('pip install --user --upgrade youtube-dl', startupinfo=startupinfo).wait()
-
+    subprocess.call('pip install --user --upgrade youtube-dl', startupinfo=startupinfo, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL)
 import youtube_dl
 
 db_client = MongoClient('localhost', 27017)
@@ -296,7 +296,7 @@ def get_video_id(url):
     return None
 
 
-def get_songs_from_youtube_playlist(url):
+def get_songs_from_youtube_playlist(url, to_play=to_play):
     playlist_id = parse_qs(url)['list']
     songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
     return songs, playlist_name
@@ -305,7 +305,7 @@ def get_songs_from_youtube_playlist(url):
 def get_songs_from_playlist(playlist_name, guild_id, author_id, to_play=False):
     songs = []
     if playlist_name.startswith('https://www.youtube.com/playlist'):
-        return get_songs_from_youtube_playlist(playlist_name)
+        return get_songs_from_youtube_playlist(playlist_name, to_play=to_play)
     playlist = None
     try: scope = int(re.compile('--[2-3]').search(playlist_name).group()[2:])
     except AttributeError: scope = 1

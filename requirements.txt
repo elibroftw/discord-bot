@@ -13,3 +13,7 @@ requests
 simplejson
 tweepy
 youtube_dl
+yfinance
+lxml
+fuzzywuzzy
+python-Levenshtein

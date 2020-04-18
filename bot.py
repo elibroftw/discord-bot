@@ -6,16 +6,17 @@ from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
 from discord.ext.commands import has_permissions, MissingPermissions
 import ffsend
-import git
 import logging
+from math import ceil
+import psutil
 from subprocess import Popen
-import tictactoe
 from random import shuffle, randint
 import sys
-from winerror import ERROR_ALREADY_EXISTS
+
+import tictactoe
 from helpers import *
-import psutil
-from math import ceil
+from investing import get_ticker_info
+
 
 # Check if script is already running
 script = os.path.basename(__file__) # or basename
@@ -153,8 +154,15 @@ async def _help(ctx):
     await ctx.author.send('Check out my commands here: https://github.com/elibroftw/discord-bot/blob/master/README.md')
 
 
+@bot.command(aliases=['source'])
+async def about(ctx):
+    ctx.author.send(f'Hi there. Thank you for inquiring about me. I was made by Elijah Lopez.\n'
+                    'For more information visit https://github.com/elibroftw/discord-bot.\n'
+                    f'Join my server at https://discord.gg/{invitation_code})')
+
+
 def save_to_file():
-    save = {'data_dict': {}}
+    save_dict = {'data_dict': {}}
     for guild in bot.guilds:
         voice_client = guild.voice_client
         guild_data = deepcopy(data_dict[guild.id])
@@ -165,24 +173,25 @@ def save_to_file():
         dq = guild_data['done']
         guild_data['done'] = [s.to_dict() for s in dq]
         # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
-        save['data_dict'][guild.id] = guild_data
+        save_dict['data_dict'][guild.id] = guild_data
     try:
         with open('save.json', 'w') as fp:
-            json.dump(save, fp, indent=4)
+            json.dump(save_dict, fp, indent=4)
     except Exception as e:
         print('Error while writing to save.json', e)
 
 
 @bot.command()
 async def save(ctx):
-    save_to_file()
+    if ctx.author.id == my_user_id:
+        save_to_file()
 
 
 @bot.command(name='exit', aliases=['quit'])
-async def _exit(ctx, save=True):
+async def _exit(ctx, _save=True):
     if ctx.author.id == my_user_id:
         await bot.change_presence(activity=discord.Game('Exiting...'))
-        if save: save_to_file()
+        if _save: save_to_file()
         for voice_client in bot.voice_clients:
             if voice_client.is_playing() or voice_client.is_paused():
                 no_after_play(data_dict[ctx.guild.id], voice_client)
@@ -192,11 +201,11 @@ async def _exit(ctx, save=True):
         
 
 @bot.command()
-async def restart(ctx, save=True):
+async def restart(ctx, _save=True):
     if ctx.author.id == my_user_id:
         print('Restarting')
         await bot.change_presence(activity=discord.Game('Restarting...'))
-        if save: save_to_file()
+        if _save: save_to_file()
         for guild in bot.guilds:
             voice_client = guild.voice_client
             if voice_client:
@@ -326,11 +335,6 @@ async def delete_channel(ctx):
 @bot.command()
 async def hi(ctx):
     await ctx.send("Hey there" + " " + ctx.message.author.name + "!")
-
-
-@bot.command()
-async def test(ctx):
-    print('test called')
 
 
 @bot.command()
@@ -1213,22 +1217,23 @@ async def view_playlist(ctx):
 
 @bot.command(aliases=['bp'])
 @commands.check(in_guild)
-async def browse_playlists(ctx):
-    try: page = ctx.message.content.split()[1]
-    except: page = 1
+async def browse_playlists(ctx, page=1):
     # 10 playlists per page
-    playlists = sorted(get_all_playlists(), key=lambda p: p['playlist_name'])[10 * (page - 1): 10 * page]
-    max_pages = ceil(len(playlists) / 10)
+    all_playlists = sorted(get_all_playlists(), key=lambda p: p['playlist_name'])
+    max_pages = ceil(len(all_playlists) / 10)
+    if page > max_pages: page = max_pages
+    playlists = all_playlists[10 * (page - 1): 10 * page]
     members = bot.get_all_members()
-    formatted_playlists = []
+    # formatted_playlists = []
     msg = ''
     temp_creators = {}
     for playlist in playlists:
         creator_id = playlist['creator_id']
         if creator_id not in temp_creators:
             creator = discord.utils.find(lambda m: m.id == creator_id, members)
+            if creator is None: creator = 'Unknown'
             temp_creators[creator_id] = creator
-        msg += f"`{playlist['playlist_name']}` by {creator if creator is not None else 'Unknown'}\n"
+        msg += f"`{playlist['playlist_name']}` by {temp_creators[creator_id]}\n"
     msg.strip()
     embed = create_embed(f'PLAYLISTS INDEX | Page {page} of {max_pages}', description=msg)
     await ctx.send(embed=embed)
@@ -1263,8 +1268,8 @@ async def has_nick(ctx):
 
 
 # The following code is modified version of https://github.com/LaughingLove/anon-bot
-#  A project that I contriibuted to
-# modifications: supporting mongoDB + removal of reporting tool 
+#  A project that I contributed to
+# modifications: supporting mongoDB + removal of reporting tool and stored messages
 
 
 @bot.command(aliases=['DM', 'Dm', 'msg', 'MSG'])
@@ -1387,13 +1392,30 @@ async def anonstatus(ctx):
 # END of modified code
 
 
-@bot.command(aliases=['source'])
-async def about(ctx):
-    ctx.author.send(f'Hi there. Thank you for inquiring about me. I was made by Elijah Lopez.\n'
-                    'For more information visit https://github.com/elibroftw/discord-bot.\n'
-                    f'Join my server at https://discord.gg/{invitation_code})')
+# Investing
+@bot.command(aliases=['get_ticker', 'getticker', 'ticker_info', 'tickerinfo'])
+async def ticker(ctx, ticker: str):
+    ticker_info = get_ticker_info(ticker.replace('$', ''))
+    if ticker_info['change'] < 0:
+        embed_color = discord.Color.from_rgb(255,51,58)  # red
+        ticker_info['change'] = f'{ticker_info["change"]} ({ticker_info["percent_change"]}%)'
+    elif ticker_info['change'] > 0:
+        embed_color = discord.Color.from_rgb(26, 197, 103)  # green
+        ticker_info['change'] = f'+{ticker_info["change"]} (+{ticker_info["percent_change"]}%)'
+    else:
+        embed_color = discord.Color.light_grey()
+        ticker_info['change'] = f'{ticker_info["change"]} ({ticker_info["percent_change"]}%)'
+    hour = ticker_info['timestamp'].strftime('%I')
+    if hour[0] == '0': hour = hour[1]
+    timestamp = ticker_info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
+    embed = discord.Embed(title=ticker_info['name'] + f' ({ticker})', color=embed_color,
+                          description=f'Last updated: {timestamp}')
+    embed.add_field(name='Last Price:', value=ticker_info['price'], inline=True)
+    embed.add_field(name='Last Close:', value=ticker_info['last_close_price'], inline=True)
+    embed.add_field(name='Change:', value=ticker_info['change'], inline=True)
+    await ctx.send(embed=embed)
 
 
 bot.run(os.environ['DISCORD'])
 
-# TODO: 'shop', 'math', 'ban', 'remove_role', 'delete_role'
+# TODO: 'shop', 'math'
