@@ -22,6 +22,7 @@ from urllib.parse import urlparse, urlencode, parse_qs
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
 import subprocess
+import pymongo.collection
 if __name__ != '__main__':
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -31,8 +32,9 @@ import youtube_dl
 
 db_client = MongoClient('localhost', 27017)
 db = db_client.discord_bot
-playlists_coll = db.playlists
-dm_coll = db.anon_messages
+playlists_coll: pymongo.collection.Collection = db.playlists
+dm_coll: pymongo.collection.Collection = db.anon_messages
+portfolio_coll: pymongo.collection.Collection = db.portfolios
 
 
 class Song:

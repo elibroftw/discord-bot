@@ -4,7 +4,7 @@ from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
-from discord.ext.commands import has_permissions, MissingPermissions
+from discord.ext.commands import has_permissions, MissingPermissions, Context
 import ffsend
 import logging
 from math import ceil
@@ -1393,28 +1393,83 @@ async def anonstatus(ctx):
 
 
 # Investing
-@bot.command(aliases=['get_ticker', 'getticker', 'ticker_info', 'tickerinfo'])
-async def ticker(ctx, ticker: str):
-    ticker_info = get_ticker_info(ticker.replace('$', ''))
-    if ticker_info['change'] < 0:
+@bot.command(aliases=['ticker', 'get_ticker', 'getticker', 'tickerinfo', 'stock', 'stock_info', 'stockinfo', 'get_stock', 'getstock'])
+async def ticker_info(ctx, ticker: str):
+    _ticker_info = get_ticker_info(ticker.replace('$', ''))
+    if _ticker_info['change'] < 0:
         embed_color = discord.Color.from_rgb(255,51,58)  # red
-        ticker_info['change'] = f'{ticker_info["change"]} ({ticker_info["percent_change"]}%)'
-    elif ticker_info['change'] > 0:
+        _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
+    elif _ticker_info['change'] > 0:
         embed_color = discord.Color.from_rgb(26, 197, 103)  # green
-        ticker_info['change'] = f'+{ticker_info["change"]} (+{ticker_info["percent_change"]}%)'
+        _ticker_info['change'] = f'+{_ticker_info["change"]} (+{_ticker_info["percent_change"]}%)'
     else:
         embed_color = discord.Color.light_grey()
-        ticker_info['change'] = f'{ticker_info["change"]} ({ticker_info["percent_change"]}%)'
-    hour = ticker_info['timestamp'].strftime('%I')
+        _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
+    hour = _ticker_info['timestamp'].strftime('%I')
     if hour[0] == '0': hour = hour[1]
-    timestamp = ticker_info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
-    embed = discord.Embed(title=ticker_info['name'] + f' ({ticker})', color=embed_color,
+    timestamp = _ticker_info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
+    embed = discord.Embed(title=_ticker_info['name'] + f' ({ticker})', color=embed_color,
                           description=f'Last updated: {timestamp}')
-    embed.add_field(name='Last Price:', value=ticker_info['price'], inline=True)
-    embed.add_field(name='Last Close:', value=ticker_info['last_close_price'], inline=True)
-    embed.add_field(name='Change:', value=ticker_info['change'], inline=True)
+    embed.add_field(name='Last Price:', value=_ticker_info['price'], inline=True)
+    embed.add_field(name='Last Close:', value=_ticker_info['last_close_price'], inline=True)
+    embed.add_field(name='Change:', value=_ticker_info['change'], inline=True)
     await ctx.send(embed=embed)
 
+
+# noinspection PyTypeChecker
+@bot.command(aliases=['buy_stock', 'hold_stock', 'buystock', ''])
+async def buy(ctx: Context, ticker: str, cost_per_share: float, shares_purchased: int, commission_fee=0.0):
+    ticker = ticker.replace('$', '')
+    portfolio = portfolio_coll.find_one({'user': ctx.author.id})
+    cost = shares_purchased * cost_per_share + commission_fee
+    today = str(datetime.today().date())
+    if portfolio is None:
+        portfolio = {'user': ctx.author.id, 'holdings': {ticker: {
+            'total_shares': 0, 'total_cost': 0, 'average_cost': 0
+        }}, 'total_cost': 0, 'total_gain': 0,
+                     'total_equity': 0, 'ledger': []}
+    ticker_holdings = portfolio['holdings'][ticker]
+    try:
+        todays_purchases = ticker_holdings[today]
+        try: todays_purchases[str(cost_per_share)] += shares_purchased
+        except KeyError: todays_purchases[str(cost_per_share)] = shares_purchased
+    except KeyError:
+        ticker_holdings[today] = {str(cost_per_share): shares_purchased}
+    new_total = ticker_holdings['total_shares'] + shares_purchased
+    new_avg_cost = (ticker_holdings['average_cost'] * ticker_holdings['total_shares'] + cost) / new_total
+    ticker_holdings['average_cost'] = new_avg_cost
+    ticker_holdings['total_shares'] = new_total
+    ticker_holdings['total_cost'] = new_avg_cost * new_total
+    portfolio['total_equity'] += cost_per_share * shares_purchased
+    portfolio['total_cost'] += cost
+    portfolio['ledger'].append({today: {'ticker': ticker, 'shares': shares_purchased,
+                                        'price': cost_per_share, 'commission_fee': commission_fee}})
+    portfolio_coll.replace_one({'user': ctx.author.id}, portfolio, upsert=True)
+    await ctx.send('Shares added to portfolio')
+
+
+@bot.command(aliases=['sell_stock', 'sellstock'])
+async def sell(ctx: Context, ticker, price_per_share, shares_purchased, commission_fee=0):  # TODO
+    ticker = ticker.replace('$', '')
+    portfolio = portfolio_coll.find_one({'user': ctx.author.id})
+    if portfolio is not None:
+        # sort the prices in the dates by lowest to highest and remove the shares from lowest price to highest
+        await ctx.send('Shares removed to portfolio')
+
+
+@bot.command(aliases=['my_holdings', 'portfolio', 'my_portfolio', 'myholdings', 'myportfolio'])
+async def holdings(ctx: Context, to_dm=False):  # TODO
+    pass
+
+
+@bot.command(
+    aliases=['export_holdings', 'export_portfolio', 'download_holdings', 'dl_portfolio', 'dl_holdings', 'dlholdings'])
+async def download_portfolio(ctx: Context, to_dm=False):  # TODO
+    # export to a csv or xlxs file
+    pass
+
+
+# TODO: daily updates of portfolio if today is not Sunday nor Saturday
 
 bot.run(os.environ['DISCORD'])
 
