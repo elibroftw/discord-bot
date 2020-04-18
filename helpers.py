@@ -265,7 +265,7 @@ def youtube_download(url_or_video_id, verbose=False):
         # 'outtmpl': 'Music/%(title)s - %(id)s.%(ext)s',
         'outtmpl': 'Music/%(id)s.%(ext)s',
         'ffmpeg_location': 'ffmpeg\\bin',
-        'verbose': verbose,
+        'verbose': True,  # for some reason it has to be True to work  # 4/18/2020
         # 'nooverwrites': True,
         'quiet': not verbose,
         'audio-quality': 0
