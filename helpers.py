@@ -17,7 +17,8 @@ from pymongo import MongoClient
 import re
 import os
 import json
-from urllib.parse import urlparse, parse_qs, urlencode
+from urllib import parse
+from urllib.parse import urlparse, urlencode, parse_qs
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
 import subprocess
@@ -248,6 +249,7 @@ def remove_silence(input_file, output_file):
     os.remove(input_file)
 
 
+# noinspection SpellCheckingInspection
 def youtube_download(url_or_video_id, verbose=False):
     ydl_opts = {
         # 'external_downloader': 'aria2c',
@@ -264,6 +266,7 @@ def youtube_download(url_or_video_id, verbose=False):
         'outtmpl': 'Music/%(id)s.%(ext)s',
         'ffmpeg_location': 'ffmpeg\\bin',
         'verbose': verbose,
+        # 'nooverwrites': True,
         'quiet': not verbose,
         'audio-quality': 0
     }
@@ -296,8 +299,8 @@ def get_video_id(url):
     return None
 
 
-def get_songs_from_youtube_playlist(url, to_play=to_play):
-    playlist_id = parse_qs(url)['list']
+def get_songs_from_youtube_playlist(url, to_play=False):
+    playlist_id = parse_qs(parse.urlsplit(url).query)['list']
     songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
     return songs, playlist_name
 
