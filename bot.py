@@ -1379,7 +1379,7 @@ async def disable_messages(ctx):
     await ctx.send('Anonymous messaging has been **DISABLED**')
 
 
-@bot.command(aliases=['anon_status'])
+@bot.command(aliases=['anonstatus'])
 async def anon_status(ctx):
     user_id = ctx.author.id
     user_settings = dm_coll.find_one({'user_id': user_id, 'type': 'user_settings'})
