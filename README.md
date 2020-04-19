@@ -51,8 +51,12 @@ For more info, view [bot.py](../master/bot.py)
     - Leave Voice chat (!leave, !disconnect, !unsummon, !desummon, !dismiss)
 - Investing Tools
     - Get price of a ticker (!ticker <ticker>)
+    - Add shares to portfolio (!buy <ticker> <cost_per_share> <shares> <commission_fee=0>)
+    - Remove shares from portfolio (!sell <ticker> <price_per_share> <shares> <commission_fee=0>)
+    - View your portfolio (!holdings <to_dm=False>)
+    - Get a copy of your portfolio/transactions (!dlholdings <to_dm=True>)
+    
 - Twitter search (rework pending)
-- Virtual currency (pending)
 - Admin uses
     - clearing (!clear int)
     - Can clear up to 100 messages in chat (needs Admin obviously)

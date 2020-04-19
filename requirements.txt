@@ -7,7 +7,7 @@ isodate
 mutagen
 psutil
 pypiwin32
-pymongo
+pymongo>=3.10.1,<4.0.0
 PyNaCl
 requests
 simplejson

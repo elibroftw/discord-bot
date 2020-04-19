@@ -4,7 +4,7 @@ from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
-from discord.ext.commands import has_permissions, MissingPermissions, Context
+from discord.ext.commands import has_permissions, Context
 import ffsend
 import logging
 from math import ceil
@@ -1275,7 +1275,6 @@ async def has_nick(ctx):
 @bot.command(aliases=['DM', 'Dm', 'msg', 'MSG'])
 async def dm(ctx):
     # TODO: in chat dm
-    
     args = ctx.message.content.split()
     if len(args) > 2:
         receiver, message = args[1], ' '.join(args[2:])
@@ -1285,7 +1284,7 @@ async def dm(ctx):
             # nope, user is a string. check if it includes a discriminator for accuracy
             # remove any @ if there is one
             receiver = receiver.replace('@', '')
-            if '#' in receiver: receiver = discord.utils.get(bot.users, receiver[:-5], discriminator=receiver[-4:])
+            if '#' in receiver: receiver = discord.utils.get(bot.users, name=receiver[:-5], discriminator=receiver[-4:])
             else:
                 temp = receiver
                 receiver = discord.utils.get(bot.users, name=receiver)
@@ -1295,7 +1294,7 @@ async def dm(ctx):
                             receiver = discord.utils.get(guild.members, nick=temp)
                             break
                             
-            # search for user by name, returns first match, people can use at their own disgrestion
+            # search for user by name, returns first match, people can use at their own digestion
             if receiver:
                 receiver_id = receiver.id
                 # check if user has anonymous messaging enabled
@@ -1359,28 +1358,29 @@ async def reply(ctx):
                 # TODO: get last thread_id in the chat with the user
                 await ctx.author.send(f'Unknown message thread!')
         else:
-            await ctx.author.send("You must have at least 2 arguments in your command! Refer to !help for more information.")
+            await ctx.author.send(
+                "You must have at least 2 arguments in your command! Refer to !help for more information.")
     else:
         await ctx.author.send(f'TIP: use `!dm` in a DM chat with me')
         await ctx.message.delete()
 
 
-@bot.command(aliases=['enable'])
-async def enablemessages(ctx):
+@bot.command(aliases=['enable', 'enablemessages'])
+async def enable_messages(ctx):
     user_id = ctx.author.id
-    dm_coll.update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': True}}, upsert=True)
+    dm_coll.update_one({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': True}}, upsert=True)
     await ctx.send('Anonymous messaging has been **ENABLED**')
 
 
-@bot.command(aliases=['disable'])
-async def disablemessages(ctx):
+@bot.command(aliases=['disable', 'disablemessages'])
+async def disable_messages(ctx):
     user_id = ctx.author.id
-    dm_coll.update({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': False}}, upsert=True)
+    dm_coll.update_one({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': False}}, upsert=True)
     await ctx.send('Anonymous messaging has been **DISABLED**')
 
 
-@bot.command()
-async def anonstatus(ctx):
+@bot.command(aliases=['anon_status'])
+async def anon_status(ctx):
     user_id = ctx.author.id
     user_settings = dm_coll.find_one({'user_id': user_id, 'type': 'user_settings'})
     if user_settings: allows_messages = user_settings['allows_messages']
@@ -1418,43 +1418,86 @@ async def ticker_info(ctx, ticker: str):
 
 # noinspection PyTypeChecker
 @bot.command(aliases=['buy_stock', 'hold_stock', 'buystock', ''])
-async def buy(ctx: Context, ticker: str, cost_per_share: float, shares_purchased: int, commission_fee=0.0):
+async def buy(ctx, ticker, cost_per_share: float, shares_purchased: int, commission_fee=0.0):
     ticker = ticker.replace('$', '')
     portfolio = portfolio_coll.find_one({'user': ctx.author.id})
     cost = shares_purchased * cost_per_share + commission_fee
     today = str(datetime.today().date())
     if portfolio is None:
-        portfolio = {'user': ctx.author.id, 'holdings': {ticker: {
-            'total_shares': 0, 'total_cost': 0, 'average_cost': 0
-        }}, 'total_cost': 0, 'total_gain': 0,
-                     'total_equity': 0, 'ledger': []}
+        portfolio = {'user': ctx.author.id,
+                     'holdings': {},
+                     'realized_gains': 0, 'ledger': []}
+    if ticker not in portfolio['holdings']:
+        portfolio['holdings'][ticker] = {'total_shares': 0, 'average_cost': 0, 'purchases': {}}
     ticker_holdings = portfolio['holdings'][ticker]
+    price_key = str(cost_per_share).replace('.', ',')  # NOTE: keys in MongoDB can't contain '.' :/
     try:
-        todays_purchases = ticker_holdings[today]
-        try: todays_purchases[str(cost_per_share)] += shares_purchased
-        except KeyError: todays_purchases[str(cost_per_share)] = shares_purchased
+        todays_purchases = ticker_holdings['purchases'][today]
+        try: todays_purchases[price_key] += shares_purchased
+        except KeyError: todays_purchases[price_key] = shares_purchased
     except KeyError:
-        ticker_holdings[today] = {str(cost_per_share): shares_purchased}
+        ticker_holdings['purchases'][today] = {price_key: shares_purchased}
     new_total = ticker_holdings['total_shares'] + shares_purchased
     new_avg_cost = (ticker_holdings['average_cost'] * ticker_holdings['total_shares'] + cost) / new_total
     ticker_holdings['average_cost'] = new_avg_cost
     ticker_holdings['total_shares'] = new_total
-    ticker_holdings['total_cost'] = new_avg_cost * new_total
-    portfolio['total_equity'] += cost_per_share * shares_purchased
-    portfolio['total_cost'] += cost
-    portfolio['ledger'].append({today: {'ticker': ticker, 'shares': shares_purchased,
+    portfolio['realized_gains'] -= commission_fee
+    portfolio['ledger'].append({today: {'ticker': ticker, 'shares': shares_purchased, 'action': 'buy',
                                         'price': cost_per_share, 'commission_fee': commission_fee}})
     portfolio_coll.replace_one({'user': ctx.author.id}, portfolio, upsert=True)
     await ctx.send('Shares added to portfolio')
 
 
 @bot.command(aliases=['sell_stock', 'sellstock'])
-async def sell(ctx: Context, ticker, price_per_share, shares_purchased, commission_fee=0):  # TODO
+async def sell(ctx, ticker, price_per_share: float, shares_sold: int, commission_fee=0.0):  # TODO
     ticker = ticker.replace('$', '')
     portfolio = portfolio_coll.find_one({'user': ctx.author.id})
     if portfolio is not None:
-        # sort the prices in the dates by lowest to highest and remove the shares from lowest price to highest
-        await ctx.send('Shares removed to portfolio')
+        with suppress(KeyError, AssertionError):
+            ticker_holdings = portfolio['holdings'][ticker]
+            assert ticker_holdings['total_shares'] >= shares_sold
+            ticker_holdings['total_shares'] -= shares_sold
+            purchases = []
+            for date in ticker_holdings['purchases']:
+                for pair in ticker_holdings['purchases'][date].items():
+                    pair = list(pair) + [date]
+                    pair[0] = pair[0].replace(',', '.')
+                    purchases.append(list(pair) + [date])
+            purchases.sort(key=lambda item: float(item[0]))
+            cost = commission_fee
+            i = 0
+            shares_sold_copy = shares_sold
+            while shares_sold > 0:
+                shares_at_price = purchases[i][1]
+                if shares_at_price > shares_sold:
+                    purchases[i][1] -= shares_sold
+                    cost += shares_sold * float(purchases[i][0])
+                    shares_sold = 0
+                else:
+                    shares_sold -= shares_at_price
+                    cost += shares_at_price * float(purchases[i][0])
+                    purchases[i][1] = 0
+                    i += 1
+            total_cost = 0
+            for purchase in purchases:
+                if purchase[1] == 0:  # pop the purchase if there are no more shares at that price
+                    ticker_holdings['purchases'][purchase[2]].pop(purchase[0].replace('.', ','))
+                    if not ticker_holdings['purchases'][purchase[2]]:
+                        ticker_holdings['purchases'].pop(purchase[2])
+                else:  # modify purchase with new number of shares
+                    total_cost += float(purchase[0]) * purchase[1]
+                    ticker_holdings['purchases'][purchase[2]][purchase[0].replace('.', ',')] = purchase[1]
+            if ticker_holdings['total_shares']:
+                ticker_holdings['average_cost'] = total_cost/ticker_holdings['total_shares']
+            else:
+                portfolio['holdings'].pop(ticker)
+            portfolio['realized_gains'] += (shares_sold_copy * price_per_share - cost)
+            today = str(datetime.today().date())
+
+            portfolio['ledger'].append({today: {'ticker': ticker, 'shares': shares_sold_copy, 'action': 'sell',
+                                                'price': price_per_share, 'commission_fee': commission_fee}})
+            portfolio_coll.replace_one({'user': ctx.author.id}, portfolio)
+            await ctx.send('Shares removed to portfolio')
 
 
 @bot.command(aliases=['my_holdings', 'portfolio', 'my_portfolio', 'myholdings', 'myportfolio'])
@@ -1464,13 +1507,19 @@ async def holdings(ctx: Context, to_dm=False):  # TODO
 
 @bot.command(
     aliases=['export_holdings', 'export_portfolio', 'download_holdings', 'dl_portfolio', 'dl_holdings', 'dlholdings'])
-async def download_portfolio(ctx: Context, to_dm=False):  # TODO
+async def download_portfolio(ctx: Context, to_dm=True):  # TODO
     # export to a csv or xlxs file
+    # use firefox send
+    # send in a DM channel by default
     pass
+
+
+@bot.command()
+async def transactions_template(ctx):
+    await ctx.send('https://1drv.ms/x/s!AnQNFW1ohAx2hpEjhlgHkbvcaPLy2Q?e=jZCsn3')
 
 
 # TODO: daily updates of portfolio if today is not Sunday nor Saturday
 
+backup_db()
 bot.run(os.environ['DISCORD'])
-
-# TODO: 'shop', 'math'

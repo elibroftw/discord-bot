@@ -2,6 +2,7 @@
 __pycache__/
 ffmpeg/
 aria2c/
+mongodb_backup.json
 .env
 Music
 discord.log

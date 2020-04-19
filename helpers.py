@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 import glob
 import isodate
 import smtplib
+from bson.objectid import ObjectId
 from collections import OrderedDict
 from contextlib import suppress
 from email.mime.multipart import MIMEMultipart
@@ -35,6 +36,7 @@ db = db_client.discord_bot
 playlists_coll: pymongo.collection.Collection = db.playlists
 dm_coll: pymongo.collection.Collection = db.anon_messages
 portfolio_coll: pymongo.collection.Collection = db.portfolios
+# save_coll: pymongo.collection.Collection = db.save_coll  # saving the state of the bot instead of a save.json
 
 
 class Song:
@@ -494,6 +496,31 @@ def format_time_ffmpeg(s):
     mins = int(total_minutes % 60 - (sec / 3600) - (msec / 3600000))
     hours = int(total_hours - (mins / 60) - (sec / 3600) - (msec / 3600000))
     return "{:02d}:{:02d}:{:02d}".format(hours, mins, sec)
+
+
+def backup_db():
+    # should be run every startup
+    backup = {}
+    for collection in db.list_collection_names():
+        cursor = db[collection].find({})
+        backup[collection] = [document for document in cursor]
+
+    def _default(o):
+        if isinstance(o, ObjectId):
+            return str(o)
+        return json.JSONEncoder.default(o)
+
+    with open('mongodb_backup.json', 'w') as fp:
+        json.dump(backup, fp, default=_default)  # no indent because that takes up space
+
+
+def db_from_backup(filename='mongodb_backup.json'):
+    with open(filename) as fp:
+        backup = json.load(fp)
+    for collection_name in backup:
+        collection: pymongo.collection.Collection = db[collection_name]
+        collection.drop()
+        for document in backup[collection_name]: collection.insert_one(document)
 
 
 if __name__ == "__main__":
