@@ -1,9 +1,28 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.4.2
+Version: 1.4.4
 Created: April 3rd 2020
-Updated: April 18th 2020
+Updated: April 19th 2020
+
+CHANGELOG
+1.4
+Added get_ticker_info
+- gets the latest price and the change for the ticker
+Added CARS sector
+
+1.3
+Added OIL sector
+
+1.2
+Added TSX
+ADded Mortgage REIT's sector
+Added price-earnings ratio
+Added basic caching features
+Making top_movers_and_losers to be more versatile
+
+1.1
+Added DOW
 """
 
 import calendar
@@ -27,18 +46,19 @@ import yfinance as yf
 NASDAQ_TICKERS_URL = 'https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nasdaq&render=download'
 NYSE_TICKERS_URL = 'https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nyse&render=download'
 global_data = {}
-stock_list = []
+us_stock_list = []
+
 REQUEST_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:75.0) Gecko/20100101 Firefox/75.0'}
 
 
-def load_cache(filename='cache.json'):
+def load_cache(filename='investing_cache.json'):
     global global_data
     with suppress(FileNotFoundError):
         with open(filename) as f:
             global_data = json.load(f)
 
 
-def save_cache(filename='cache.json'):
+def save_cache(filename='investing_cache.json'):
     def default(obj):
         if isinstance(obj, set):
             return list(obj)
@@ -104,11 +124,19 @@ def tickers_from_csv(url, name=''):
 
 
 def get_company_name_from_ticker(ticker: str):
-    global stock_list
-    if not stock_list:
-        r = requests.get('https://api.iextrading.com/1.0/ref-data/symbols')
-        stock_list = r.json()
-    return process.extractOne(ticker, stock_list)[0]
+    global us_stock_list
+    if ticker.count('.TO'):
+        ticker = ticker.replace('.TO', '')
+        r = requests.get(f'https://www.tsx.com/json/company-directory/search/tsx/{ticker}')
+        results = {s['symbol']: s for s in r.json()['results']}
+        best_match = process.extractOne(ticker, list(results.keys()))[0]
+        return results[best_match]
+    else:
+        if not us_stock_list:
+            r = requests.get('https://api.iextrading.com/1.0/ref-data/symbols')
+            us_stock_list = {s['symbol']: s for s in r.json()}
+        best_match = process.extractOne(ticker, list(us_stock_list.keys()))[0]
+        return us_stock_list[best_match]
 
 
 def get_ticker_info(ticker: str, round_values=True) -> dict:
@@ -132,10 +160,9 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
         change = round(change, 4)
         percent_change = round(change/closing_price * 100, 2)
         latest_price = round(latest_price, 4)
-        closing_price = round(closing_price, 4)
     else: percent_change = change/closing_price * 100
     name = get_company_name_from_ticker(ticker)['name']
-    info = {'name': name, 'price': latest_price, 'change': change, 'percent_change': percent_change, 'timestamp': timestamp, 'symbol': ticker, 'last_close_price': closing_price}
+    info = {'name': name, 'price': latest_price, 'change': change, 'percent_change': percent_change, 'timestamp': timestamp, 'symbol': ticker}
     return info
 
 
@@ -304,4 +331,3 @@ def get_tickers(market):
 
 
 load_cache()  # IGNORE. This loads cache from cache.json if the file exists
-

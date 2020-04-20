@@ -1,22 +1,24 @@
 # Discord Bot (Works best self hosted)
-A discord bot (called El Chapo) I made using the `discord.py` module and is self hosted. 
-This bot is tailored towards being a custom bot for one server rather than one bot for 
-multiple servers (edge cases where downloading songs is blocking).
-I am not liable for any illegal activities one conducts using my bot or my code.
+A discord bot (called El Chapo) I made for my personal server.
+Rather than having a sole purpose, this bot is aimed at being doing all tasks I want it to do. I made it for a singular
+server so it may not work for multiple servers (regarding the music playing features).
 
 # Features
 For more info, view [bot.py](../master/bot.py)
 
-- Tic-Tac-Toe (Difficulty set to impossible)
-- Youtube search
-- Anonymous DM's
+- Admin uses
+    - Clear chat (!clear int)
+        - Can clear up to 100 messages in chat (at the moment)
+    - Ban (!ban nick/username)
+    - Get creation date of user (!created_at <user=YOU>)
+- Anonymous Messaging Service
     - Send a dm to a user (!dm <user/nick> <message>) // send it to the bot
     - Reply to a dm (!re <thread_id> <message>)
     - Enable anonymous messages (!enable)
     - Disable anonymous messages (!disable)
     - Toggle status (!anontoggle, !anon)  // Future replacement
     - See if you are opted in or out of the messages (!anonstatus)
-- Plays music (Working but adding features)
+- Listen to Music
     - Summon (!summon, !play <query/youtube_url>)
     - Play or Add to queue (!play, !p)
     - Play next (adds the song to play right after, will rework this later !pn, !play_next)
@@ -50,18 +52,22 @@ For more info, view [bot.py](../master/bot.py)
         - !v -  # decrease volume by 10
     - Leave Voice chat (!leave, !disconnect, !unsummon, !desummon, !dismiss)
 - Investing Tools
-    - Get price of a ticker (!ticker <ticker>)
+    - Get the price of a stock (!stock <ticker>)
     - Add shares to portfolio (!buy <ticker> <cost_per_share> <shares> <commission_fee=0>)
     - Remove shares from portfolio (!sell <ticker> <price_per_share> <shares> <commission_fee=0>)
     - View your portfolio (!holdings <to_dm=False>)
     - Get a copy of your portfolio/transactions (!dlholdings <to_dm=True>)
-    
-- Twitter search (rework pending)
-- Admin uses
-    - clearing (!clear int)
-    - Can clear up to 100 messages in chat (needs Admin obviously)
-    - Banning (!ban nick/username)
-    - Get creation date of user (!created_at, !create_date, query is optional)
+- Games (!games)
+    - Tic-Tac-Toe (Difficulty is impossible)
+        - Use !ttt to start a match
+    - Shift (!shift)
+        - A game my friend and I made (sends a link to the chat)
+- Youtube Search
+    - Search for a video (!yt, !youtube)
+    - See "Listen to Music" for playing songs from YouTube
+- Twitter (DISABLED; Rework pending)
+    - Get the latest tweet from a user (!twitter <user>)
+    - Search for a twitter user (!tu_search <query>)
 
 # Future
 - Set and get invite codes (currently only gets my invite code)
@@ -70,13 +76,14 @@ For more info, view [bot.py](../master/bot.py)
     - All playlists can be used by other people using the bot
 
 # Installation
-1. Clone repoistory
-2. Have [MongoDB](https://www.mongodb.com/what-is-mongodb) installed
-3. Have [FFmpeg](https://www.ffmpeg.org/download.html) binaries in `discord-bot/ffmpeg/bin`
-4. Only tested on Windows
-5. `pip install -r requirements.txt`
-6. If you want to run on Windows boot, import and edit "Discord Bot.xml" in Task Scheduler. OR
+Note that this bot has only been tested on Windows
+1. Clone the repository
+2. Have [MongoDB Community 4.2.X](https://www.mongodb.com/download-center/community) installed
+3. Have [FFmpeg](https://www.ffmpeg.org/download.html) binaries located in `discord-bot/ffmpeg/bin`
+4. Have [aria2c](https://github.com/aria2/aria2/releases) downloaded to path `discord-bot/aria2c.exe` (Optional)
+5. Do `pip install -r requirements.txt` in the terminal of the current directory
+6. If you want to run on Windows boot, import and edit "Discord Bot.xml" in Task Scheduler OR
 7. Click [here](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8) to start from scratch
 
-[Test the bot](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
+[Test the bot yourself](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
 WARNING: bot is not always online

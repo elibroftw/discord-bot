@@ -1,11 +1,12 @@
 .idea/
 __pycache__/
 ffmpeg/
-aria2c/
-mongodb_backup.json
+music/
+aria2c.exe
 .env
-Music
-discord.log
 .vscode
+discord.log
+mongodb_backup.json
 save.json
+investing_cache.json
 test.py

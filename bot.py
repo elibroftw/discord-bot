@@ -4,7 +4,7 @@ from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
-from discord.ext.commands import has_permissions, Context
+from discord.ext.commands import has_permissions, Context, CommandNotFound, CheckFailure
 import ffsend
 import logging
 from math import ceil
@@ -19,12 +19,16 @@ from investing import get_ticker_info
 
 
 # Check if script is already running
-script = os.path.basename(__file__) # or basename
+script = os.path.basename(__file__)
 for q in psutil.process_iter():
     if q.name().startswith('python'):
-        script_in_items = [item for item in q.cmdline() if script in item]
-        if q.pid != os.getpid() and script_in_items:
-            print(f"Bot is already running!")
+        try:
+            script_in_items = [item for item in q.cmdline() if script in item]
+            if q.pid != os.getpid() and script_in_items:
+                print(f'Bot is already running!')
+                sys.exit()
+        except psutil.AccessDenied:
+            print('Bot is malfunctioning. Try to stop it in Task Manager')
             sys.exit()
 
 logger = logging.getLogger('discord')
@@ -37,25 +41,20 @@ bot.remove_command('help')
 bot.command()
 load_opus_lib()
 
-invitation_code = os.environ['INVITATION_CODE']
-my_guild_id = int(os.environ['GUILD_ID'])
-my_user_id = int(os.environ['USER_ID'])
+INVITATION_CODE = os.environ['INVITATION_CODE']
+MY_GUILD_ID = int(os.environ['GUILD_ID'])
+MY_USER_ID = int(os.environ['USER_ID'])
+BLUE = discord.Color.blue()
+TWITTER_BLUE = discord.Color(5631660)
 
 tic_tac_toe_data = {}
-ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 data_dict = {'downloads': {}}
-
-if not os.path.exists('Music'):
-    os.mkdir('Music')
+with suppress(FileExistsError): os.mkdir('music')
 
 
-def create_embed(title, description='', color=discord.Color.blue()):
-    return discord.Embed(title=title, description=description, color=color)
-
-
-def run_coro(coro: asyncio.coroutine):
-    # e.g. coro = bot.change_presence(activity=discord.Game('Prison Break (!)'))
-    fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+def run_coroutine(coroutine: asyncio.coroutine):
+    # e.g. coroutine = bot.change_presence(activity=discord.Game('Prison Break (!)'))
+    fut = asyncio.run_coroutine_threadsafe(coroutine, bot.loop)
     return fut.result()
 
 
@@ -75,13 +74,13 @@ async def has_vc(ctx):
 async def on_ready():
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
-    save = {'data_dict': {}}
+    _save_dict = {'data_dict': {}}
     with suppress(FileNotFoundError):
         if os.path.exists('save.json'):
             with open('save.json') as f:
-                save = json.load(f)
+                _save_dict = json.load(f)
         os.remove('save.json')
-    for k, v in save['data_dict'].items():
+    for k, v in _save_dict['data_dict'].items():
         if k != 'downloads':
             mq = v['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in v['music']]
             v['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in v['done']]
@@ -118,13 +117,13 @@ async def on_message(message):
     if message.content.startswith('!RUN'): await message.channel.send('I GOT EXTRADITED! :(')
     elif message.content.lower().startswith('!run'): await message.channel.send('N o t  h y p e  e n o u g h')
     else:
-        with suppress(discord.ext.commands.errors.CommandNotFound): await bot.process_commands(message)
+        with suppress(CommandNotFound): await bot.process_commands(message)
 
 
 # noinspection PyUnusedLocal
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, (commands.errors.CommandNotFound,)): return
+    if isinstance(error, (CommandNotFound, CheckFailure)): return
     if error == KeyboardInterrupt:
         await bot.logout()
         return
@@ -133,24 +132,6 @@ async def on_command_error(ctx, error):
 
 @bot.command(name='help')
 async def _help(ctx):
-    # TODO: rich embed
-    # embed = discord.Embed(title="Showing All Commands:", color=0x267d28)
-    # # DM Command
-    # embed.add_field(
-    #     name="dm", value="Sends anonymous message to a user\n***Usage***: !dm 'username#0000' 'message'", inline=False)
-    # # Reply Command
-    # embed.add_field(
-    #     name="reply", value="Replies a message you received\n***Usage***: !reply 'thread id' 'message'", inline=False)
-    # # Enable Messages Command
-    # embed.add_field(
-    #     name="enable", value="Enables anonymous messaging\n***Usage***: !enable", inline=False)
-    # # Disable Messages
-    # embed.add_field(
-    #     name="disable", value="Disables anonymous messaging\n***Usage***: !disable", inline=False)
-    # # Checks the status of anon messaging
-    # embed.add_field(
-    #     name="status", value="Checks the status of anonymous messaging\n***Usage***: !status", inline=False)
-    # await ctx.send(embed=embed)
     await ctx.author.send('Check out my commands here: https://github.com/elibroftw/discord-bot/blob/master/README.md')
 
 
@@ -158,7 +139,7 @@ async def _help(ctx):
 async def about(ctx):
     ctx.author.send(f'Hi there. Thank you for inquiring about me. I was made by Elijah Lopez.\n'
                     'For more information visit https://github.com/elibroftw/discord-bot.\n'
-                    f'Join my server at https://discord.gg/{invitation_code})')
+                    f'Join my server at https://discord.gg/{INVITATION_CODE})')
 
 
 def save_to_file():
@@ -183,13 +164,13 @@ def save_to_file():
 
 @bot.command()
 async def save(ctx):
-    if ctx.author.id == my_user_id:
+    if ctx.author.id == MY_USER_ID:
         save_to_file()
 
 
 @bot.command(name='exit', aliases=['quit'])
 async def _exit(ctx, _save=True):
-    if ctx.author.id == my_user_id:
+    if ctx.author.id == MY_USER_ID:
         await bot.change_presence(activity=discord.Game('Exiting...'))
         if _save: save_to_file()
         for voice_client in bot.voice_clients:
@@ -202,7 +183,7 @@ async def _exit(ctx, _save=True):
 
 @bot.command()
 async def restart(ctx, _save=True):
-    if ctx.author.id == my_user_id:
+    if ctx.author.id == MY_USER_ID:
         print('Restarting')
         await bot.change_presence(activity=discord.Game('Restarting...'))
         if _save: save_to_file()
@@ -265,7 +246,7 @@ async def ban(ctx):
 
 @bot.command(name='eval')
 async def _eval(ctx):
-    if ctx.author.id == my_user_id:
+    if ctx.author.id == MY_USER_ID:
         await ctx.send(str(eval(ctx.message.content[6:])))
         print(f'{ctx.message.author} used eval')
 
@@ -291,7 +272,6 @@ async def create_role(ctx):
 @bot.command(aliases=['addrole', 'giverole'])
 @has_permissions(manage_roles=True)
 async def add_role(ctx):
-    # TODO: must be comma separated values
     message = ctx.message.content.split()[1:]
     if len(message) > 1:
         guild = ctx.guild
@@ -316,7 +296,12 @@ async def add_role(ctx):
 #     raise NotImplementedError
 
 
-@bot.command()  # TODO: create_channel
+@bot.command()  # TODO:
+async def create_channel(ctx):
+    pass
+
+
+@bot.command()
 async def delete_channel(ctx):
     if str(ctx.message.author.top_role) == 'Admin':
         msg_content = ctx.message.content[16:]
@@ -334,12 +319,12 @@ async def delete_channel(ctx):
 
 @bot.command()
 async def hi(ctx):
-    await ctx.send("Hey there" + " " + ctx.message.author.name + "!")
+    await ctx.send(f'Hey there {ctx.message.author.name}!')
 
 
 @bot.command()
 async def sleep(ctx):
-    if ctx.message.author.id == my_user_id:
+    if ctx.message.author.id == MY_USER_ID:
         try: secs = int(ctx.message.content[7:])
         except ValueError: secs = 5
         await asyncio.sleep(secs)
@@ -352,26 +337,50 @@ async def balance(ctx):
     await ctx.message.delete()
 
 
-# @bot.command(aliases=['gettweet', 'get_tweet'])
-# async def twitter(ctx, statuses=1):
-#     msg = discord_get_tweet_from(ctx.message.content[ctx.message.content.index(' ') + 1:])
-#     await ctx.send(msg)
-#
-#
-# @bot.command(aliases=['searchuser' 'search_user'])
-# async def search_twitter_user(ctx):
-#     text = ctx.message.content[ctx.message.content.index(' ') + 1:]  #  except ValueError
-#     bot_message = discord_search_twitter_user(text)
-#     await ctx.send(bot_message)
-# search_users()
+@bot.command(aliases=['gettweet', 'get_tweet'])
+async def twitter(ctx: Context):
+    text = ctx.message.content[ctx.message.content.index(' ') + 1:]
+    try:
+        p = text.index(' --')  # p: parameter
+        twitter_user = text[0:p]
+        num = max(int(text[p + 3:]), 1)
+    except (ValueError, IndexError):
+        num = 1
+        twitter_user = text[0:]
+    try:
+        try: twitter_user = twitter_get_screen_name(twitter_user)
+        except tweepy.TweepError: twitter_user = twitter_search_user(twitter_user)[0][1]
+        links_to_tweets = twitter_get_tweets(twitter_user, quantity=num)
+        if num == 1:
+            title = f'Latest tweet from @{twitter_user}'
+        else:
+            title = f'Latest tweets from @{twitter_user}'
+        msg = ''
+        for i, link in enumerate(links_to_tweets):
+            if i == 0: msg += link
+            else: msg += '\n<' + link + '>'
+        embed = discord.Embed(title=title, description=msg, color=TWITTER_BLUE)
+        await ctx.send(embed=embed)
+    except IndexError:
+        await ctx.send('Could not find the user specified')
+
+
+@bot.command(aliases=['tu_search'])
+async def search_twitter_user(ctx):
+    text = ctx.message.content[ctx.message.content.index(' ') + 1:]
+    users = twitter_search_user(text)
+    msg = ''
+    for name, screenName in users:
+        msg += f'\n{name} | @{screenName}'
+    embed = discord.Embed(title='Twitter Users [Display Name | Screen name]', description=msg,
+                          color=TWITTER_BLUE)
+    await ctx.send(embed=embed)
 
 
 @bot.command(aliases=['yt'])
 async def youtube(ctx):
-    try:
-        url = youtube_search(' '.join(ctx.message.content.split()[1:]))
-    except IndexError:
-        url = 'No Video Found'
+    try: url = youtube_search(' '.join(ctx.message.content.split()[1:]))
+    except IndexError: url = 'No Video Found'
     await ctx.send(url)
 
 
@@ -382,8 +391,8 @@ async def thank(ctx):
 
 @bot.command(aliases=['invite', 'invitecode', 'invite_link', 'invitelink'])
 async def invite_code(ctx):
-    if ctx.guild.id == my_guild_id:
-        await ctx.send(f'https://discord.gg/{invitation_code}')
+    if ctx.guild.id == MY_GUILD_ID:
+        await ctx.send(f'https://discord.gg/{INVITATION_CODE}')
     else:
         with suppress(IndexError):
             await ctx.send(ctx.guild.invites()[0].url)
@@ -396,7 +405,6 @@ async def games(ctx):
 
 @bot.command(aliases=['tic_tac_toe'])
 async def ttt(ctx):
-    # TODO: add different difficulties
     global tic_tac_toe_data
     author: discord.User = ctx.message.author
     if tic_tac_toe_data.get(author, {'in_game': False})['in_game']:
@@ -453,7 +461,7 @@ async def ttt(ctx):
                                 if author_data['round'] == 5:
                                     await author.send(f'Your Move{temp_msg + tempt}')
                                 else: await author.send(f'Your Move{temp_msg}My Move{tempt}')
-                            else:  # TODO: rich embed???
+                            else:
                                 await author.send(f'Your Move{temp_msg}My Move{tempt}\nEnter your move (#)')
                             author_data['round'] += 1
             except asyncio.TimeoutError:
@@ -465,7 +473,7 @@ async def shift(ctx):
     await ctx.send('https://elibroftw.itch.io/shift')
 
 
-@bot.command(aliases=['create_date', 'createdat', 'createdate'])
+@bot.command(aliases=['create_date', 'createdat', 'creation_date', 'date_created', 'discord_birth'])
 async def created_at(ctx):
     args = ctx.message.content.split()
     if len(args) > 1:
@@ -499,28 +507,38 @@ async def summon(ctx):
         return voice_client
 
 
-# @bot.command(aliases=['dl'])
-# async def download(ctx):  # TODO: download url/query
-#     pass
-
-
-@bot.command(aliases=['dls'])
-@commands.check(in_guild)
-async def download_song(ctx, index=0):
-    guild = ctx.guild
-    guild_data = data_dict[guild.id]
-    if index >= 0: que = guild_data['music']
-    else:
-        que = guild_data['done']
-        index = -index - 1
-    with suppress(IndexError):
-        song = que[index]
-        file = f'Music/{song.get_video_id()}.mp3'
-        url = ffsend.upload('https://send.firefox.com/', song.title + '.mp3', file)[0]
-        msg = await ctx.author.send('Uploading the song')
-        content = f'Here is the download link <{url}>. You can rename the file and set the metadata and album art ' \
-                  '(Spotify API) using this metadata editor <https://github.com/elibroftw/mp3-editor>'
-        await msg.edit(content=content, file=file)
+# async def download_in_background(video_id, callback=None, callback_args=None, on_exception=None):  # TODO:
+#     music_filename = f'music/{video_id}.mp3'
+#
+#     def _callback(future: asyncio.Future):
+#         exc = future.exception()
+#         if len(future._callbacks) == 1:
+#             pass
+#         if exc:
+#             on_exception(future)
+#             return
+#         if callback is not None:
+#             if isinstance(callback_args, dict):
+#                 callback(**callback_args)
+#             else:
+#                 callback()
+#
+#     if video_id in data_dict['downloads']:
+#         result = data_dict['downloads'][video_id][0]
+#         result.add_done_callback(_callback)
+#     elif not os.path.exists(music_filename):
+#         result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
+#         result.add_done_callback(_callback)
+#         return
+#     # file exists already
+#     if callback is not None:
+#         if isinstance(callback_args, dict):
+#             callback(**callback_args)
+#         else:
+#             callback()
+#
+#     result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
+#     result.add_done_callback(_callback)
 
 
 async def download_if_not_exists(ctx, title, video_id, play_next=False):
@@ -530,9 +548,9 @@ async def download_if_not_exists(ctx, title, video_id, play_next=False):
     returns None if it exists, or discord.Message object of the downloading title if it doesn't
     """
 
-    music_filepath = f'Music/{video_id}.mp3'
+    music_filename = f'music/{video_id}.mp3'
     m = None
-    if not os.path.exists(music_filepath) and video_id not in data_dict['downloads']:
+    if not os.path.exists(music_filename) and video_id not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
 
         def callback(future):
@@ -540,26 +558,29 @@ async def download_if_not_exists(ctx, title, video_id, play_next=False):
             exc = future.exception()
             music_queue = data_dict[ctx.guild.id]['music']
             latest_id = music_queue[0].get_video_id()
-            
+
             if exc:
                 if latest_id == video_id:
                     music_queue.pop(0)
                     bot.loop.create_task(play_file(ctx))
                 else:
                     music_queue.remove(Song(title, video_id))
-                bot.loop.create_task(m.edit(content=f'Video `{title}` with id `{video_id}` was deleted', delete_after=5))
+                new_content = f'Video `{title}` with id `{video_id}` was deleted'
+                bot.loop.create_task(m.edit(content=new_content, delete_after=5))
                 return
             elif latest_id == video_id:
                 bot.loop.create_task(m.edit(content=f'Downloaded `{title}`', delete_after=5))
                 bot.loop.create_task(play_file(ctx))
                 return
-            elif play_next: msg_content = f'Added `{title}` to next up'
-            else: msg_content = f'Added `{title}` to the playing queue'
+            elif play_next:
+                msg_content = f'Added `{title}` to next up'
+            else:
+                msg_content = f'Added `{title}` to the playing queue'
             bot.loop.create_task(m.edit(content=msg_content))
 
         result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
         result.add_done_callback(callback)
-        data_dict['downloads'][video_id] = (result, m)
+        data_dict['downloads'][video_id] = [result, m]
     return m
 
 
@@ -578,21 +599,50 @@ async def download_related_video(ctx):
         related_m = await download_if_not_exists(ctx, related_title, related_video_id)
         related_msg_content = f'Added `{related_title}` to the playing queue'
         if not related_m: await ctx.send(related_msg_content)
-download_next_song = download_related_video
+
+
+@bot.command(aliases=['dls'])
+@commands.check(in_guild)
+async def download_song(ctx, index=0):
+    args = ctx.message.content.split()
+    is_query = False
+    # if len(args) <= 2:
+    try:
+        index = 0 if len(args) == 1 else int(args[1])
+        guild = ctx.guild
+        guild_data = data_dict[guild.id]
+        if index >= 0:  que = guild_data['music']
+        else:
+            que = guild_data['done']
+            index = -index - 1
+        try: song = que[index]
+        except IndexError:
+            return await ctx.send('Invalid index argument')
+    except ValueError:
+        is_query = True
+        return
+    if len(args) > 1 or is_query:
+        query = ' '.join(args[1:])
+    file = f'music/{song.get_video_id()}.mp3'
+    url = ffsend.upload('https://send.firefox.com/', song.title + '.mp3', file)[0]
+    msg = await ctx.author.send('Uploading the song')
+    content = f'Here is the download link <{url}>. You can rename the file and set the metadata and album art ' \
+              '(Spotify API) using this metadata editor <https://github.com/elibroftw/mp3-editor>'
+    await msg.edit(content=content, file=file)
 
 
 @bot.command(aliases=['mute'])
 @commands.check(in_guild)
 async def quiet(ctx):
+    """ mute any music related output """
     guild_data = data_dict[ctx.guild.id]
     guild_data['output'] = not guild_data['output']
 
 
 def create_audio_source(guild_data, song, start_at=0.0):
     # -af silenceremove=start_periods=1:stop_periods=1:detection=peak
-    music_filepath = f'Music/{song.get_video_id()}.mp3'
-    audio_source = FFmpegPCMAudio(music_filepath, executable=ffmpeg_path,
-                                  before_options=f'-nostdin -ss {format_time_ffmpeg(start_at)}',
+    filename = f'music/{song.get_video_id()}.mp3'
+    audio_source = FFmpegPCMAudio(filename, before_options=f'-nostdin -ss {format_time_ffmpeg(start_at)}',
                                   options='-vn -b:a 128k')
     audio_source = PCMVolumeTransformer(audio_source)
     audio_source.volume = guild_data['volume']
@@ -637,18 +687,18 @@ async def play_file(ctx, start_at=0):
                         next_title, next_video_id = get_related_video(last_song.get_video_id(), dq)[1:]
                         next_song = Song(next_title, next_video_id)
                         mq.append(next_song)
-                        next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id))
+                        next_m = run_coroutine(download_if_not_exists(ctx, next_title, next_video_id))
                     else:  # if mq, check if the next song is downloading
                         next_song = mq[0]
                         next_video_id = next_song.get_video_id()
                         next_title = next_song.title
                         next_result, next_m = data_dict['downloads'].get(next_video_id, (None, None))
                         if next_result:
-                            # run_coro(next_result)
+                            # run_coroutine(next_result)
                             return
                         else:
-                            # TODO TEST 
-                            next_m = run_coro(download_if_not_exists(ctx, next_title, next_video_id))
+                            # TODO test
+                            next_m = run_coroutine(download_if_not_exists(ctx, next_title, next_video_id))
                         if next_m is None:
                             vc.play(create_audio_source(guild_data, next_song), after=after_play)
                             next_song.start(0)
@@ -656,14 +706,13 @@ async def play_file(ctx, start_at=0):
                             guild_data['is_stopped'] = False
                             if guild_data['output']:
                                 next_msg_content = f'Now playing `{next_title}` {next_time_stamp}'
-                                if next_m: run_coro(next_m.edit(content=next_msg_content))
-                                elif not guild_data['repeat'] and not next_m: run_coro(ctx.send(next_msg_content))
-                                
-                            run_coro(bot.change_presence(activity=discord.Game(next_title)))
-                            run_coro(download_related_video(ctx))
+                                if next_m: run_coroutine(next_m.edit(content=next_msg_content))
+                                elif not guild_data['repeat'] and not next_m: run_coroutine(ctx.send(next_msg_content))
+                            run_coroutine(bot.change_presence(activity=discord.Game(next_title)))
+                            run_coroutine(download_related_video(ctx))
             else:
-                run_coro(bot.change_presence(activity=discord.Game('Prison Break (!)')))
-                if len(vc.channel.members) == 1: run_coro(vc.disconnect())
+                run_coroutine(bot.change_presence(activity=discord.Game('Prison Break (!)')))
+                if len(vc.channel.members) == 1: run_coroutine(vc.disconnect())
 
     if vc and upcoming_tracks:
         song = upcoming_tracks[0]
@@ -671,7 +720,7 @@ async def play_file(ctx, start_at=0):
         video_id = song.get_video_id()
         result, m = data_dict['downloads'].get(video_id, (None, None))
         if result:
-            # TODO: test this
+            # TODO: test?
             # await result
             return
         m = await download_if_not_exists(ctx, title, video_id)
@@ -699,8 +748,6 @@ async def play_file(ctx, start_at=0):
 @bot.command(aliases=['paly', 'p', 'P', 'pap', 'pn', 'play_next', 'playnext'])
 @commands.check(in_guild)
 async def play(ctx):
-    # TODO: use a db to determine which files get constantly queued (db should be title: video_id, times_queued)
-    #   if I make a public bot
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     ctx_msg_content = ctx.message.content
@@ -710,18 +757,18 @@ async def play(ctx):
     mq = guild_data['music']
     if voice_client is None: voice_client = await bot.get_command('summon').callback(ctx)
     url_or_query = ctx.message.content.split()
-    # TODO: test https://www.youtube.com/watch?v=oEAjv2vgUGc
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
         video_id = get_video_id(url_or_query)
         if video_id is not None:
-            # TODO: playlist support
-            title = get_youtube_title(video_id)
+            title = get_video_title(video_id)
             if get_video_duration(video_id) > 1800:
                 await ctx.send('That song is too long! (> 30 minutes)')
                 return
         elif url_or_query.startswith('https://www.youtube.com/playlist'):
-            songs = get_songs_from_youtube_playlist(url_or_query)[0]
+            playlist_id = parse_qs(parse.urlsplit(url_or_query).query)['list'][0]
+            songs = get_videos_from_playlist(playlist_id, return_title=True)[0]
+            # songs = get_songs_from_youtube_playlist(url_or_query)[0]
             if songs:
                 mq.extend(songs)
                 await ctx.send('Songs added to queue!')
@@ -842,7 +889,6 @@ def no_after_play(guild_data, voice_client):
         guild_data['is_stopped'] = True
         guild_data['music'][0].stop()
         voice_client.stop()
-        # TODO: move the song to the dq? Check ever no_after_play
 
 
 @bot.command(aliases=['next', 'n', 'N', 'sk'])
@@ -1002,9 +1048,9 @@ async def next_up(ctx, page=1):
         if mq_length > i:
             msg += '\n...'
 
-        embed = create_embed(title, description=msg)
+        embed = discord.Embed(title=title, description=msg, color=BLUE)
         await ctx.send(embed=embed)
-    else: await ctx.send(embed=create_embed('MUSIC QUEUE IS EMPTY'))
+    else: await ctx.send(embed=discord.Embed(title='MUSIC QUEUE IS EMPTY', description='', color=BLUE))
 
 
 @bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
@@ -1027,8 +1073,7 @@ async def _recently_played(ctx, page=1):
         if dq_length > i:
             msg += '\n...'
 
-        embed = create_embed(title, description=msg)
-        await ctx.send(embed=embed)
+        await ctx.send(embed=discord.Embed(title=title, description=msg, color=BLUE))
     else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
 
 
@@ -1157,7 +1202,6 @@ async def save_as(ctx):
         else: await ctx.send(f'Successfully updated playlist `{playlist_name}`!')
 
 
-# TODO: add options so that a person can play someone elses playlist
 # for example, --creator <name/id>
 # and also !pp <post_id>
 @bot.command(aliases=['pp', 'sp'])
@@ -1183,8 +1227,6 @@ async def play_playlist(ctx):
         else: await ctx.send('No playlist found with that name')
 
 
-# TODO: test with invalid playlist_id
-# TODO: add options so that a person can load someone elses playlist
 @bot.command(aliases=['lp', 'load_pl', 'load', 'l'])
 @commands.check(in_guild)
 async def load_playlist(ctx):
@@ -1210,8 +1252,7 @@ async def view_playlist(ctx):
                 msg += f'\n`{i + 1}.` {song.title}'
             if pl_length > 10: msg += '\n...'
             title = f"PLAYLIST {playlist_name} | {pl_length} Song{'s' if pl_length > 1 else ''}"
-            embed = create_embed(title, description=msg)
-            await ctx.send(embed=embed)
+            await ctx.send(embed=discord.Embed(title=title, description=msg, color=BLUE))
         else: await ctx.send('No playlist found with that name')
 
 
@@ -1235,7 +1276,7 @@ async def browse_playlists(ctx, page=1):
             temp_creators[creator_id] = creator
         msg += f"`{playlist['playlist_name']}` by {temp_creators[creator_id]}\n"
     msg.strip()
-    embed = create_embed(f'PLAYLISTS INDEX | Page {page} of {max_pages}', description=msg)
+    embed = discord.Embed(title=f'PLAYLISTS INDEX | Page {page} of {max_pages}', description=msg, color=BLUE)
     await ctx.send(embed=embed)
 
 
@@ -1244,10 +1285,8 @@ async def delete_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
     if playlist_name:
         r = playlists_coll.delete_one({'playlist_name': playlist_name, 'creator_id': ctx.author.id})
-        if r.deleted_count:
-            await ctx.send(f'Deleted playlist `{playlist_name}``')
-        else:
-            await ctx.send(f'No playlist found with that name')
+        if r.deleted_count: await ctx.send(f'Deleted playlist `{playlist_name}``')
+        else: await ctx.send(f'No playlist found with that name')
 
 
 @bot.command(aliases=['mp'])
@@ -1258,8 +1297,7 @@ async def my_playlists(ctx):
         number = len(playlist['songs'])
         if number == 1: msg += f"\n`{playlist['playlist_name']}` - 1 Song"
         else: msg += f"\n`{playlist['playlist_name']}` - {number} Songs"
-    embed = create_embed(f'You have {result.count()} playlists', description=msg)
-    await ctx.send(embed=embed)
+    await ctx.send(embed=discord.Embed(title=f'You have {result.count()} playlists', description=msg, color=BLUE))
 
 
 @bot.command()
@@ -1274,7 +1312,6 @@ async def has_nick(ctx):
 
 @bot.command(aliases=['DM', 'Dm', 'msg', 'MSG'])
 async def dm(ctx):
-    # TODO: in chat dm
     args = ctx.message.content.split()
     if len(args) > 2:
         receiver, message = args[1], ' '.join(args[2:])
@@ -1299,24 +1336,30 @@ async def dm(ctx):
                 receiver_id = receiver.id
                 # check if user has anonymous messaging enabled
                 user_settings = dm_coll.find_one({'user_id': receiver_id, 'type': 'user_settings'})
-                if user_settings:
-                    allows_messages = user_settings['allows_messages']
+                if user_settings: allows_messages = user_settings['allows_messages']
                 else:
                     dm_coll.insert_one({'user_id': receiver_id, 'type': 'user_settings', 'allows_messages': True})
                     allows_messages = True
                 if allows_messages:
                     sender_id = ctx.author.id
-                    message_thread = True
+                    message_thread = dm_coll.find_one({'sender': sender_id, 'receiver': receiver_id})
+                    if message_thread: thread_id = message_thread['thread_id']
+                    else:
+                        thread_id = 0
+                        message_thread = True
                     while message_thread is not None:
-                        thread_id = randint(1, 9999999)
+                        thread_id = randint(0, 16777215)
                         message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
-                    # TODO: make thead_id the color? how cool would that be?
-                    dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id, 'type': 'message_thread'})
-                    embed = discord.Embed(title='Message Received :mailbox_with_mail:', color=0xe74c3c, description=f'Reply with `!reply {thread_id} <msg>`')
+                    dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id,
+                                        'type': 'message_thread'})
+                    thread_id_color = discord.Color(thread_id)
+                    thread_id = str(thread_id)
+                    embed = discord.Embed(title='Message Received :mailbox_with_mail:', color=thread_id_color,
+                                          description=f'Reply with `!reply {thread_id} <msg>`')
                     embed.add_field(name='Thread ID:', value=thread_id, inline=True)
                     embed.add_field(name='Message:', value=message, inline=True)
                     await receiver.send(embed=embed)
-                    embed = discord.Embed(title='Message Sent :airplane:', color=0x2ecc71)
+                    embed = discord.Embed(title='Message Sent :airplane:', color=thread_id_color)
                     embed.add_field(name='To:', value=str(receiver))
                     embed.add_field(name='Thread ID:', value=thread_id)
                     await ctx.author.send(embed=embed)
@@ -1336,7 +1379,7 @@ async def reply(ctx):
     if isinstance(ctx.channel, discord.DMChannel):
         args = ctx.message.content.split()
         if len(args) > 2:
-            thread_id, message = args[1], ' '.join(args[2:])
+            thread_id, message = int(args[1]), ' '.join(args[2:])
             user = ctx.author
             sender_id = user.id
             message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
@@ -1347,15 +1390,17 @@ async def reply(ctx):
                     receiver_id = message_thread['sender']
                 else:
                     embed_title = 'You got another message'
-                embed = discord.Embed(title=embed_title, color=0x267d28,
+                # received_embed_color = 0x267d28
+                # receipt_embed_color = 0x2ecc71
+                thread_id_color = discord.Color(thread_id)
+                embed = discord.Embed(title=embed_title, color=thread_id_color,
                                       description=f'Use `!reply {thread_id} <msg>` to respond')
-                embed.add_field(name='Thread ID:', value=thread_id, inline=True)
+                embed.add_field(name='Thread ID:', value=str(thread_id), inline=True)
                 embed.add_field(name='Message:', value=message, inline=True)
                 receiver = bot.get_user(receiver_id)
                 await receiver.send(embed=embed)
                 await ctx.author.send('Reply sent! :airplane:')
             else:
-                # TODO: get last thread_id in the chat with the user
                 await ctx.author.send(f'Unknown message thread!')
         else:
             await ctx.author.send(
@@ -1393,11 +1438,11 @@ async def anon_status(ctx):
 
 
 # Investing
-@bot.command(aliases=['ticker', 'get_ticker', 'getticker', 'tickerinfo', 'stock', 'stock_info', 'stockinfo', 'get_stock', 'getstock'])
+@bot.command(aliases=['ticker', 'get_ticker', 'stock', 'stock_info', 'get_stock'])
 async def ticker_info(ctx, ticker: str):
-    _ticker_info = get_ticker_info(ticker.replace('$', ''))
+    _ticker_info = get_ticker_info(ticker.replace('$', '').upper())
     if _ticker_info['change'] < 0:
-        embed_color = discord.Color.from_rgb(255,51,58)  # red
+        embed_color = discord.Color.from_rgb(255, 51, 58)  # red
         _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
     elif _ticker_info['change'] > 0:
         embed_color = discord.Color.from_rgb(26, 197, 103)  # green
@@ -1417,9 +1462,9 @@ async def ticker_info(ctx, ticker: str):
 
 
 # noinspection PyTypeChecker
-@bot.command(aliases=['buy_stock', 'hold_stock', 'buystock', ''])
+@bot.command(aliases=['buy_stock', 'hold_stock', 'buystock'])
 async def buy(ctx, ticker, cost_per_share: float, shares_purchased: int, commission_fee=0.0):
-    ticker = ticker.replace('$', '')
+    ticker = ticker.replace('$', '').upper()
     portfolio = portfolio_coll.find_one({'user': ctx.author.id})
     cost = shares_purchased * cost_per_share + commission_fee
     today = str(datetime.today().date())
@@ -1449,8 +1494,8 @@ async def buy(ctx, ticker, cost_per_share: float, shares_purchased: int, commiss
 
 
 @bot.command(aliases=['sell_stock', 'sellstock'])
-async def sell(ctx, ticker, price_per_share: float, shares_sold: int, commission_fee=0.0):  # TODO
-    ticker = ticker.replace('$', '')
+async def sell(ctx, ticker, price_per_share: float, shares_sold: int, commission_fee=0.0):
+    ticker = ticker.replace('$', '').upper()
     portfolio = portfolio_coll.find_one({'user': ctx.author.id})
     if portfolio is not None:
         with suppress(KeyError, AssertionError):
@@ -1500,9 +1545,9 @@ async def sell(ctx, ticker, price_per_share: float, shares_sold: int, commission
             await ctx.send('Shares removed to portfolio')
 
 
-@bot.command(aliases=['my_holdings', 'portfolio', 'my_portfolio', 'myholdings', 'myportfolio'])
+@bot.command(aliases=['portfolio'])
 async def holdings(ctx: Context, to_dm=False):  # TODO
-    pass
+    await ctx.send('Feature coming soon')
 
 
 @bot.command(
@@ -1511,15 +1556,13 @@ async def download_portfolio(ctx: Context, to_dm=True):  # TODO
     # export to a csv or xlxs file
     # use firefox send
     # send in a DM channel by default
-    pass
+    await ctx.send('Feature coming soon')
 
 
 @bot.command()
 async def transactions_template(ctx):
     await ctx.send('https://1drv.ms/x/s!AnQNFW1ohAx2hpEjhlgHkbvcaPLy2Q?e=jZCsn3')
-
-
-# TODO: daily updates of portfolio if today is not Sunday nor Saturday
+# END of Investing
 
 backup_db()
 bot.run(os.environ['DISCORD'])
