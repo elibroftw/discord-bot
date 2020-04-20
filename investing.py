@@ -1,28 +1,8 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.4.4
-Created: April 3rd 2020
-Updated: April 19th 2020
-
-CHANGELOG
-1.4
-Added get_ticker_info
-- gets the latest price and the change for the ticker
-Added CARS sector
-
-1.3
-Added OIL sector
-
-1.2
-Added TSX
-ADded Mortgage REIT's sector
-Added price-earnings ratio
-Added basic caching features
-Making top_movers_and_losers to be more versatile
-
-1.1
-Added DOW
+Version: 1.4.6
+Source: https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 """
 
 import calendar
@@ -160,9 +140,11 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
         change = round(change, 4)
         percent_change = round(change/closing_price * 100, 2)
         latest_price = round(latest_price, 4)
+        closing_price = round(closing_price, 4)
     else: percent_change = change/closing_price * 100
     name = get_company_name_from_ticker(ticker)['name']
-    info = {'name': name, 'price': latest_price, 'change': change, 'percent_change': percent_change, 'timestamp': timestamp, 'symbol': ticker}
+    info = {'name': name, 'price': latest_price, 'change': change, 'last_close_price': closing_price,
+            'percent_change': percent_change, 'timestamp': timestamp, 'symbol': ticker}
     return info
 
 

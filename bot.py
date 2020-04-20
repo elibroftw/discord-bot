@@ -1178,10 +1178,11 @@ async def volume(ctx):
                 else: amount = float(args[1]) / 100
                 amount = max(0.0, amount)
                 amount = min(1.0, amount)
-                amount = round(amount, 4)
+                amount = round(amount, 2)
                 vc.source.volume = amount
                 data_dict[guild.id]['volume'] = amount
             except ValueError: await ctx.send('Invalid argument', delete_after=5)
+            except AttributeError: await ctx.send('Nothing is playing at the moment', delete_after=5)
         else: await ctx.send(f'{vc.source.volume * 100}%')
 
 
@@ -1475,7 +1476,7 @@ async def buy(ctx, ticker, cost_per_share: float, shares_purchased: int, commiss
     if ticker not in portfolio['holdings']:
         portfolio['holdings'][ticker] = {'total_shares': 0, 'average_cost': 0, 'purchases': {}}
     ticker_holdings = portfolio['holdings'][ticker]
-    price_key = str(cost_per_share).replace('.', ',')  # NOTE: keys in MongoDB can't contain '.' :/
+    price_key = str(cost_per_share).replace('.', ',')  # keys in MongoDB can't contain '.' :/
     try:
         todays_purchases = ticker_holdings['purchases'][today]
         try: todays_purchases[price_key] += shares_purchased
