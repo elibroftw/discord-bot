@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.7.3
+Version: 1.7.4
 Source: https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 """
 
@@ -257,7 +257,7 @@ def get_parsed_data(_data=None, tickers: list = None, market='ALL', sort_key='Pe
         _data = get_data(tickers, period='5d', interval='1m')  # ALWAYS USE LATEST DATA
         market_day = _data.last_valid_index().date() == todays_date
 
-        if False and (not market_day or (_today.hour * 60 + _today.minute >= 645)):  # >= 10:45 AM
+        if not market_day or (_today.hour * 60 + _today.minute >= 645):  # >= 10:45 AM
             # movers of the latest market day
             recent_day = _data.last_valid_index()
             start_price_key = 'Open' if market_day else 'Close'
