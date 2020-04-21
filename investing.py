@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.7.4
+Version: 1.7.5
 Source: https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 """
 
@@ -256,14 +256,12 @@ def get_parsed_data(_data=None, tickers: list = None, market='ALL', sort_key='Pe
     elif of in {'day', '1d'}:
         _data = get_data(tickers, period='5d', interval='1m')  # ALWAYS USE LATEST DATA
         market_day = _data.last_valid_index().date() == todays_date
-
         if not market_day or (_today.hour * 60 + _today.minute >= 645):  # >= 10:45 AM
             # movers of the latest market day
             recent_day = _data.last_valid_index()
-            start_price_key = 'Open' if market_day else 'Close'
             parsed_info = {}
             for ticker in tickers:
-                info = parse_info(_data, ticker, recent_day, recent_day, start_price_key=start_price_key)
+                info = parse_info(_data, ticker, recent_day, recent_day)
                 if not math.isnan(info['Start']): parsed_info[ticker] = info
         else:  # movers of the second last market day
             yest = _data.tail(2).first_valid_index()  # assuming interval = 1d
