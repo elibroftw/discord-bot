@@ -15,7 +15,7 @@ import sys
 
 import tictactoe
 from helpers import *
-from investing import get_ticker_info
+from investing import get_ticker_info, losers, winners, get_parsed_data
 
 
 # Check if script is already running
@@ -46,7 +46,13 @@ MY_GUILD_ID = int(os.environ['GUILD_ID'])
 MY_USER_ID = int(os.environ['USER_ID'])
 BLUE = discord.Color.blue()
 TWITTER_BLUE = discord.Color(5631660)
-
+STOCKS_GREEN = discord.Color.from_rgb(26, 197, 103)
+STOCKS_RED = discord.Color.from_rgb(255, 51, 58)
+MOVERS_ETAS = {'DOW': '10 seconds', 'S&P500': '30 seconds', 'NASDAQ': '6 minutes',
+               'NYSE': '6 minutes', 'NYSEARCA': '3 minutes', 'AMEX': '3 minutes',
+               'US': '8 minutes', 'CA': '3 minutes', 'TSX': '3 minutes', 'ALL': '9 minutes'}
+# LATEST_SORTED_INFO = {'market': [0.0, []]}
+LATEST_SORTED_INFO = {}  # last update, sorted_info list
 tic_tac_toe_data = {}
 data_dict = {'downloads': {}}
 with suppress(FileExistsError): os.mkdir('music')
@@ -58,10 +64,18 @@ def run_coroutine(coroutine: asyncio.coroutine):
     return fut.result()
 
 
+def get_latest_sorted_info(of, market):
+    global LATEST_SORTED_INFO
+    if market not in LATEST_SORTED_INFO: LATEST_SORTED_INFO[market] = {of: [0.0, []]}
+    elif of not in LATEST_SORTED_INFO[market]: LATEST_SORTED_INFO[market][of] = [0.0, []]
+    if time.time() - LATEST_SORTED_INFO[market][of][0] > 120:  # update data every 2 minutes
+        LATEST_SORTED_INFO[market][of][1] = get_parsed_data(of=of, market=market)
+        LATEST_SORTED_INFO[market][of][0] = time.time()
+    return LATEST_SORTED_INFO[market][of][1]
+
+
 async def in_guild(ctx):
-    if ctx.guild:
-        return True
-    return False
+    return ctx.guild is not None
 
 
 async def has_vc(ctx):
@@ -489,6 +503,7 @@ async def created_at(ctx):
         await ctx.send(f'could not find that user in the server')
 
 
+@commands.check(in_guild)
 @bot.command()
 async def summon(ctx):
     guild = ctx.guild
@@ -755,7 +770,7 @@ async def play(ctx):
     guild_data = data_dict[guild.id]
 
     mq = guild_data['music']
-    if voice_client is None: voice_client = await bot.get_command('summon').callback(ctx)
+    if voice_client is None: voice_client = await ctx.invoke(bot.get_command('summon'))
     url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
@@ -796,10 +811,10 @@ async def play(ctx):
         else: await play_file(ctx)  # download if need to and then play the song
 
     elif (voice_client.is_playing() or voice_client.is_paused()) and not play_next:
-        await bot.get_command('pause').callback(ctx)
+        await ctx.invoke(bot.get_command('pause'))
     elif mq: await play_file(ctx)
     if ctx_msg_content.startswith('!pap'):
-        await bot.get_command('auto_play').callback(ctx)
+        await ctx.invoke(bot.get_command('auto_play'))
 
 
 @bot.command(aliases=['resume'])
@@ -1137,7 +1152,7 @@ async def leave(ctx):
         guild_data = data_dict[guild.id]
         guild_data['music'].clear()
         guild_data['auto_play'] = False
-        await ctx.send('Stopped playing music, music queue has been emptied')
+        await ctx.send('Stopped playing music and cleared the music queue')
 
 
 @bot.command(aliases=['s', 'end'])
@@ -1153,10 +1168,10 @@ async def stop(ctx):
 @commands.check(in_guild)
 async def fix(ctx):
     guild = ctx.message.channel.guild
-    await bot.get_command('summon').callback(ctx)
+    await ctx.invoke(bot.get_command('summon'))
     voice_client: discord.VoiceClient = guild.voice_client
     await voice_client.disconnect()
-    await bot.get_command('summon').callback(ctx)
+    await ctx.invoke(bot.get_command('summon'))
 
 
 @bot.command(aliases=['set_volume', 'sv', 'v'])
@@ -1218,7 +1233,7 @@ async def play_playlist(ctx):
         songs = get_songs_from_playlist(parsed_out_name, guild_id, ctx.author.id, to_play=True)[0]
         if songs:
             voice_client = ctx.guild.voice_client
-            if voice_client is None: voice_client = await bot.get_command('summon').callback(ctx)
+            if voice_client is None: voice_client = await ctx.invoke(bot.get_command('summon'))
             guild_data = data_dict[guild_id]
             no_after_play(guild_data, voice_client)
             if parsed_out_name != playlist_name or key_word == '!sp': shuffle(songs)
@@ -1443,10 +1458,10 @@ async def anon_status(ctx):
 async def ticker_info(ctx, ticker: str):
     _ticker_info = get_ticker_info(ticker.replace('$', '').upper())
     if _ticker_info['change'] < 0:
-        embed_color = discord.Color.from_rgb(255, 51, 58)  # red
+        embed_color = STOCKS_RED  # red
         _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
     elif _ticker_info['change'] > 0:
-        embed_color = discord.Color.from_rgb(26, 197, 103)  # green
+        embed_color = STOCKS_GREEN
         _ticker_info['change'] = f'+{_ticker_info["change"]} (+{_ticker_info["percent_change"]}%)'
     else:
         embed_color = discord.Color.light_grey()
@@ -1454,8 +1469,8 @@ async def ticker_info(ctx, ticker: str):
     hour = _ticker_info['timestamp'].strftime('%I')
     if hour[0] == '0': hour = hour[1]
     timestamp = _ticker_info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
-    embed = discord.Embed(title=_ticker_info['name'] + f' ({ticker})', color=embed_color,
-                          description=f'Last updated: {timestamp}')
+    embed = discord.Embed(title=_ticker_info['name'] + f' ({ticker})', color=embed_color)
+    embed.set_footer(text=f'Last updated: {timestamp}')
     embed.add_field(name='Last Price:', value=_ticker_info['price'], inline=True)
     embed.add_field(name='Last Close:', value=_ticker_info['last_close_price'], inline=True)
     embed.add_field(name='Change:', value=_ticker_info['change'], inline=True)
@@ -1563,7 +1578,75 @@ async def download_portfolio(ctx: Context, to_dm=True):  # TODO
 @bot.command()
 async def transactions_template(ctx):
     await ctx.send('https://1drv.ms/x/s!AnQNFW1ohAx2hpEjhlgHkbvcaPLy2Q?e=jZCsn3')
+
+
+@bot.command(aliases=['gainers', 'winners', 'top_gainers'])
+async def command_winners(ctx, market='ALL', of='day', show=5, sorted_info: list = None):
+    def _winners():
+        nonlocal market, show, sorted_info
+        market = market.upper()
+        eta = MOVERS_ETAS.get(market, '?')
+        if sorted_info is None:
+            m = run_coroutine(ctx.send(f'Calculating Top Winners for {market} (ETA. {eta})'))
+            sorted_info = get_latest_sorted_info(of, market)
+        else: m = None
+        winners_list = winners(sorted_info=sorted_info, of=of, show=show, market=market)
+        show = len(winners_list)
+        msg = ''
+        for i, winner in enumerate(winners_list):
+            if i != 0: msg += '\n'
+            ticker = winner[0]
+            open_close = f'[{round(winner[1]["Start"], 2)}, {round(winner[1]["End"], 2)}]'
+            percent_change = str(round(winner[1]["Percent Change"] * 100, 2)) + '%'
+            msg += f'{ticker}\t{open_close}\t{percent_change}'
+        embed = discord.Embed(title=f'{market} Top {show} Winners ({of})', description=msg, color=STOCKS_GREEN)
+        if m is None: run_coroutine(ctx.send(embed=embed))
+        else: run_coroutine(m.edit(embed=embed, content=''))
+    bot.loop.run_in_executor(None, _winners)
+
+
+@bot.command(aliases=['losers', 'top_losers'])
+async def command_losers(ctx: Context, market='ALL', of='day', show=5, sorted_info: list = None):
+    def _losers():
+        nonlocal market, show, sorted_info
+        market = market.upper()
+        eta = MOVERS_ETAS.get(market, '?')
+
+        if sorted_info is None:
+            m = run_coroutine(ctx.send(f'Calculating Top Losers for {market} (ETA. {eta})'))
+            sorted_info = get_latest_sorted_info(of, market)
+        else: m = None
+        losers_list = losers(sorted_info=sorted_info, of=of, show=show, market=market)
+        show = len(losers_list)
+        msg = ''
+        for i, loser in enumerate(losers_list):
+            if i != 0: msg += '\n'
+            ticker = loser[0]
+            open_close = f'[{round(loser[1]["Start"], 2)}, {round(loser[1]["End"], 2)}]'
+            percent_change = str(round(loser[1]["Percent Change"] * 100, 2)) + '%'
+            msg += f'{ticker}    {open_close}    {percent_change}'
+        embed = discord.Embed(title=f'{market} Top {show} Losers ({of})', description=msg, color=STOCKS_RED)
+        if m is None: run_coroutine(ctx.send(embed=embed))
+        else: run_coroutine(m.edit(embed=embed, content=''))
+    bot.loop.run_in_executor(None, _losers)
+
+
+@bot.command(aliases=['top_movers', 'gainers&losers', 'gainers_and_losers', 'gainers_&_losers'])
+async def movers(ctx: Context, market='ALL', of='day', show=5):
+    # TODO: hyperlinks and better formatting and optimize multiple calls
+    def _movers():
+        nonlocal market
+        market = market.upper()
+        eta = MOVERS_ETAS.get(market, '?')
+        m = run_coroutine(ctx.send(f'Calculating top movers for {market} (ETA. {eta})'))
+        sorted_info = get_latest_sorted_info(of, market)
+        run_coroutine(m.delete())
+        run_coroutine(ctx.invoke(bot.get_command('gainers'), market, of, show, sorted_info))
+        run_coroutine(ctx.invoke(bot.get_command('losers'), market, of, show, sorted_info))
+    bot.loop.run_in_executor(None, _movers)
+
 # END of Investing
 
 backup_db()
 bot.run(os.environ['DISCORD'])
+# useful: https://discordpy.readthedocs.io/en/latest/ext/commands/commands.html
