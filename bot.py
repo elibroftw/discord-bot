@@ -774,7 +774,7 @@ async def play(ctx):
     url_or_query = ctx.message.content.split()
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
-        video_id = get_video_id(url_or_query)
+        video_id = extract_video_id(url_or_query)
         if video_id is not None:
             title = get_video_title(video_id)
             if get_video_duration(video_id) > 1800:

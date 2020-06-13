@@ -18,8 +18,7 @@ import tweepy
 import re
 import os
 import json
-from urllib import parse
-from urllib.parse import urlparse, urlencode, parse_qs
+from urllib.parse import urlparse, urlencode, parse_qs, urlsplit
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
 import subprocess
@@ -311,13 +310,7 @@ def youtube_download(url_or_video_id, verbose=False, use_external_downloader=Fal
         return 'downloaded'
 
 
-def get_video_id(url):
-    # This was taken from StackOverflow
-    # Examples:
-    # - http://youtu.be/SA2iWivDJiE
-    # - http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu
-    # - http://www.youtube.com/embed/SA2iWivDJiE
-    # - http://www.youtube.com/v/SA2iWivDJiE?version=3&amp;hl=en_US
+def extract_video_id(url):
     query = urlparse(url)
     if query.hostname == 'youtu.be': return query.path[1:]
     if query.hostname in ('www.youtube.com', 'youtube.com'):
@@ -329,7 +322,7 @@ def get_video_id(url):
 
 
 def get_songs_from_youtube_playlist(url, to_play=False):
-    playlist_id = parse_qs(parse.urlsplit(url).query)['list'][0]
+    playlist_id = parse_qs(urlsplit(url).query)['list'][0]
     songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
     return songs, playlist_name
 
@@ -337,7 +330,7 @@ def get_songs_from_youtube_playlist(url, to_play=False):
 def get_songs_from_playlist(playlist_name, guild_id, author_id, to_play=False):
     songs = []
     if playlist_name.startswith('https://www.youtube.com/playlist'):
-        playlist_id = parse_qs(parse.urlsplit(playlist_name).query)['list'][0]
+        playlist_id = parse_qs(urlsplit(playlist_name).query)['list'][0]
         return get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
         # return get_songs_from_youtube_playlist(playlist_name, to_play=to_play)
     playlist = None
@@ -512,12 +505,16 @@ if __name__ == "__main__":
     assert twitter_search_user('Lady Gaga')
     assert twitter_get_tweets(twitter_search_user('Elon Musk')[0][1])
     assert twitter_get_tweets('discord')
-    assert get_video_id('https://www.youtube.com/watch?v=JnIO6AQRS2k') == 'JnIO6AQRS2k'
-    assert get_video_id('https://www.youtube.com/watch?v=oEAjv2vgUGc') == 'oEAjv2vgUGc'
+    assert extract_video_id('https://www.youtube.com/watch?v=JnIO6AQRS2k') == 'JnIO6AQRS2k'
+    assert extract_video_id('https://www.youtube.com/watch?v=oEAjv2vgUGc') == 'oEAjv2vgUGc'
+    assert extract_video_id('http://youtu.be/SA2iWivDJiE') == 'SA2iWivDJiE'
+    assert extract_video_id('http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu') == '_oPAwA_Udwc'
+    assert extract_video_id('http://www.youtube.com/embed/SA2iWivDJiE') == 'SA2iWivDJiE'
+    assert extract_video_id('http://www.youtube.com/v/SA2iWivDJiE?version=3&amp;hl=en_US') == 'SA2iWivDJiE'
     assert get_video_title('oEAjv2vgUGc') == 'Poseidon'
-    assert get_video_id('https:/test.ca') is None
-    assert get_video_id('This is a test') is None
-    assert get_video_id('youtube') is None
+    assert extract_video_id('https:/test.ca') is None
+    assert extract_video_id('This is a test') is None
+    assert extract_video_id('youtube') is None
     assert get_video_duration('JnIO6AQRS2k') == 3682
     assert get_videos_from_playlist('PLY4YLSp44QYvmvSNX3Q_0y-mOQ02ZWIbu')
     start_time = time.time()
