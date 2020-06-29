@@ -9,9 +9,10 @@ import ffsend
 import logging
 from math import ceil
 import psutil
-from subprocess import Popen
+import subprocess
 from random import shuffle, randint
 import sys
+import argparse
 
 import tictactoe
 from helpers import *
@@ -20,6 +21,10 @@ from investing import get_ticker_info, losers, winners, get_parsed_data, index_f
 
 # Check if script is already running
 script = os.path.basename(__file__)
+parser = argparse.ArgumentParser(description='Start the discord bot')
+parser.add_argument('--prod', default=False, action='store_true')
+parsed_args = parser.parse_args()
+
 for q in psutil.process_iter():
     if q.name().startswith('python'):
         try:
@@ -89,7 +94,7 @@ async def on_ready():
     print('Logged In')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
     _save_dict = {'data_dict': {}}
-    with suppress(FileNotFoundError):
+    with suppress(FileNotFoundError, json.decoder.JSONDecodeError):
         if os.path.exists('save.json'):
             with open('save.json') as f:
                 _save_dict = json.load(f)
@@ -157,10 +162,10 @@ async def about(ctx):
 
 
 def save_to_file():
-    save_dict = {'save_time': datetime.now(), 'data_dict': {}}
+    save_dict = {'save_time': str(datetime.now()), 'data_dict': {}}
     for guild in bot.guilds:
         voice_client = guild.voice_client
-        guild_data = deepcopy(data_dict[guild.id])
+        guild_data = deepcopy(data_dict.get(guild.id, {}))
         if voice_client: guild_data['voice_channel'] = voice_client.channel.id
         else: guild_data['voice_channel'] = None
         mq = guild_data['music']
@@ -183,33 +188,40 @@ async def save(ctx):
 
 
 @bot.command(name='exit', aliases=['quit'])
-async def _exit(ctx, _save=True):
+async def _exit(ctx, save_data=True):
     if ctx.author.id == MY_USER_ID:
-        await bot.change_presence(activity=discord.Game('Exiting...'))
-        if _save: save_to_file()
+        if save_data:
+            await bot.change_presence(activity=discord.Game('Saving Data'))
+            save_to_file()
+        await bot.change_presence(activity=discord.Game('Leaving Voice Chats'))
         for voice_client in bot.voice_clients:
             if voice_client.is_playing() or voice_client.is_paused():
                 no_after_play(data_dict[ctx.guild.id], voice_client)
             await voice_client.disconnect()
+        await bot.change_presence(activity=discord.Game('Inactive'))
+        print('Bot logged out')
         await bot.logout()
-        sys.exit()
+
 
 
 @bot.command()
-async def restart(ctx, _save=True):
+async def restart(ctx, save_data=True):
     if ctx.author.id == MY_USER_ID:
         print('Restarting')
-        await bot.change_presence(activity=discord.Game('Restarting...'))
-        if _save: save_to_file()
+        if save_data:
+            await bot.change_presence(activity=discord.Game('Saving Data'))
+            save_to_file()
+        await bot.change_presence(activity=discord.Game('Leaving Voice Chats'))
         for guild in bot.guilds:
             voice_client = guild.voice_client
             if voice_client:
                 no_after_play(data_dict[guild.id], voice_client)
                 await voice_client.disconnect()
-            # # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
-        Popen('pythonw bot.py')
+        await bot.change_presence(activity=discord.Game('Restarting...'))
+        # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
+        if parsed_args.prod: subprocess.Popen('pythonw bot.py --prod')
+        else: subprocess.Popen('python bot.py')
         await bot.logout()
-        sys.exit()
 
 
 @commands.has_permissions(manage_messages=True)
@@ -1648,7 +1660,6 @@ async def movers(ctx: Context, market='ALL', of='day', show=5):
 
 @bot.command()
 async def futures(ctx):
-    pass
     def _futures():
         m = run_coroutine(ctx.send('Getting futures data'))
         futures_data = index_futures()
@@ -1665,6 +1676,8 @@ async def futures(ctx):
 
 # END of Investing
 
+print('Backing up database')
 backup_db()
+print('Starting bot')
 bot.run(os.environ['DISCORD'])
 # useful: https://discordpy.readthedocs.io/en/latest/ext/commands/commands.html
