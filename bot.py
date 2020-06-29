@@ -15,7 +15,7 @@ import sys
 
 import tictactoe
 from helpers import *
-from investing import get_ticker_info, losers, winners, get_parsed_data
+from investing import get_ticker_info, losers, winners, get_parsed_data, index_futures
 
 
 # Check if script is already running
@@ -157,7 +157,7 @@ async def about(ctx):
 
 
 def save_to_file():
-    save_dict = {'data_dict': {}}
+    save_dict = {'save_time': datetime.now(), 'data_dict': {}}
     for guild in bot.guilds:
         voice_client = guild.voice_client
         guild_data = deepcopy(data_dict[guild.id])
@@ -193,7 +193,7 @@ async def _exit(ctx, _save=True):
             await voice_client.disconnect()
         await bot.logout()
         sys.exit()
-        
+
 
 @bot.command()
 async def restart(ctx, _save=True):
@@ -289,7 +289,7 @@ async def add_role(ctx):
     message = ctx.message.content.split()[1:]
     if len(message) > 1:
         guild = ctx.guild
-        
+
         member = message[-1]
         member = discord.utils.get(guild.members, name=member)
         if not member:
@@ -465,7 +465,7 @@ async def ttt(ctx):
                         await author.send('You have ended your tic-tac-toe game')
                     else:
                         player_move = int(user_msg.content)
-                        
+
                         temp_msg = tictactoe.valid_move(player_move, author_data)
                         if not temp_msg: await author.send('That was an invalid move')
                         else:
@@ -952,7 +952,7 @@ async def previous(ctx, times=1):
             dq += mq[:-times][::-1]
             guild_data['music'] = mq[-times:]
             await play_file(ctx)
-            
+
 
 @bot.command(aliases=['rm'])
 @commands.check(in_guild)
@@ -1002,7 +1002,7 @@ async def shuffle_music(ctx):
     voice_client = guild.voice_client
     song_playing = voice_client.is_playing() or voice_client.is_paused()
     current_song = guild_data['music'][0]
-        
+
     shuffled_songs = guild_data['music'] + guild_data['done']
     shuffle(shuffled_songs)
 
@@ -1056,7 +1056,7 @@ async def next_up(ctx, page=1):
                 else:
                     song_status = song.status
                     msg += f'`{song_status}` {song.title} `{song.get_time_stamp(True)}`'
-                    
+
             else: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
             i += 1
 
@@ -1346,7 +1346,7 @@ async def dm(ctx):
                         if ctx.author in guild.members:
                             receiver = discord.utils.get(guild.members, nick=temp)
                             break
-                            
+
             # search for user by name, returns first match, people can use at their own digestion
             if receiver:
                 receiver_id = receiver.id
@@ -1388,7 +1388,7 @@ async def dm(ctx):
     if not isinstance(ctx.channel, discord.DMChannel):
         await ctx.author.send(f'TIP: use `!dm` in a DM chat with me')
         await ctx.message.delete()
-        
+
 
 @bot.command(aliases=['re', 'RE'])
 async def reply(ctx):
@@ -1448,7 +1448,7 @@ async def anon_status(ctx):
     else:
         dm_coll.insert_one({'user_id': user_id, 'type': 'user_settings', 'allows_messages': True})
         allows_messages = True
-    setting = '**ENABLED**' if allows_messages else '**DISABLED**' 
+    setting = '**ENABLED**' if allows_messages else '**DISABLED**'
     await ctx.send(f'Anonymous messaging is {setting}')
 # END of modified code
 
@@ -1644,6 +1644,24 @@ async def movers(ctx: Context, market='ALL', of='day', show=5):
         run_coroutine(ctx.invoke(bot.get_command('gainers'), market, of, show, sorted_info))
         run_coroutine(ctx.invoke(bot.get_command('losers'), market, of, show, sorted_info))
     bot.loop.run_in_executor(None, _movers)
+
+
+@bot.command()
+async def futures(ctx):
+    pass
+    def _futures():
+        m = run_coroutine(ctx.send('Getting futures data'))
+        futures_data = index_futures()
+        important_futures = ['S&P 500', 'DOW JONES 30', 'NASDAQ', 'RUSSELL 2000']
+        return_msg = ''
+        for future in important_futures:
+            data = futures_data[future]
+            price = data['price']
+            change = data['change']
+            percent_change = data['percent_change']
+            return_msg += f'\n**{future}**: *price* = {price}; *change* = {change} ({percent_change})'
+        run_coroutine(m.edit(content=return_msg))
+    bot.loop.run_in_executor(None, _futures)
 
 # END of Investing
 

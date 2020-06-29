@@ -1,10 +1,11 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.7.5
+Version: 1.10
 Source: https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 """
 
+import calendar
 from contextlib import suppress
 import csv
 from datetime import datetime, timedelta
@@ -21,14 +22,20 @@ import requests
 import yfinance as yf
 
 
+
 NASDAQ_TICKERS_URL = 'https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nasdaq&render=download'
 NYSE_TICKERS_URL = 'https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nyse&render=download'
 AMEX_TICKERS_URL = 'https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=amex&render=download'
+PREMARKET_FUTURES = 'https://ca.investing.com/indices/indices-futures'
 GLOBAL_DATA = {}
 US_COMPANY_LIST = []
 SORTED_INFO_CACHE = {}  # for when its past 4 PM
-REQUEST_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:75.0) Gecko/20100101 Firefox/75.0'}
+GENERIC_HEADERS = {
+    'accept': 'text/html,application/xhtml+xml',
+    'user-agent': 'Mozilla/5.0'
+}
 # NOTE: something for later https://www.alphavantage.co/
+
 
 def load_cache(filename='investing_cache.json'):
     global GLOBAL_DATA
@@ -105,7 +112,6 @@ def get_nyse_arca_tickers():
     return _arca_tickers
 
 
-
 def tickers_from_csv(url, name=''):
     if name and name in GLOBAL_DATA and datetime.strptime(GLOBAL_DATA[name]['UPDATED'],
                                                           '%m/%d/%Y').date() == datetime.today().date():
@@ -119,6 +125,7 @@ def tickers_from_csv(url, name=''):
 
 def get_tickers(market):
     # TODO: add ETFs to the markets
+    market = market.upper()
     # OPTIONS: CUSTOM, ALL, US, NYSE, NASDAQ, S&P500, DOW/DJIA, TSX/CA, Mortgage REITs
     tickers_to_download = set()
     if market in {'S&P500', 'S&P 500'}: tickers_to_download = tickers_to_download.union(get_sp500_tickers())
@@ -138,6 +145,11 @@ def get_tickers(market):
     elif market == 'OIL': tickers_to_download = {'DNR', 'PVAC', 'ROYT', 'SWN', 'CPE', 'CEQP', 'PAA', 'PUMP', 'PBF'}
     elif market in {'AUTO', 'AUTOMOBILE', 'CARS'}:
         tickers_to_download = {'TSLA', 'GM', 'F', 'RACE', 'FCAU', 'HMC', 'NIO', 'TTM', 'TM'}
+    elif market in {'INDEXFUTURES', 'INDEX_FUTURES'}: tickers_to_download = {'YM=F', 'NQ=F', 'RTY=F', 'ES=F'}
+    elif market == 'TANKERS':
+        tickers_to_download = {'EURN', 'TNK', 'TK', 'TNP', 'DSX', 'NAT', 'STNG', 'SFL', 'DHT', 'CPLP', 'DSSI', 'FRO', 'INSW', 'NNA', 'SBNA'}
+    elif market in {'UTILS', 'UTILITIES'}:
+        tickers_to_download = {'PCG', 'ELLO', 'AT', 'ELP', 'ES', 'EDN', 'IDA', 'HNP', 'GPJA', 'NEP', 'SO', 'CEPU', 'AES', 'ETR', 'KEP', 'OGE', 'EIX', 'NEE', 'TVC', 'TAC', 'EE', 'CIG', 'PNW', 'EMP', 'EBR.B', 'CPL', 'DTE', 'POR', 'EAI', 'NRG', 'CWEN', 'KEN', 'AGR', 'BEP', 'ORA', 'EAE', 'PPX', 'AZRE', 'ENIC', 'FE', 'CVA', 'BKH', 'ELJ', 'EZT', 'HE', 'VST', 'ELU', 'ELC', 'TVE', 'AQN', 'PAM', 'AEP', 'ENIA', 'EAB', 'PPL', 'CNP', 'D', 'PNM', 'EBR', 'FTS'}
     elif market == 'CUSTOM': pass
     # TODO: add more sectors
     # TODO: add foreign markets
@@ -179,9 +191,9 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
         while _today.strftime('%Y-%m-%d %H:%M:%S-04:00') not in data_last_close:
             _today -= timedelta(days=1)
         closing_price = data_last_close[_today.strftime('%Y-%m-%d %H:%M:%S-04:00')]
-        # as_of = f"Market Open: {timestamp['Datetime']}"
+        # as_of = f'Market Open: {timestamp["Datetime"]}'
     # else:
-        # as_of = f"After hours: {timestamp['Datetime']}"
+        # as_of = f'After hours: {timestamp["Datetime"]}'
     change = latest_price - closing_price
     if round_values:
         change = round(change, 4)
@@ -190,7 +202,13 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
         closing_price = round(closing_price, 4)
     else: percent_change = change/closing_price * 100
     name = get_company_name_from_ticker(ticker)
-    info = {'name': name, 'price': latest_price, 'last_close_price': closing_price,
+    try:
+        dividend = get_latest_dividend(ticker)
+    except Exception as e:
+        print(e)
+        dividend = 0
+    pd_ratio = round(latest_price/dividend, 2)
+    info = {'name': name, 'price': latest_price, 'last_close_price': closing_price, 'price:dividend': pd_ratio,
             'change': change, 'percent_change': percent_change, 'timestamp': timestamp, 'symbol': ticker}
     return info
 
@@ -242,6 +260,7 @@ def get_parsed_data(_data=None, tickers: list = None, market='ALL', sort_key='Pe
     todays_date = _today.date()
     if tickers is None: tickers = get_tickers(market)
     if _today.hour >= 16 and of == 'day':
+        # TODO: cache pre-market as well
         # key format will be
         with suppress(KeyError):
             return SORTED_INFO_CACHE[of][str(todays_date)][','.join(tickers)]
@@ -377,6 +396,34 @@ def top_movers(_data=None, tickers=None, market='ALL', of='day', start_date=None
                               end_date=end_date, show=show, console_output=console_output, csv_output=csv_output)
 
 
+def create_headers(subdomain):
+    hdrs = {'authority': 'finance.yahoo.com',
+            'method': 'GET',
+            'path': subdomain,
+            'scheme': 'https',
+            'accept': 'text/html,application/xhtml+xml',
+            'accept-encoding': 'gzip, deflate, br',
+            'accept-language': 'en-US,en;q=0.9',
+            'cache-control': 'no-cache',
+            'cookie': 'cookies',
+            'dnt': '1',
+            'pragma': 'no-cache',
+            'sec-fetch-mode': 'navigate',
+            'sec-fetch-site': 'same-origin',
+            'sec-fetch-user': '?1',
+            'upgrade-insecure-requests': '1',
+            'user-agent': 'Mozilla/5.0'}
+    return hdrs
+
+
+def get_latest_dividend(ticker: str) -> float:
+    url = f'https://finance.yahoo.com/quote/{ticker}/history'
+    hdr = create_headers(f'{ticker}/history')
+    soup = BeautifulSoup(requests.get(url, headers=hdr).text, 'html.parser')
+    soup = soup.find('tbody')
+    dividend = soup.find('strong').text
+    return float(dividend)
+
 
 def price_to_earnings(ticker, return_dict: dict = None, return_price=False):
     # uses latest EPS (diluted)
@@ -387,7 +434,7 @@ def price_to_earnings(ticker, return_dict: dict = None, return_price=False):
     else:
         url = f'https://www.marketwatch.com/investing/stock/{ticker}/financials'
     try:
-        text_soup = BeautifulSoup(requests.get(url, headers=REQUEST_HEADERS).text, 'html.parser')
+        text_soup = BeautifulSoup(requests.get(url, headers=GENERIC_HEADERS).text, 'html.parser')
     except requests.TooManyRedirects:
         return pe
     try:
@@ -437,4 +484,23 @@ def tickers_by_pe(tickers: set, output_to_csv='', console_output=True):
     return pes
 
 
-load_cache()  # IGNORE. This loads cache from investing_cache.json if the file exists
+def sort_by_volume(tickers):
+    pass
+
+
+def index_futures():
+    resp = requests.get(PREMARKET_FUTURES, headers=GENERIC_HEADERS)
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    quotes = soup.find('tbody').findAll('tr')
+    return_obj = {}
+    for quote in quotes:
+        index_name = quote.find('a').text.upper()
+        nums = quote.findAll('td')[3:]
+        price = nums[0].text
+        change = nums[3].text
+        percent_change = nums[4].text
+        return_obj[index_name] = {'name': index_name, 'price': price, 'change': change, 'percent_change': percent_change}
+    return return_obj
+
+
+load_cache()
