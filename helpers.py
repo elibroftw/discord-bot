@@ -22,12 +22,13 @@ from urllib.parse import urlparse, urlencode, parse_qs, urlsplit
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
 import subprocess
+from subprocess import PIPE, DEVNULL
 import pymongo.collection
+from pathlib import Path
 if __name__ != '__main__':
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    subprocess.call('pip install --user --upgrade youtube-dl', startupinfo=startupinfo, stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL)
+    subprocess.call('pip install --user --upgrade youtube-dl', startupinfo=startupinfo, stdout=DEVNULL, stderr=DEVNULL)
 import youtube_dl
 
 db_client = MongoClient('localhost', 27017)
@@ -35,6 +36,7 @@ db = db_client.discord_bot
 playlists_coll: pymongo.collection.Collection = db.playlists
 dm_coll: pymongo.collection.Collection = db.anon_messages
 portfolio_coll: pymongo.collection.Collection = db.portfolios
+FFMPEG = Path(subprocess.check_output('where ffmpeg').decode()).parent
 # save_coll: pymongo.collection.Collection = db.save_coll  # saving the state of the bot instead of a save.json
 
 
@@ -291,7 +293,7 @@ def youtube_download(url_or_video_id, verbose=False, use_external_downloader=Fal
         'postprocessor_args': ['-threads', '1'],
         # 'outtmpl': 'music/%(title)s - %(id)s.%(ext)s',
         'outtmpl': 'music/%(id)s.%(ext)s',
-        'ffmpeg_location': 'ffmpeg\\bin',
+        'ffmpeg_location': FFMPEG,
         'verbose': verbose,  # for some reason it has to be True to work  # 4/18/2020
         'cachedir': False,
         # 'nooverwrites': True,
@@ -353,7 +355,7 @@ def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
         songs = [Song(songs_dict[video_id], video_id) for video_id, duration in durations if duration <= 1800]
     else:
         songs = [Song(item['snippet']['title'], item['snippet']['resourceId']['videoId']) for item in response['items']]
-        
+
     if return_title:
         f = {'part': 'snippet',  'id': playlist_id, 'key': GOOGLE_API}
         response = json.loads(requests.get(f'{YT_API_URL}playlists?{urlencode(f)}').text)
@@ -364,7 +366,7 @@ def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
 def get_all_playlists():
     playlists = playlists_coll.find({'type': 'playlist'}, {'_id': 0, 'playlist_name': 1, 'creator_id': 1})
     return playlists
-    
+
 
 def get_video_titles(video_ids):
     video_ids = ','.join(video_ids)
