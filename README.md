@@ -82,11 +82,10 @@ For more info, view [bot.py](../master/bot.py)
 Note that this bot has only been tested on Windows
 1. Clone the repository
 2. Have [MongoDB Community 4.2.X](https://www.mongodb.com/download-center/community) installed
-3. Have [FFmpeg](https://www.ffmpeg.org/download.html) binaries located in `discord-bot/ffmpeg/bin`
-4. Have [aria2c](https://github.com/aria2/aria2/releases) downloaded to path `discord-bot/aria2c.exe` (Optional)
-5. Do `pip install -r requirements.txt` in the terminal of the current directory
-6. If you want to run on Windows boot, import and edit "Discord Bot.xml" in Task Scheduler OR
-7. Click [here](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8) to start from scratch
+3. Have [FFmpeg](https://www.ffmpeg.org/download.html) accessible in PATH
+4. Do `pip install -r requirements.txt` in the terminal of the current directory
+5. If you want to run on Windows boot, import and edit "Discord Bot.xml" in Task Scheduler OR
+6. Click [here](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8) to start from scratch
 
 [Test the bot yourself](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8).
 WARNING: bot is not always online
