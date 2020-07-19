@@ -1,6 +1,6 @@
 # Discord Bot (Works best self hosted)
 A discord bot (called El Chapo) I made for my personal server.
-Rather than having a sole purpose, this bot is aimed at being doing all tasks I want it to do. I made it for a singular
+Rather than having a sole purpose, this bot is aimed at doing all the tasks I want it to do. I made it for a singular
 server so it may not work for multiple servers (regarding the music playing features).
 
 # Features
