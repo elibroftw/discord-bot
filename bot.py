@@ -1136,9 +1136,9 @@ async def rewind(ctx, seconds: int = 5):
     if voice_client.is_playing() or voice_client.is_paused():
         guild_data = data_dict[guild.id]
         start_at = guild_data['music'][0].get_time_stamp() - seconds
-        start_at = max(0.0, start_at)
+        start_at = max(0, start_at)
         no_after_play(guild_data, voice_client)
-        await play_file(ctx, start_at)
+        await play_file(ctx, int(start_at))
 
 
 @bot.command(aliases=['np', 'currently_playing', 'cp'])

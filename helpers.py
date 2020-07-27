@@ -25,6 +25,7 @@ import subprocess
 from subprocess import PIPE, DEVNULL
 import pymongo.collection
 from pathlib import Path
+import platform
 if __name__ != '__main__':
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -417,12 +418,15 @@ OPUS_LIBS = ['libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus
 
 # noinspection PyDefaultArgument
 def load_opus_lib(opus_libs=OPUS_LIBS):
+    if platform.system() == 'Windows': return True
     if opus.is_loaded(): return True
     for opus_lib in opus_libs:
-        with suppress(OSError):
+        try:
             opus.load_opus(opus_lib)
-            return
-        raise RuntimeError(f"Could not load an opus lib ({opus_lib}). Tried {', '.join(opus_libs)}")
+            return True
+        except OSError as e:
+            print(e)
+            raise RuntimeError(f"Could not load an opus lib ({opus_lib}). Tried {', '.join(opus_libs)}")
 
 
 def send_email(recipient, name='', subject=''):  # NOTE: for later
