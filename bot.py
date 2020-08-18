@@ -295,7 +295,7 @@ async def create_role(ctx):
 #     raise NotImplementedError
 
 
-@bot.command(aliases=['addrole', 'giverole'])
+@bot.command(aliases=['addrole', 'giverole', 'give_role'])
 @has_permissions(manage_roles=True)
 async def add_role(ctx):
     message = ctx.message.content.split()[1:]
