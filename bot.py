@@ -9,7 +9,6 @@ import ffsend
 import logging
 from math import ceil
 import psutil
-import subprocess
 from random import shuffle, randint
 import sys
 import argparse
@@ -64,6 +63,7 @@ data_dict = {'downloads': {}}
 with suppress(FileExistsError): os.mkdir('music')
 
 
+# noinspection PyDeprecation
 def run_coroutine(coroutine: asyncio.coroutine):
     # e.g. coroutine = bot.change_presence(activity=discord.Game('Prison Break (!)'))
     fut = asyncio.run_coroutine_threadsafe(coroutine, bot.loop)
@@ -102,8 +102,9 @@ async def on_ready():
         os.remove('save.json')
     for k, v in _save_dict['data_dict'].items():
         if k != 'downloads':
-            mq = v['music'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in v['music']]
-            v['done'] = [Song(s['title'], s['video_id'], s['time_stamp']) for s in v['done']]
+            mq = v['music'] = [Track(s['title'], s['video_id'], s['time_stamp']) for s in v['music']]
+            v['done'] = [Track(s['title'], s['video_id'], s['time_stamp']) for s in v['done']]
+            # noinspection PyTypeChecker
             data_dict[int(k)] = v
             channel_id = v['voice_channel']
             if channel_id:
@@ -204,7 +205,6 @@ async def _exit(ctx, save_data=True):
         await bot.change_presence(activity=discord.Game('Inactive'))
         print('Bot logged out')
         await bot.logout()
-
 
 
 @bot.command()
@@ -325,9 +325,9 @@ async def add_role(ctx):
 #     raise NotImplementedError
 
 
-@bot.command()  # TODO:
-async def create_channel(ctx):
-    pass
+# @bot.command()  # TODO:
+# async def create_channel(ctx):
+#     pass
 
 
 @bot.command()
@@ -443,7 +443,7 @@ async def ttt(ctx):
               'inactivity or if you enter !end\nWould you like to go first? [Y/n]'
         await author.send(msg)
         author_data = tic_tac_toe_data[author] = {'comp_moves': [], 'user_moves': [], 'danger': None,
-                                    'danger2': None, 'in_game': True, 'round': 0}
+                                                  'danger2': None, 'in_game': True, 'round': 0}
         user_msg, game_channel = None, author.dm_channel
 
         def check_yn(waited_msg):
@@ -537,68 +537,42 @@ async def summon(ctx):
         return voice_client
 
 
-# async def download_in_background(video_id, callback=None, callback_args=None, on_exception=None):  # TODO:
-#     music_filename = f'music/{video_id}.mp3'
-#
-#     def _callback(future: asyncio.Future):
-#         exc = future.exception()
-#         if len(future._callbacks) == 1:
-#             pass
-#         if exc:
-#             on_exception(future)
-#             return
-#         if callback is not None:
-#             if isinstance(callback_args, dict):
-#                 callback(**callback_args)
-#             else:
-#                 callback()
-#
-#     if video_id in data_dict['downloads']:
-#         result = data_dict['downloads'][video_id][0]
-#         result.add_done_callback(_callback)
-#     elif not os.path.exists(music_filename):
-#         result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
-#         result.add_done_callback(_callback)
-#         return
-#     # file exists already
-#     if callback is not None:
-#         if isinstance(callback_args, dict):
-#             callback(**callback_args)
-#         else:
-#             callback()
-#
-#     result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
-#     result.add_done_callback(_callback)
+def normalize_url(url):
+    parsed = urlparse(url)
+    return 'https://' + parsed.netloc + parsed.path
 
 
-async def download_if_not_exists(ctx, title, video_id, play_next=False):
+async def download_if_not_exists(ctx, track: Track, play_next=False):
     """
     Checks if file corresponding to title and video_id exists
     If it doesn't exist, download it
     returns None if it exists, or discord.Message object of the downloading title if it doesn't
     """
-
-    music_filename = f'music/{video_id}.mp3'
+    title = track.title
+    url_or_video_id = track.get_video_id()
+    from_soundcloud = track.from_soundcloud
+    music_filename = track.get_path()
     m = None
-    if not os.path.exists(music_filename) and video_id not in data_dict['downloads']:
+    if not os.path.exists(music_filename) and track not in data_dict['downloads']:
         m = await ctx.channel.send(f'Downloading `{title}`')
 
-        def callback(future):
-            data_dict['downloads'].pop(video_id)
+        def callback(future: asyncio.Future):
             exc = future.exception()
             music_queue = data_dict[ctx.guild.id]['music']
             latest_id = music_queue[0].get_video_id()
-
             if exc:
-                if latest_id == video_id:
+                if latest_id == url_or_video_id:
                     music_queue.pop(0)
                     bot.loop.create_task(play_file(ctx))
                 else:
-                    music_queue.remove(Song(title, video_id))
-                new_content = f'Video `{title}` with id `{video_id}` was deleted'
+                    music_queue.remove(Track(title, url_or_video_id, from_soundcloud=from_soundcloud))
+                new_content = f'Video `{title}` with id `{url_or_video_id}` was deleted'
                 bot.loop.create_task(m.edit(content=new_content, delete_after=5))
                 return
-            elif latest_id == video_id:
+            if from_soundcloud:
+                info_dict = future.result()
+                track.title = info_dict['title']
+            if latest_id == url_or_video_id:
                 bot.loop.create_task(m.edit(content=f'Downloaded `{title}`', delete_after=5))
                 bot.loop.create_task(play_file(ctx))
                 return
@@ -606,37 +580,40 @@ async def download_if_not_exists(ctx, title, video_id, play_next=False):
                 msg_content = f'Added `{title}` to next up'
             else:
                 msg_content = f'Added `{title}` to the playing queue'
+            data_dict['downloads'].pop(track)
             bot.loop.create_task(m.edit(content=msg_content))
-
-        result: asyncio.Future = bot.loop.run_in_executor(None, youtube_download, video_id)
+        outtmpl = music_filename if from_soundcloud else ''
+        result: asyncio.Future = bot.loop.run_in_executor(None, ytdl, url_or_video_id, outtmpl)
         result.add_done_callback(callback)
-        data_dict['downloads'][video_id] = [result, m]
+        data_dict['downloads'][track] = [result, m]
     return m
 
 
 async def download_related_video(ctx):
+    # or the next video
     guild = ctx.guild
     guild_data = data_dict[guild.id]
     auto_play_setting = guild_data['auto_play']
     mq = guild_data['music']
     if len(mq) > 1:
-        next_song = mq[1]
-        await download_if_not_exists(ctx, next_song.title, next_song.get_video_id())
+        next_track = mq[1]
+        await download_if_not_exists(ctx, next_track)
     if auto_play_setting and len(mq) == 1:
-        song = mq[0]
-        related_title, related_video_id = get_related_video(song.get_video_id(),  guild_data['done'])[1:]
-        mq.append(Song(related_title, related_video_id))
-        related_m = await download_if_not_exists(ctx, related_title, related_video_id)
-        related_msg_content = f'Added `{related_title}` to the playing queue'
-        if not related_m: await ctx.send(related_msg_content)
+        track = mq[0]
+        if not track.from_soundcloud:
+            related_title, related_video_id = get_related_video(track.get_video_id(),  guild_data['done'])[1:]
+            related_track = Track(related_title, related_video_id)
+            mq.append(related_track)
+            related_m = await download_if_not_exists(ctx, related_track)
+            related_msg_content = f'Added `{related_title}` to the playing queue'
+            if not related_m: await ctx.send(related_msg_content)
 
 
-@bot.command(aliases=['dls'])
+@bot.command(aliases=['dls', 'dlt'])
 @commands.check(in_guild)
-async def download_song(ctx, index=0):
+async def download_track(ctx):
     args = ctx.message.content.split()
-    is_query = False
-    # if len(args) <= 2:
+    # is_query = False
     try:
         index = 0 if len(args) == 1 else int(args[1])
         guild = ctx.guild
@@ -645,17 +622,17 @@ async def download_song(ctx, index=0):
         else:
             que = guild_data['done']
             index = -index - 1
-        try: song = que[index]
+        try: track = que[index]
         except IndexError:
             return await ctx.send('Invalid index argument')
     except ValueError:
-        is_query = True
+        # is_query = True  # TODO
         return
-    if len(args) > 1 or is_query:
-        query = ' '.join(args[1:])
-    file = f'music/{song.get_video_id()}.mp3'
-    url = ffsend.upload('https://send.firefox.com/', song.title + '.mp3', file)[0]
-    msg = await ctx.author.send('Uploading the song')
+    # if len(args) > 1 or is_query:
+    #     query = ' '.join(args[1:])
+    file = track.get_path()
+    url = ffsend.upload('https://send.firefox.com/', track.title + '.mp3', file)[0]
+    msg = await ctx.author.send('Uploading the track')
     content = f'Here is the download link <{url}>. You can rename the file and set the metadata and album art ' \
               '(Spotify API) using this metadata editor <https://github.com/elibroftw/mp3-editor>'
     await msg.edit(content=content, file=file)
@@ -669,18 +646,17 @@ async def quiet(ctx):
     guild_data['output'] = not guild_data['output']
 
 
-def create_audio_source(guild_data, song, start_at=0.0):
-    # -af silenceremove=start_periods=1:stop_periods=1:detection=peak
-    filename = f'music/{song.get_video_id()}.mp3'
+def create_audio_source(guild_data, track, start_at=0.0):
+    filename = track.get_path()
     audio_source = FFmpegPCMAudio(filename, before_options=f'-nostdin -ss {format_time_ffmpeg(start_at)}',
-                                  options='-vn -b:a 128k')
+                                  options='-vn -b:a 128k -af bass=g=2')
     audio_source = PCMVolumeTransformer(audio_source)
     audio_source.volume = guild_data['volume']
     return audio_source
 
 
 async def play_file(ctx, start_at=0):
-    """Plays first (index=0) song in the music queue"""
+    """Plays first (index=0) track in the music queue"""
     guild: discord.Guild = ctx.guild
     vc: discord.VoiceClient = guild.voice_client
     # noinspection PyTypeChecker
@@ -701,10 +677,10 @@ async def play_file(ctx, start_at=0):
             guild_data['skip_voters'] = []
 
             if not guild_data['repeat']:
-                last_song = mq.pop(0)
-                dq.insert(0, last_song)
-            else: last_song = mq[0]
-            last_song.stop()
+                last_track = mq.pop(0)
+                dq.insert(0, last_track)
+            else: last_track = mq[0]
+            last_track.stop()
 
             if guild_data['repeat_all'] and not mq and dq:
                 mq = guild_data['music'] = dq[::-1]
@@ -714,25 +690,25 @@ async def play_file(ctx, start_at=0):
                 setting = guild_data['auto_play']
                 if mq or setting:
                     if setting and not mq:
-                        next_title, next_video_id = get_related_video(last_song.get_video_id(), dq)[1:]
-                        next_song = Song(next_title, next_video_id)
-                        mq.append(next_song)
-                        next_m = run_coroutine(download_if_not_exists(ctx, next_title, next_video_id))
-                    else:  # if mq, check if the next song is downloading
-                        next_song = mq[0]
-                        next_video_id = next_song.get_video_id()
-                        next_title = next_song.title
-                        next_result, next_m = data_dict['downloads'].get(next_video_id, (None, None))
+                        if not last_track.from_soundcloud:
+                            next_title, next_video_id = get_related_video(last_track.get_video_id(), dq)[1:]
+                            next_track = Track(next_title, next_video_id)
+                            mq.append(next_track)
+                            run_coroutine(download_if_not_exists(ctx, next_track))
+                    else:  # if mq, check if the next track is downloading
+                        next_track = mq[0]
+                        next_title = next_track.title
+                        next_result, next_m = data_dict['downloads'].get(next_track, (None, None))
                         if next_result:
                             # run_coroutine(next_result)
                             return
                         else:
                             # TODO test
-                            next_m = run_coroutine(download_if_not_exists(ctx, next_title, next_video_id))
+                            next_m = run_coroutine(download_if_not_exists(ctx, next_track))
                         if next_m is None:
-                            vc.play(create_audio_source(guild_data, next_song), after=after_play)
-                            next_song.start(0)
-                            next_time_stamp = next_song.get_time_stamp(True)
+                            vc.play(create_audio_source(guild_data, next_track), after=after_play)
+                            next_track.start(0)
+                            next_time_stamp = next_track.get_time_stamp(True)
                             guild_data['is_stopped'] = False
                             if guild_data['output']:
                                 next_msg_content = f'Now playing `{next_title}` {next_time_stamp}'
@@ -745,20 +721,19 @@ async def play_file(ctx, start_at=0):
                 if len(vc.channel.members) == 1: run_coroutine(vc.disconnect())
 
     if vc and upcoming_tracks:
-        song = upcoming_tracks[0]
-        title = song.title
-        video_id = song.get_video_id()
-        result, m = data_dict['downloads'].get(video_id, (None, None))
+        track = upcoming_tracks[0]
+        title = track.title
+        result, m = data_dict['downloads'].get(track, (None, None))
         if result:
             # TODO: test?
             # await result
             return
-        m = await download_if_not_exists(ctx, title, video_id)
+        m = await download_if_not_exists(ctx, track)
         if m is None:
-            audio_source = create_audio_source(guild_data, song, start_at=start_at)
+            audio_source = create_audio_source(guild_data, track, start_at=start_at)
             vc.play(audio_source, after=after_play)
-            song.start(start_at)
-            time_stamp = song.get_time_stamp(True)
+            track.start(start_at)
+            time_stamp = track.get_time_stamp(True)
             guild_data['is_stopped'] = False
             # guild_data['skip_voters'] = []
             if guild_data['output']:
@@ -790,40 +765,45 @@ async def play(ctx):
     if len(url_or_query) > 1:
         url_or_query = ' '.join(url_or_query[1:])
         video_id = extract_video_id(url_or_query)
+        from_soundcloud = False
         if video_id is not None:
             title = get_video_title(video_id)
             if get_video_duration(video_id) > 1800:
-                await ctx.send('That song is too long! (> 30 minutes)')
+                await ctx.send('That track is too long! (> 30 minutes)')
                 return
         elif url_or_query.startswith('https://www.youtube.com/playlist'):
-            playlist_id = parse_qs(parse.urlsplit(url_or_query).query)['list'][0]
-            songs = get_videos_from_playlist(playlist_id, return_title=True)[0]
-            # songs = get_songs_from_youtube_playlist(url_or_query)[0]
-            if songs:
-                mq.extend(songs)
-                await ctx.send('Songs added to queue!')
-            if len(songs) == len(mq):
+            playlist_id = parse_qs(urlsplit(url_or_query).query)['list'][0]
+            tracks = get_videos_from_playlist(playlist_id, return_title=True)[0]
+            # tracks = get_videos_from_yt_playlist(url_or_query)[0]
+            if tracks:
+                mq.extend(tracks)
+                await ctx.send('Tracks added to queue!')
+            if len(tracks) == len(mq):
                 await play_file(ctx)
             return
+        elif 'soundcloud.com' in url_or_query:
+            if 'sets' in url_or_query:
+                return await ctx.send('Sound cloud playlists are not supported at the moment')
+            from_soundcloud = True
+            title = video_id = normalize_url(url_or_query)
         else:
             try: title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)[1:]
             except (ValueError, IndexError):
-                await ctx.send(f'No valid video found with query `{url_or_query}`')
-                return
-        song = Song(title, video_id)
+                return await ctx.send(f'No valid video found with query `{url_or_query}`')
+        track = Track(title, video_id, from_soundcloud=from_soundcloud)
 
         # adding to queue
-        if mq and play_next: mq.insert(1, song)
-        else: mq.append(song)
+        if mq and play_next: mq.insert(1, track)
+        else: mq.append(track)
 
-        # download the song if something is playing
+        # download the track if something is playing
         if voice_client.is_playing() or voice_client.is_paused():
             # download if your not going to play the file
-            m = await download_if_not_exists(ctx, title, video_id, play_next=play_next)
+            m = await download_if_not_exists(ctx, track, play_next=play_next)
             if play_next: m_content = f'Added `{title}` to next up'
             else: m_content = f'Added `{title}` to the playing queue'
             if not m: await ctx.send(m_content)
-        else: await play_file(ctx)  # download if need to and then play the song
+        else: await play_file(ctx)  # download if need to and then play the track
 
     elif (voice_client.is_playing() or voice_client.is_paused()) and not play_next:
         await ctx.invoke(bot.get_command('pause'))
@@ -838,15 +818,15 @@ async def pause(ctx):
     voice_client: discord.VoiceClient = ctx.guild.voice_client
     if voice_client:
         guild_data = data_dict[ctx.guild.id]
-        song = guild_data['music'][0]
+        track = guild_data['music'][0]
         if voice_client.is_paused():
             voice_client.resume()
-            song.start()
+            track.start()
             guild_data['is_stopped'] = False
-            await bot.change_presence(activity=discord.Game(song.title))
+            await bot.change_presence(activity=discord.Game(track.title))
         else:
             voice_client.pause()
-            song.pause()
+            track.pause()
             guild_data['is_stopped'] = True
             await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
@@ -865,9 +845,9 @@ async def auto_play(ctx, setting: bool = None):
         mq = guild_data['music']
         dq = guild_data['done']
         if not mq and dq:
-            song_id = dq[0].get_video_id()
-            title, video_id, = get_related_video(song_id, dq)[1:]
-            mq.append(Song(title, video_id))
+            track_id = dq[0].get_video_id()
+            title, video_id, = get_related_video(track_id, dq)[1:]
+            mq.append(Track(title, video_id))
             await play_file(ctx)  # takes care of the download
         await download_related_video(ctx)
 
@@ -881,7 +861,7 @@ async def _repeat(ctx, setting: bool = None):
     if setting is None: setting = not guild_data['repeat']
     data_dict[guild.id]['repeat'] = setting
     if setting:
-        await ctx.send('Repeating the current song')
+        await ctx.send('Repeating the current track')
         if voice_client and not voice_client.is_playing() and not voice_client.is_paused():
             mq = data_dict[guild.id]['music']
             dq = data_dict[guild.id]['done']
@@ -889,7 +869,7 @@ async def _repeat(ctx, setting: bool = None):
                 mq.append(dq.pop(0))
                 await play_file(ctx)
     else:
-        await ctx.send('Not repeating the current song')
+        await ctx.send('Not repeating the current track')
 
 
 @bot.command(name='repeat_all', aliases=['ra'])
@@ -978,12 +958,12 @@ async def remove(ctx, position: int = 0):
     dq = guild_data['done']
     voice_client: discord.VoiceClient = guild.voice_client
     with suppress(IndexError):
-        if position < 0: removed_song = dq.pop(-position - 1)
-        elif position > 0: removed_song = mq.pop(position)
+        if position < 0: removed_track = dq.pop(-position - 1)
+        elif position > 0: removed_track = mq.pop(position)
         else:
             no_after_play(guild_data, voice_client)
-            removed_song = mq.pop(0)
-        await ctx.send(f'Removed `{removed_song.title}`')
+            removed_track = mq.pop(0)
+        await ctx.send(f'Removed `{removed_track.title}`')
         if position == 0: await play_file(ctx)
 
 
@@ -998,13 +978,13 @@ async def move(ctx, _from: int, _to: int):
     else:
         from_queue = guild_data['done']
         _from = -_from - 1
-    try: song = from_queue[_from]
+    try: track = from_queue[_from]
     except IndexError: return
     if _to > 0: to_queue: list = guild_data['music']
     else:
         to_queue = guild_data['done']
         _to = -_to - 1
-    to_queue.insert(_to, song)
+    to_queue.insert(_to, track)
     if to_queue == from_queue and _to < _from: _from += 1
     from_queue.pop(_from)
 
@@ -1015,17 +995,17 @@ async def shuffle_music(ctx):
     guild = ctx.guild
     guild_data = data_dict[guild.id]
     voice_client = guild.voice_client
-    song_playing = voice_client.is_playing() or voice_client.is_paused()
-    current_song = guild_data['music'][0]
+    track_playing = voice_client.is_playing() or voice_client.is_paused()
+    current_track = guild_data['music'][0]
 
-    shuffled_songs = guild_data['music'] + guild_data['done']
-    shuffle(shuffled_songs)
+    shuffled_tracks = guild_data['music'] + guild_data['done']
+    shuffle(shuffled_tracks)
 
-    if song_playing:
-        shuffled_songs.remove(current_song)
-        shuffled_songs = [current_song] + shuffled_songs
+    if track_playing:
+        shuffled_tracks.remove(current_track)
+        shuffled_tracks = [current_track] + shuffled_tracks
 
-    guild_data['music'] = shuffled_songs
+    guild_data['music'] = shuffled_tracks
     guild_data['done'].clear()
     await ctx.send('Shuffled music!')
 
@@ -1057,22 +1037,22 @@ async def next_up(ctx, page=1):
         page = abs(page)
         mq_length = len(mq)
         max_pages = ceil(mq_length / 10)
-        title = f"MUSIC QUEUE [{mq_length} Song{'s' if mq_length > 1 else ''} | Page {page} of {max_pages}]"
-        if guild_data['auto_play']: title += ' | AUTO PLAY ENABLED'
-        if guild_data['repeat_all']: title += ' | REPEAT ALL ENABLED'
-        if guild_data['repeat']: title += ' | REPEAT SONG ENABLED}'
+        title = f"Music Queue [{mq_length} Track{'s' if mq_length > 1 else ''} | Page {page} of {max_pages}]"
+        if guild_data['auto_play']: title += ' | Auto-play Enabled'
+        if guild_data['repeat_all']: title += ' | Repeat All Enabled'
+        if guild_data['repeat']: title += ' | Repeat Track Enabled}'
         msg = ''
         i = 10 * (page - 1)
-        for song in mq[i:10 * page]:
+        for track in mq[i:10 * page]:
             if i == 0:
-                song_status = song.get_length()
-                if song_status == 'DOWNLOADING':
-                    msg += f'`DOWNLOADING` {song.title}'
+                status = track.get_length()
+                if status == 'DOWNLOADING':
+                    msg += f'`DOWNLOADING` {track.title}'
                 else:
-                    song_status = song.status
-                    msg += f'`{song_status}` {song.title} `{song.get_time_stamp(True)}`'
+                    status = track.status
+                    msg += f'`{status}` {track.title} `{track.get_time_stamp(True)}`'
 
-            else: msg += f'\n`{i}.` {song.title} `[{song.get_length(True)}]`'
+            else: msg += f'\n`{i}.` {track.title} `[{track.get_length(True)}]`'
             i += 1
 
         if mq_length > i:
@@ -1080,7 +1060,7 @@ async def next_up(ctx, page=1):
 
         embed = discord.Embed(title=title, description=msg, color=BLUE)
         await ctx.send(embed=embed)
-    else: await ctx.send(embed=discord.Embed(title='MUSIC QUEUE IS EMPTY', description='', color=BLUE))
+    else: await ctx.send(embed=discord.Embed(title='Music Queue is empty', description='', color=BLUE))
 
 
 @bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
@@ -1092,19 +1072,19 @@ async def _recently_played(ctx, page=1):
     if dq:
         page = abs(page)
         dq_length = len(dq)
-        title = f"RECENTLY PLAYED [{dq_length} Song{'s' if dq_length > 1 else ''} | Page {page}]"
+        title = f"Recently Played [{dq_length} Track{'s' if dq_length > 1 else ''} | Page {page}]"
         msg = ''
 
         i = 10 * (page - 1)
-        for song in dq[i:i + 10]:
+        for track in dq[i:i + 10]:
             i += 1
-            msg += f'\n`-{i}` {song.title} `{song.get_length(True)}`'
+            msg += f'\n`-{i}` {track.title} `{track.get_length(True)}`'
 
         if dq_length > i:
             msg += '\n...'
 
         await ctx.send(embed=discord.Embed(title=title, description=msg, color=BLUE))
-    else: await ctx.send('RECENTLY PLAYED IS EMPTY, were you looking for !play_history?')
+    else: await ctx.send('Recently Played is empty, were you looking for !play_history?')
 
 
 @bot.command(aliases=['start_at', 'st'])
@@ -1124,9 +1104,9 @@ async def fast_forward(ctx, seconds: int = 5):
     voice_client = guild.voice_client
     if voice_client.is_playing() or voice_client.is_paused():
         guild_data = data_dict[guild.id]
-        current_song = guild_data['music'][0]
-        start_at = current_song.get_time_stamp() + seconds
-        start_at = min(current_song.get_length(), start_at)
+        current_track = guild_data['music'][0]
+        start_at = current_track.get_time_stamp() + seconds
+        start_at = min(current_track.get_length(), start_at)
         no_after_play(guild_data, voice_client)
         await play_file(ctx, start_at)
 
@@ -1149,9 +1129,9 @@ async def rewind(ctx, seconds: int = 5):
 async def now_playing(ctx):
     guild = ctx.guild
     mq = data_dict[guild.id]['music']
-    song = mq[0]
-    embed = discord.Embed(title=song.title, url=f'https://www.youtube.com/watch?v={song.get_video_id()}',
-                          description=song.get_time_stamp(True), color=0xff0000)
+    track = mq[0]
+    embed = discord.Embed(title=track.title, url=f'https://www.youtube.com/watch?v={track.get_video_id()}',
+                          description=track.get_time_stamp(True), color=0xff0000)
     embed.set_author(name='Now Playing')
     await ctx.send(embed=embed)
     # https://cog-creators.github.io/discord-embed-sandbox/
@@ -1226,10 +1206,12 @@ async def save_as(ctx):
         mq = data_dict[guild_id]['music']
         dq = data_dict[guild_id]['done']
         temp = dq[::-1] + mq
-        song_ids = [(song.title, song.get_video_id()) for song in temp]
-        document = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name, 'creator_id': author_id, 'songs': song_ids, 'type': 'playlist'}
-        result = playlists_coll.replace_one({'playlist_name': playlist_name, 'creator_id': author_id}, document, upsert=True)
-        if result.upserted_id:await ctx.send(f'Successfully created playlist `{playlist_name}`!')
+        track_ids = [(track.title, track.get_video_id()) for track in temp]
+        document = {'guild_id': ctx.guild.id, 'playlist_name': playlist_name,
+                    'creator_id': author_id, 'tracks': track_ids, 'type': 'playlist'}
+        look_for = {'playlist_name': playlist_name, 'creator_id': author_id}
+        result = playlists_coll.replace_one(look_for, document, upsert=True)
+        if result.upserted_id: await ctx.send(f'Successfully created playlist `{playlist_name}`!')
         else: await ctx.send(f'Successfully updated playlist `{playlist_name}`!')
 
 
@@ -1245,14 +1227,14 @@ async def play_playlist(ctx):
         guild_id = ctx.guild.id
         playlist_name = playlist_name.replace(' --s', '--s')
         parsed_out_name = playlist_name.replace('--s', '')
-        songs = get_songs_from_playlist(parsed_out_name, guild_id, ctx.author.id, to_play=True)[0]
-        if songs:
+        tracks = get_tracks_from_playlist(parsed_out_name, guild_id, ctx.author.id, to_play=True)[0]
+        if tracks:
             voice_client = ctx.guild.voice_client
             if voice_client is None: voice_client = await ctx.invoke(bot.get_command('summon'))
             guild_data = data_dict[guild_id]
             no_after_play(guild_data, voice_client)
-            if parsed_out_name != playlist_name or key_word == '!sp': shuffle(songs)
-            guild_data['music'] = songs
+            if parsed_out_name != playlist_name or key_word == '!sp': shuffle(tracks)
+            guild_data['music'] = tracks
             guild_data['done'].clear()
             await play_file(ctx)
         else: await ctx.send('No playlist found with that name')
@@ -1263,10 +1245,10 @@ async def play_playlist(ctx):
 async def load_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
     if playlist_name:
-        songs = get_songs_from_playlist(playlist_name, ctx.guild.id, ctx.author.id)[0]
-        if songs:
-            data_dict[ctx.guild.id]['music'].extend(songs)
-            await ctx.send('Songs added to queue!')
+        tracks = get_tracks_from_playlist(playlist_name, ctx.guild.id, ctx.author.id)[0]
+        if tracks:
+            data_dict[ctx.guild.id]['music'].extend(tracks)
+            await ctx.send('Tracks added to queue!')
         else: await ctx.send('No playlist found with that name')
 
 
@@ -1275,14 +1257,14 @@ async def load_playlist(ctx):
 async def view_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
     if playlist_name:
-        songs, playlist_name = get_songs_from_playlist(playlist_name, ctx.guild.id, ctx.author.id)
-        if songs:
-            pl_length = len(songs)
+        tracks, playlist_name = get_tracks_from_playlist(playlist_name, ctx.guild.id, ctx.author.id)
+        if tracks:
+            pl_length = len(tracks)
             msg = ''
-            for i, song in enumerate(songs[:10]):
-                msg += f'\n`{i + 1}.` {song.title}'
+            for i, track in enumerate(tracks[:10]):
+                msg += f'\n`{i + 1}.` {track.title}'
             if pl_length > 10: msg += '\n...'
-            title = f"PLAYLIST {playlist_name} | {pl_length} Song{'s' if pl_length > 1 else ''}"
+            title = f"PLAYLIST {playlist_name} | {pl_length} Track{'s' if pl_length > 1 else ''}"
             await ctx.send(embed=discord.Embed(title=title, description=msg, color=BLUE))
         else: await ctx.send('No playlist found with that name')
 
@@ -1325,9 +1307,9 @@ async def my_playlists(ctx):
     result = playlists_coll.find({'creator_id': ctx.author.id})
     msg = ''
     for playlist in result:
-        number = len(playlist['songs'])
-        if number == 1: msg += f"\n`{playlist['playlist_name']}` - 1 Song"
-        else: msg += f"\n`{playlist['playlist_name']}` - {number} Songs"
+        number = len(playlist['tracks'])
+        if number == 1: msg += f"\n`{playlist['playlist_name']}` - 1 Track"
+        else: msg += f"\n`{playlist['playlist_name']}` - {number} Tracks"
     await ctx.send(embed=discord.Embed(title=f'You have {result.count()} playlists', description=msg, color=BLUE))
 
 
@@ -1362,42 +1344,42 @@ async def dm(ctx):
                             receiver = discord.utils.get(guild.members, nick=temp)
                             break
 
-            # search for user by name, returns first match, people can use at their own digestion
-            if receiver:
-                receiver_id = receiver.id
-                # check if user has anonymous messaging enabled
-                user_settings = dm_coll.find_one({'user_id': receiver_id, 'type': 'user_settings'})
-                if user_settings: allows_messages = user_settings['allows_messages']
-                else:
-                    dm_coll.insert_one({'user_id': receiver_id, 'type': 'user_settings', 'allows_messages': True})
-                    allows_messages = True
-                if allows_messages:
-                    sender_id = ctx.author.id
-                    message_thread = dm_coll.find_one({'sender': sender_id, 'receiver': receiver_id})
-                    if message_thread: thread_id = message_thread['thread_id']
-                    else:
-                        thread_id = 0
-                        message_thread = True
-                    while message_thread is not None:
-                        thread_id = randint(0, 16777215)
-                        message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
-                    dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id,
-                                        'type': 'message_thread'})
-                    thread_id_color = discord.Color(thread_id)
-                    thread_id = str(thread_id)
-                    embed = discord.Embed(title='Message Received :mailbox_with_mail:', color=thread_id_color,
-                                          description=f'Reply with `!reply {thread_id} <msg>`')
-                    embed.add_field(name='Thread ID:', value=thread_id, inline=True)
-                    embed.add_field(name='Message:', value=message, inline=True)
-                    await receiver.send(embed=embed)
-                    embed = discord.Embed(title='Message Sent :airplane:', color=thread_id_color)
-                    embed.add_field(name='To:', value=str(receiver))
-                    embed.add_field(name='Thread ID:', value=thread_id)
-                    await ctx.author.send(embed=embed)
-                else:
-                    await ctx.author.send(f'{receiver.name} is not accepting anonymous messages at this time.')
+        # search for user by name, returns first match, people can use at their own digestion
+        if receiver:
+            receiver_id = receiver.id
+            # check if user has anonymous messaging enabled
+            user_settings = dm_coll.find_one({'user_id': receiver_id, 'type': 'user_settings'})
+            if user_settings: allows_messages = user_settings['allows_messages']
             else:
-                await ctx.author.send(f'A user with that name could not be found. Names are case sensitive.')
+                dm_coll.insert_one({'user_id': receiver_id, 'type': 'user_settings', 'allows_messages': True})
+                allows_messages = True
+            if allows_messages:
+                sender_id = ctx.author.id
+                message_thread = dm_coll.find_one({'sender': sender_id, 'receiver': receiver_id})
+                if message_thread: thread_id = message_thread['thread_id']
+                else:
+                    thread_id = 0
+                    message_thread = True
+                while message_thread is not None:
+                    thread_id = randint(0, 16777215)
+                    message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
+                dm_coll.insert_one({'thread_id': thread_id, 'sender': sender_id, 'receiver': receiver_id,
+                                    'type': 'message_thread'})
+                thread_id_color = discord.Color(thread_id)
+                thread_id = str(thread_id)
+                embed = discord.Embed(title='Message Received :mailbox_with_mail:', color=thread_id_color,
+                                      description=f'Reply with `!reply {thread_id} <msg>`')
+                embed.add_field(name='Thread ID:', value=thread_id, inline=True)
+                embed.add_field(name='Message:', value=message, inline=True)
+                await receiver.send(embed=embed)
+                embed = discord.Embed(title='Message Sent :airplane:', color=thread_id_color)
+                embed.add_field(name='To:', value=str(receiver))
+                embed.add_field(name='Thread ID:', value=thread_id)
+                await ctx.author.send(embed=embed)
+            else:
+                await ctx.author.send(f'{receiver.name} is not accepting anonymous messages at this time.')
+        else:
+            await ctx.author.send(f'A user with that name could not be found. Names are case sensitive.')
     else:
         await ctx.send('You must have at least 2 arguments! Refer to !help for more information.')
     if not isinstance(ctx.channel, discord.DMChannel):
@@ -1412,7 +1394,6 @@ async def reply(ctx):
         if len(args) > 2:
             thread_id, message = int(args[1]), ' '.join(args[2:])
             user = ctx.author
-            sender_id = user.id
             message_thread = dm_coll.find_one({'thread_id': thread_id, 'type': 'message_thread'})
             if message_thread:
                 receiver_id = message_thread['receiver']
@@ -1576,18 +1557,17 @@ async def sell(ctx, ticker, price_per_share: float, shares_sold: int, commission
             await ctx.send('Shares removed to portfolio')
 
 
-@bot.command(aliases=['portfolio'])
-async def holdings(ctx: Context, to_dm=False):  # TODO
-    await ctx.send('Feature coming soon')
+# @bot.command(aliases=['portfolio'])
+# async def holdings(ctx: Context, to_dm=False):  # TODO
+#     await ctx.send('Feature coming soon')
 
 
-@bot.command(
-    aliases=['export_holdings', 'export_portfolio', 'download_holdings', 'dl_portfolio', 'dl_holdings', 'dlholdings'])
-async def download_portfolio(ctx: Context, to_dm=True):  # TODO
-    # export to a csv or xlxs file
-    # use firefox send
-    # send in a DM channel by default
-    await ctx.send('Feature coming soon')
+# @bot.command(aliases=['download_holdings', 'dlportf', 'xportf'])
+# async def download_portfolio(ctx: Context, to_dm=True):  # TODO
+#     # export to a csv or xlxs file
+#     # use firefox send
+#     # send in a DM channel by default
+#     await ctx.send('Feature coming soon')
 
 
 @bot.command()

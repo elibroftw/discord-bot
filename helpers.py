@@ -6,7 +6,9 @@ from bson.objectid import ObjectId
 from collections import OrderedDict
 from contextlib import suppress
 from email.mime.multipart import MIMEMultipart
+import base64
 from email.mime.text import MIMEText
+from functools import wraps
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 import time
@@ -22,7 +24,7 @@ from urllib.parse import urlparse, urlencode, parse_qs, urlsplit
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
 import subprocess
-from subprocess import PIPE, DEVNULL
+from subprocess import DEVNULL
 import pymongo.collection
 from pathlib import Path
 import platform
@@ -30,7 +32,7 @@ if __name__ != '__main__':
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     subprocess.call('pip install --user --upgrade youtube-dl', startupinfo=startupinfo, stdout=DEVNULL, stderr=DEVNULL)
-import youtube_dl
+from youtube_dl import YoutubeDL
 
 db_client = MongoClient('localhost', 27017)
 db = db_client.discord_bot
@@ -38,7 +40,35 @@ playlists_coll: pymongo.collection.Collection = db.playlists
 dm_coll: pymongo.collection.Collection = db.anon_messages
 portfolio_coll: pymongo.collection.Collection = db.portfolios
 FFMPEG = Path(subprocess.check_output('where ffmpeg').decode()).parent
+# https://github.com/ytdl-org/youtube-dl/blob/3e4cedf9e8cd3157df2457df7274d0c842421945/youtube_dl/YoutubeDL.py#L137-L312
+ydl_opts = {
+    'external_downloader_args': ['-c', '-j', '3', '-x', '3', '-s', '3', '-k', '1M'],
+    # https://aria2.github.io/manual/en/html/aria2c.html#options
+    'format': 'bestaudio/best',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192'
+    }],
+    'postprocessor_args': ['-threads', '1'],
+    'ffmpeg_location': FFMPEG,
+    'cachedir': False,
+    # 'nooverwrites': True,
+    'audio-quality': 0
+}
+ydl = YoutubeDL(ydl_opts)
+MUSIC_DIR = 'music'
 # save_coll: pymongo.collection.Collection = db.save_coll  # saving the state of the bot instead of a save.json
+
+
+def timing(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        _start = time.time()
+        result = f(*args, **kwargs)
+        print(f'@timing {f.__name__} ELAPSED TIME:', time.time() - _start)
+        return result
+    return wrapper
 
 
 def backup_db():
@@ -51,7 +81,7 @@ def backup_db():
     def _default(o):
         if isinstance(o, ObjectId):
             return str(o)
-        return json.JSONEncoder.default(o)
+        return json.JSONEncoder().default(o)
 
     with open('mongodb_backup.json', 'w') as fp:
         json.dump(backup, fp, default=_default)  # no indent because that takes up space
@@ -66,28 +96,37 @@ def db_from_backup(filename='mongodb_backup.json'):
         for document in backup[collection_name]: collection.insert_one(document)
 
 
-class Song:
-    __slots__ = ('title', '_video_id', '_time_stamp', 'start_time', 'status', 'length')
+class Track:
+    __slots__ = 'title', '_video_id', '_time_stamp', 'start_time', 'status', 'length', 'from_soundcloud'
 
-    def __init__(self, title, video_id, time_stamp=0):
+    def __init__(self, title, video_id, from_soundcloud=False, time_stamp=0):
+        # default is YouTube
         self.title = title
         self._video_id = video_id
         self._time_stamp = time_stamp
         self.start_time = None
         self.status = 'NOT PLAYING'
         self.length = 'DOWNLOADING'
+        self.from_soundcloud = from_soundcloud
 
     def __hash__(self):
         return hash(self._video_id)
 
+    def get_path(self):
+        if self.from_soundcloud:
+            part = base64.b64encode(urlparse(self._video_id).path.encode()).decode()
+            return f'{MUSIC_DIR}/soundcloud@{part}.mp3'
+        else: return f'{MUSIC_DIR}/youtube@{self._video_id}.mp3'
+
     def __repr__(self):
-        return f'Song({self.title}, {self._video_id}, {self.get_time_stamp()})'
+        return f'Track({self.title}, {self._video_id}, {self.from_soundcloud}, {self.get_time_stamp()})'
 
     def __str__(self, show_length=False):
-        return f'Song({self.title}, {self._video_id}, {self.get_time_stamp()}, length={self.get_length()})'
+        return f'Track({self.title}, {self._video_id}, {self.from_soundcloud},' \
+               f' {self.get_time_stamp()}, length={self.get_length()})'
 
     def __eq__(self, other):
-        return self.__class__ == other.__class__ and other.get_video_id() == self._video_id
+        return Track == other.__class__ and other.get_video_id() == self._video_id
 
     def start(self, start_at=None):
         if start_at is None: start_at = self._time_stamp
@@ -108,11 +147,13 @@ class Song:
     def get_length(self, string=False):
         if self.length == 'DOWNLOADING':
             try:
-                audio = MP3(f'music/{self._video_id}.mp3')
+                audio = MP3(self.get_path())
                 temp = audio.info.length
                 if temp == 0: raise MutagenError
                 self.length = temp
-            except MutagenError: return 'DOWNLOADING'
+            except MutagenError as e:
+                print(e)
+                return 'DOWNLOADING'
         if string:
             temp = round(self.length)
             minutes = temp // 60
@@ -126,14 +167,14 @@ class Song:
         if self.status == 'PLAYING':
             self._time_stamp = time.time() - self.start_time
         if string:
-            song_length = self.get_length(True)
-            if song_length in ('DOWNLOADING', '00:00'): return ''
+            track_length = self.get_length(True)
+            if track_length in ('DOWNLOADING', '00:00'): return ''
             temp = round(self._time_stamp)
             minutes = temp // 60
             seconds = temp % 60
             if minutes < 10: minutes = f'0{minutes}'
             if seconds < 10: seconds = f'0{seconds}'
-            return f'[{minutes}:{seconds} - {song_length}]'
+            return f'[{minutes}:{seconds} - {track_length}]'
         return self._time_stamp
 
     def set_time_stamp(self, seconds):
@@ -279,38 +320,24 @@ def remove_silence(input_file, output_file):
 
 
 # noinspection SpellCheckingInspection
-def youtube_download(url_or_video_id, verbose=False, use_external_downloader=False):
+def ytdl(url_or_video_id, outputtmpl, verbose=False, use_external_downloader=False):
     # https://github.com/ytdl-org/youtube-dl/blob/3e4cedf9e8cd3157df2457df7274d0c842421945/youtube_dl/YoutubeDL.py#L137-L312
-    ydl_opts = {
+    dyanmic_opts = {
         'external_downloader': 'aria2c.exe' if use_external_downloader else None,
-        'external_downloader_args': ['-c', '-j', '3', '-x', '3', '-s', '3', '-k', '1M'],
-        # https://aria2.github.io/manual/en/html/aria2c.html#options
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'postprocessor_args': ['-threads', '1'],
-        # 'outtmpl': 'music/%(title)s - %(id)s.%(ext)s',
-        'outtmpl': 'music/%(id)s.%(ext)s',
-        'ffmpeg_location': FFMPEG,
-        'verbose': verbose,  # for some reason it has to be True to work  # 4/18/2020
-        'cachedir': False,
-        # 'nooverwrites': True,
         'quiet': not verbose,
-        'audio-quality': 0
+        'verbose': verbose,   # for some reason it has to be True to work  # 4/18/2020
+        'outtmpl': outputtmpl if outputtmpl else f'{MUSIC_DIR}/%(extractor)s@%(id)s.%(ext)s',
     }
+    ydl.params.update(dyanmic_opts)
+    return ydl.extract_info(url_or_video_id)
+    # info_dict = ydl.extract_info(url_or_video_id, download=Track)
+    # video_id = info_dict['display_id']
+    # remove_silence(input_file, output_file)
+    # return info_dict
 
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url_or_video_id])
-        # info_dict = ydl.extract_info(url_or_video_id, download=False)
-        # video_id = info_dict['display_id']
-        # input_file = f'music/{video_id}.mp3'
-        # output_file = f'music/{video_id}.mp3'
-        # remove_silence(input_file, output_file)
-        # return info_dict
-        return 'downloaded'
+
+def get_soundcloud_info(url):
+    return ydl.extract_info(url, download=False)
 
 
 def extract_video_id(url):
@@ -324,44 +351,48 @@ def extract_video_id(url):
     return None
 
 
-def get_songs_from_youtube_playlist(url, to_play=False):
+def get_videos_from_yt_playlist(url, to_play=False):
     playlist_id = parse_qs(urlsplit(url).query)['list'][0]
-    songs, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
-    return songs, playlist_name
+    tracks, playlist_name = get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
+    return tracks, playlist_name
 
 
-def get_songs_from_playlist(playlist_name, guild_id, author_id, to_play=False):
-    songs = []
+def get_tracks_from_playlist(playlist_name, guild_id, author_id, to_play=False):
+    tracks = []
     if playlist_name.startswith('https://www.youtube.com/playlist'):
         playlist_id = parse_qs(urlsplit(playlist_name).query)['list'][0]
         return get_videos_from_playlist(playlist_id, return_title=True, to_play=to_play)
-        # return get_songs_from_youtube_playlist(playlist_name, to_play=to_play)
+        # return get_videos_from_yt_playlist(playlist_name, to_play=to_play)
     playlist = None
     try: scope = int(re.compile('--[2-3]').search(playlist_name).group()[2:])
     except AttributeError: scope = 1
-    if scope == 1: playlist = playlists_coll.find_one({'guild_id': guild_id, 'playlist_name': playlist_name, 'creator_id': author_id})
-    if scope == 2 or not playlist: playlist = playlists_coll.find_one({'guild_id': guild_id, 'playlist_name': playlist_name})
+    if scope == 1:
+        look_for = {'guild_id': guild_id, 'playlist_name': playlist_name, 'creator_id': author_id}
+        playlist = playlists_coll.find_one(look_for)
+    if scope == 2 or not playlist:
+        look_for = {'guild_id': guild_id, 'playlist_name': playlist_name}
+        playlist = playlists_coll.find_one(look_for)
     if scope == 3 or not playlist: playlist = playlists_coll.find_one({'playlist_name': playlist_name})
-    if playlist: songs = [Song(*item) for item in playlist['songs']]
-    return songs, playlist_name
+    if playlist: tracks = [Track(*item) for item in playlist['tracks']]
+    return tracks, playlist_name
 
 
 def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
     f = {'part': 'snippet',  'playlistId': playlist_id, 'key': GOOGLE_API, 'maxResults': 50}
     response = json.loads(requests.get(f'{YT_API_URL}playlistItems?{urlencode(f)}').text)
     if to_play:
-        songs_dict = {item['snippet']['resourceId']['videoId']: item['snippet']['title'] for item in response['items']}
-        video_ids = list(songs_dict.keys())
+        tracks_dict = {item['snippet']['resourceId']['videoId']: item['snippet']['title'] for item in response['items']}
+        video_ids = list(tracks_dict.keys())
         durations = get_video_durations(video_ids).items()
-        songs = [Song(songs_dict[video_id], video_id) for video_id, duration in durations if duration <= 1800]
+        tracks = [Track(tracks_dict[video_id], video_id) for video_id, duration in durations if duration <= 1800]
     else:
-        songs = [Song(item['snippet']['title'], item['snippet']['resourceId']['videoId']) for item in response['items']]
+        tracks = [Track(it['snippet']['title'], it['snippet']['resourceId']['videoId']) for it in response['items']]
 
     if return_title:
         f = {'part': 'snippet',  'id': playlist_id, 'key': GOOGLE_API}
         response = json.loads(requests.get(f'{YT_API_URL}playlists?{urlencode(f)}').text)
-        return songs, response['items'][0]['snippet']['title']
-    return songs
+        return tracks, response['items'][0]['snippet']['title']
+    return tracks
 
 
 def get_all_playlists():
@@ -384,7 +415,7 @@ def get_video_title(video_id):
 
 
 def get_related_video(video_id, done_queue):
-    dq = done_queue[:20]  # songs have a possibility of repeating after 20 songs
+    dq = done_queue[:20]  # tracks have a possibility of repeating after 20 tracks
     results = min(5 + len(dq), 50)
     f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
          'type': 'video', 'key': GOOGLE_API}
@@ -395,8 +426,8 @@ def get_related_video(video_id, done_queue):
     for item in search_response['items']:
         title = item['snippet']['title']
         video_id = item['id']['videoId']
-        related_song = Song(title, video_id)
-        if related_song not in dq and video_durations[video_id] <= 1800:  # 30 minutes
+        related_track = Track(title, video_id)
+        if related_track not in dq and video_durations[video_id] <= 1800:  # 30 minutes
             related_url = f'https://www.youtube.com/watch?v={video_id}'
             return related_url, fix_youtube_title(title), video_id
     raise Exception('No related videos found :(')
@@ -506,7 +537,7 @@ def twitter_search_user(query, users_to_search=5):
     return users
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # tests go here
     assert twitter_search_user('Lady Gaga')
     assert twitter_get_tweets(twitter_search_user('Elon Musk')[0][1])
@@ -524,6 +555,10 @@ if __name__ == "__main__":
     assert get_video_duration('JnIO6AQRS2k') == 3682
     assert get_videos_from_playlist('PLY4YLSp44QYvmvSNX3Q_0y-mOQ02ZWIbu')
     start_time = time.time()
-    youtube_download('https://www.youtube.com/watch?v=oEAjv2vgUGc', verbose=True)
+    ytdl('https://www.youtube.com/watch?v=oEAjv2vgUGc', '', verbose=True)
+    assert os.path.exists(f'{MUSIC_DIR}/youtube@oEAjv2vgUGc.mp3')
+    bipolar_remix = 'https://soundcloud.com/kiiaraonline/bipolar-no-mana-remix'
+    ytdl(bipolar_remix, '', verbose=True)
+    get_soundcloud_info(bipolar_remix)
     print('Download time:', time.time() - start_time)
     print('ALL TESTS PASSED')
