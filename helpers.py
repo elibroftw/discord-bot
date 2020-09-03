@@ -6,6 +6,7 @@ from bson.objectid import ObjectId
 from collections import OrderedDict
 from contextlib import suppress
 from email.mime.multipart import MIMEMultipart
+from environs import Env
 import base64
 from email.mime.text import MIMEText
 from functools import wraps
@@ -60,7 +61,6 @@ ydl = YoutubeDL(ydl_opts)
 MUSIC_DIR = 'music'
 # save_coll: pymongo.collection.Collection = db.save_coll  # saving the state of the bot instead of a save.json
 
-
 def timing(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -69,31 +69,6 @@ def timing(f):
         print(f'@timing {f.__name__} ELAPSED TIME:', time.time() - _start)
         return result
     return wrapper
-
-
-def backup_db():
-    # should be run every startup
-    backup = {}
-    for collection in db.list_collection_names():
-        cursor = db[collection].find({})
-        backup[collection] = [document for document in cursor]
-
-    def _default(o):
-        if isinstance(o, ObjectId):
-            return str(o)
-        return json.JSONEncoder().default(o)
-
-    with open('mongodb_backup.json', 'w') as fp:
-        json.dump(backup, fp, default=_default)  # no indent because that takes up space
-
-
-def db_from_backup(filename='mongodb_backup.json'):
-    with open(filename) as fp:
-        backup = json.load(fp)
-    for collection_name in backup:
-        collection: pymongo.collection.Collection = db[collection_name]
-        collection.drop()
-        for document in backup[collection_name]: collection.insert_one(document)
 
 
 class Track:
@@ -199,41 +174,38 @@ class Track:
                 'time_stamp': self.get_time_stamp()}
 
 
-try: GOOGLE_API = os.environ['google']
-except KeyError:
-    from environs import Env
 
-    env = Env()
-    env.read_env()
-    GOOGLE_API = os.environ['google']
-
+env = Env()
+env.read_env()
 
 YT_API_URL = 'https://www.googleapis.com/youtube/v3/'
-twitter_auth = tweepy.OAuthHandler(os.environ['TWITTER_CONSUMER_KEY'], os.environ['TWITTER_CONSUMER_SECRET'])
-twitter_auth.set_access_token(os.environ['TWITTER_ACCESS_TOKEN'], os.environ['TWITTER_ACCESS_TOKEN_SECRET'])
+GOOGLE_API = os.environ['google']
+
+SPOTIFY_AUTH_STR = f"{os.environ['SPOTIFY_CLIENT_ID']}:{os.environ['SPOTIFY_SECRET']}"
+SPOTIFY_B64_AUTH_STR = base64.urlsafe_b64encode(SPOTIFY_AUTH_STR.encode()).decode()
+spotify_token_creation = time.time() - 7 * 360  # -7 hours to ensure token regen
+spotify_token = ''
+
+twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
+twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
 TWITTER_API = tweepy.API(twitter_auth)
-
-
-def file_friendly_title(title):
-    return title.replace('&quot;', '\'').replace('&amp;', '&').replace(
-        '/', '_').replace('?', '').replace(':', ' -').replace('&#39;', "'").replace(' || ', '_')
 
 
 def fix_youtube_title(title):
     return title.replace('&quot;', '\'').replace('&amp;', '&').replace('&#39;', "'")
 
 
-def youtube_search(text, return_info=False, limit_duration=False, duration_limit=600):
+def youtube_search(text, parse_text=True, return_info=False, limit_duration=False, duration_limit=600):
     if text in ('maagnolia', 'magnolia') and return_info:
         text = 'magnolia (Audio)'
     # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
-    p = re.compile('--[1-4][0-9]|--[1-2]')
-    try: results = int(p.search(text).group()[2:])
-    except AttributeError: results = 1
-    p = re.compile('--channel|--playlist')  # defaults to video so I removed --video
-    try: kind = p.search(text).group()[2:]
-    except AttributeError: kind = 'video'
-    with suppress(ValueError): text = text[text.index(' '):text.index('--')]
+    results, kind = 1, 'video'
+    if parse_text:
+        p = re.compile('--[1-4][0-9]|--[1-2]')
+        with suppress(AttributeError): results = int(p.search(text).group()[2:])
+        p = re.compile('--channel|--playlist')  # defaults to video so I removed --video
+        with suppress(AttributeError): kind = p.search(text).group()[2:]
+        with suppress(ValueError): text = text[text.index(' '):text.index('--')]
     f = {'part': 'id,snippet', 'maxResults': min(results + 5, 50), 'order': 'relevance',
          'q': text, 'type': kind, 'key': GOOGLE_API}
     query_string = urlencode(f)
@@ -301,22 +273,64 @@ def get_video_durations(video_ids):
     return return_dict
 
 
-def detect_silence(input_file):
-    # https://stackoverflow.com/a/42509904/7732434
-    ffmpeg_location = r'ffmpeg\bin\ffmpeg'
-    args_1 = f'{ffmpeg_location} -i {input_file} -af silencedetect=d=0.2 -f null - 2>&1 -loglevel quiet'
-    yes_or_no = os.system(args_1)
-    # yes_or_no = yes_or_no.split('\n')
-    return yes_or_no
+def get_spotify_auth():
+    global spotify_token_creation, spotify_token
+    if time.time() - spotify_token_creation > 5 * 360:  # every 5 hours just to be safe
+        spotify_token_creation = time.time()
+        header = {'Authorization': 'Basic ' + SPOTIFY_B64_AUTH_STR}
+        data = {'grant_type': 'client_credentials'}
+        access_token_response = requests.post('https://accounts.spotify.com/api/token', headers=header, data=data)
+        spotify_token = access_token_response.json()['access_token']
+    return {'Authorization': f'Bearer {spotify_token}'}
 
 
-def remove_silence(input_file, output_file):
-    if input_file == output_file:
-        return False
-    ffmpeg_location = r'ffmpeg\bin\ffmpeg'
-    args = f'-i "{input_file}" -af silenceremove=start_periods=1:stop_periods=1:detection=peak "{output_file}"'
-    os.system(f'{ffmpeg_location} -loglevel quiet ' + args)
-    os.remove(input_file)
+def spotify_track_to_youtube(link):
+    track_id = urlparse(link).path.split('/track/', 1)[1]
+    r = requests.get(f'https://api.spotify.com/v1/tracks/{track_id}', headers=get_spotify_auth()).json()
+    track_name = r['name']
+    track_artist = r['artists'][0]['name']
+    return youtube_search(f'{track_artist} - {track_name}', parse_text=False, return_info=True)
+
+
+@timing
+def spotify_album_to_youtube(link):
+    album_id = urlparse(link).path.split('/album/', 1)[1]
+    r = requests.get(f'https://api.spotify.com/v1/albums/{album_id}/tracks', headers=get_spotify_auth()).json()
+    tracks = []
+    for track in r['items']:
+        track_artist = track['artists'][0]['name']
+        track_name = track['name']
+        title, video_id = youtube_search(f'{track_artist} - {track_name}', parse_text=False, return_info=True)[1:]
+        tracks.append(Track(title, video_id))
+    return tracks
+
+
+@timing
+def spotify_playlist_to_youtube(link):
+    playlist_id = urlparse(link).path.split('/playlist/', 1)[1]
+    r = requests.get(f'https://api.spotify.com/v1/playlists/{playlist_id}/tracks', headers=get_spotify_auth()).json()
+    tracks = []
+    for track in r['items']:
+        pprint(track.keys())
+        track_artist = track['artists'][0]['name']
+        track_name = track['name']
+        title, video_id = youtube_search(f'{track_artist} - {track_name}', parse_text=False, return_info=True)[1:]
+        tracks.append(Track(title, video_id))
+    return tracks
+
+
+def spotify_to_youtube(link):
+    if 'track' in link:
+        return spotify_track_to_youtube(link)
+    elif 'album' in link:
+        return spotify_album_to_youtube(link)
+    elif 'playlist' in link:
+        return spotify_playlist_to_youtube(link)
+
+
+def query_to_tracks(url_or_query):
+    # TODO: take
+    pass
 
 
 # noinspection SpellCheckingInspection
@@ -330,10 +344,6 @@ def ytdl(url_or_video_id, outputtmpl, verbose=False, use_external_downloader=Fal
     }
     ydl.params.update(dyanmic_opts)
     return ydl.extract_info(url_or_video_id)
-    # info_dict = ydl.extract_info(url_or_video_id, download=Track)
-    # video_id = info_dict['display_id']
-    # remove_silence(input_file, output_file)
-    # return info_dict
 
 
 def get_soundcloud_info(url):
@@ -460,40 +470,12 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
             raise RuntimeError(f"Could not load an opus lib ({opus_lib}). Tried {', '.join(opus_libs)}")
 
 
-def send_email(recipient, name='', subject=''):  # NOTE: for later
-    password = os.environ['PASSWORD']
-    my_address = os.environ['EMAIL']
-    s = smtplib.SMTP('smtp.gmail.com', 587)
-    s.starttls()
-    s.login(my_address, password)
-    msg = MIMEMultipart()
-    message = f'Hey {name}, this is just a test'
-    msg['From'] = my_address
-    msg['To'] = recipient
-    msg['Subject'] = f'{subject}'
-    msg.attach(MIMEText(message, 'plain'))
-    s.send_message(msg)
-    s.quit()
-
-
 def search_for(directory, contains):
     contains_list = []
     for file in glob.glob(f'{directory}/*'):
         if contains in file:
             contains_list.append(file)
     return contains_list
-
-
-def format_time_ffmpeg(s):
-    total_msec = s * 1000
-    total_seconds = s
-    total_minutes = s / 60
-    total_hours = s / 3600
-    msec = int(total_msec % 1000)
-    sec = int(total_seconds % 60 - (msec / 3600000))
-    mins = int(total_minutes % 60 - (sec / 3600) - (msec / 3600000))
-    hours = int(total_hours - (mins / 60) - (sec / 3600) - (msec / 3600000))
-    return "{:02d}:{:02d}:{:02d}".format(hours, mins, sec)
 
 
 # TODO: TURN GET TWEET INTO ONE FUNCTION
@@ -537,8 +519,88 @@ def twitter_search_user(query, users_to_search=5):
     return users
 
 
+def backup_db():
+    # should be run every startup
+    backup = {}
+    for collection in db.list_collection_names():
+        cursor = db[collection].find({})
+        backup[collection] = [document for document in cursor]
+
+    def _default(o):
+        if isinstance(o, ObjectId):
+            return str(o)
+        return json.JSONEncoder().default(o)
+
+    with open('mongodb_backup.json', 'w') as fp:
+        json.dump(backup, fp, default=_default)  # no indent because that takes up space
+
+
+def db_from_backup(filename='mongodb_backup.json'):
+    with open(filename) as fp:
+        backup = json.load(fp)
+    for collection_name in backup:
+        collection: pymongo.collection.Collection = db[collection_name]
+        collection.drop()
+        for document in backup[collection_name]: collection.insert_one(document)
+
+
+def format_time_ffmpeg(s):
+    total_msec = s * 1000
+    total_seconds = s
+    total_minutes = s / 60
+    total_hours = s / 3600
+    msec = int(total_msec % 1000)
+    sec = int(total_seconds % 60 - (msec / 3600000))
+    mins = int(total_minutes % 60 - (sec / 3600) - (msec / 3600000))
+    hours = int(total_hours - (mins / 60) - (sec / 3600) - (msec / 3600000))
+    return "{:02d}:{:02d}:{:02d}".format(hours, mins, sec)
+
+
+# unused functions
+def send_email(recipient, name='', subject=''):  # NOTE: for later
+    password = os.environ['password']
+    my_address = os.environ['email']
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.starttls()
+    s.login(my_address, password)
+    msg = MIMEMultipart()
+    message = f'Hey {name}, this is just a test'
+    msg['From'] = my_address
+    msg['To'] = recipient
+    msg['Subject'] = f'{subject}'
+    msg.attach(MIMEText(message, 'plain'))
+    s.send_message(msg)
+    s.quit()
+
+
+# FFMPEG unused functions
+def detect_silence(input_file):
+    # https://stackoverflow.com/a/42509904/7732434
+    ffmpeg_location = r'ffmpeg\bin\ffmpeg'
+    args_1 = f'{ffmpeg_location} -i {input_file} -af silencedetect=d=0.2 -f null - 2>&1 -loglevel quiet'
+    yes_or_no = os.system(args_1)
+    # yes_or_no = yes_or_no.split('\n')
+    return yes_or_no
+
+
+def remove_silence(input_file, output_file):
+    if input_file == output_file:
+        return False
+    ffmpeg_location = r'ffmpeg\bin\ffmpeg'
+    args = f'-i "{input_file}" -af silenceremove=start_periods=1:stop_periods=1:detection=peak "{output_file}"'
+    os.system(f'{ffmpeg_location} -loglevel quiet ' + args)
+    os.remove(input_file)
+
+
 if __name__ == '__main__':
     # tests go here
+    # ZHU - Cold Blooded
+    spotify_track = 'https://open.spotify.com/track/1HvOkMQua2nC7CQpKNGLNE?si=TOz6DGa2SyaYYBwBLB2b2Q'
+    # ZHU - GENERATIONWHY
+    spotify_album = 'https://open.spotify.com/album/6Xhb46t8f3z8FkuXQAj4UV?si=xJC87utOQ92qP_Cp9zo4JQ'
+    # Power Hour playlist
+    spotify_playlist = 'https://open.spotify.com/user/spotify/playlist/37i9dQZF1DX32NsLKyzScr?si=tp3XpSiMSUmu-DoEyXl7Mg'
+    bipolar_remix = 'https://soundcloud.com/kiiaraonline/bipolar-no-mana-remix'
     assert twitter_search_user('Lady Gaga')
     assert twitter_get_tweets(twitter_search_user('Elon Musk')[0][1])
     assert twitter_get_tweets('discord')
@@ -554,11 +616,10 @@ if __name__ == '__main__':
     assert extract_video_id('youtube') is None
     assert get_video_duration('JnIO6AQRS2k') == 3682
     assert get_videos_from_playlist('PLY4YLSp44QYvmvSNX3Q_0y-mOQ02ZWIbu')
-    start_time = time.time()
-    ytdl('https://www.youtube.com/watch?v=oEAjv2vgUGc', '', verbose=True)
-    assert os.path.exists(f'{MUSIC_DIR}/youtube@oEAjv2vgUGc.mp3')
-    bipolar_remix = 'https://soundcloud.com/kiiaraonline/bipolar-no-mana-remix'
-    ytdl(bipolar_remix, '', verbose=True)
-    get_soundcloud_info(bipolar_remix)
-    print('Download time:', time.time() - start_time)
+    # ytdl('https://www.youtube.com/watch?v=oEAjv2vgUGc', '', verbose=True)
+    # assert os.path.exists(f'{MUSIC_DIR}/youtube@oEAjv2vgUGc.mp3')
+    # ytdl(bipolar_remix, '', verbose=True)
+    spotify_track_to_youtube(spotify_track)
+    assert type(spotify_album_to_youtube(spotify_album)) == list
+    assert type(spotify_playlist_to_youtube(spotify_playlist)) == list
     print('ALL TESTS PASSED')

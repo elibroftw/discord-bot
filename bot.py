@@ -45,10 +45,10 @@ bot.remove_command('help')
 bot.command()
 load_opus_lib()
 
-INVITATION_CODE = os.environ['INVITATION_CODE']
-MY_GUILD_ID = int(os.environ['GUILD_ID'])
-MY_USER_ID = int(os.environ['USER_ID'])
-DEFAULT_ROLE = os.getenv('DEFAULT_ROLE')
+INVITATION_CODE = os.environ['invite_code']
+MY_GUILD_ID = int(os.environ['guild_id'])
+MY_USER_ID = int(os.environ['user_id'])
+DEFAULT_ROLE = os.environ['default_role']
 BLUE = discord.Color.blue()
 TWITTER_BLUE = discord.Color(5631660)
 STOCKS_GREEN = discord.Color.from_rgb(26, 197, 103)
@@ -766,6 +766,7 @@ async def play(ctx):
         url_or_query = ' '.join(url_or_query[1:])
         video_id = extract_video_id(url_or_query)
         from_soundcloud = False
+        # TODO: cleanup. Use query_to_tracks
         if video_id is not None:
             title = get_video_title(video_id)
             if get_video_duration(video_id) > 1800:
@@ -786,6 +787,17 @@ async def play(ctx):
                 return await ctx.send('Sound cloud playlists are not supported at the moment')
             from_soundcloud = True
             title = video_id = normalize_url(url_or_query)
+        elif 'spotify.com' in url_or_query:
+            if 'track' in url_or_query:
+                title, video_id = spotify_to_youtube(url_or_query)[1:]
+            elif 'album' in url_or_query:
+                tracks = spotify_album_to_youtube(url_or_query)
+                if tracks:
+                    mq.extend(tracks)
+                    await ctx.send('Tracks added to queue!')
+                if len(tracks) == len(mq):
+                    await play_file(ctx)
+                return
         else:
             try: title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)[1:]
             except (ValueError, IndexError):
