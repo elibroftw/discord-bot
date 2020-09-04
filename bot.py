@@ -100,18 +100,19 @@ async def on_ready():
             with open('save.json') as f:
                 _save_dict = json.load(f)
         os.remove('save.json')
-    for k, v in _save_dict['data_dict'].items():
-        if k != 'downloads':
-            mq = v['music'] = [Track(s['title'], s['video_id'], s['time_stamp']) for s in v['music']]
-            v['done'] = [Track(s['title'], s['video_id'], s['time_stamp']) for s in v['done']]
+    for guild_id, v in _save_dict['data_dict'].items():
+        if guild_id != 'downloads':
+            mq = v['music'] = [Track(s['title'], s['video_id'], time_stamp=s['time_stamp']) for s in v['music']]
+            v['done'] = [Track(s['title'], s['video_id'], time_stamp=s['time_stamp']) for s in v['done']]
             # noinspection PyTypeChecker
-            data_dict[int(k)] = v
-            channel_id = v['voice_channel']
-            if channel_id:
-                voice_channel = bot.get_channel(channel_id)
+            data_dict[int(guild_id)] = v
+            vc_id = v['voice_channel']
+            if vc_id:
+                voice_channel = bot.get_channel(vc_id)
                 await voice_channel.connect()
                 tc = bot.get_channel(v['text_channel'])
                 if mq and tc is not None and not v['is_stopped']:
+                    print('Resuming playback')
                     m = await tc.send('Bot has been restarted, now resuming music', delete_after=3)
                     ctx = await bot.get_context(m)
                     await play_file(ctx, v['music'][0].get_time_stamp())
@@ -788,15 +789,16 @@ async def play(ctx):
             from_soundcloud = True
             title = video_id = normalize_url(url_or_query)
         elif 'spotify.com' in url_or_query:
-            if 'track' in url_or_query:
-                title, video_id = spotify_to_youtube(url_or_query)[1:]
-            elif 'album' in url_or_query:
-                tracks = spotify_album_to_youtube(url_or_query)
-                if tracks:
-                    mq.extend(tracks)
-                    await ctx.send('Tracks added to queue!')
-                if len(tracks) == len(mq):
-                    await play_file(ctx)
+            tracks = spotify_to_youtube(url_or_query)
+            if not tracks:
+                # illegal Spotify link or empty playlist / album
+                return await ctx.send('ERROR: No tracks found with for that Spotify link')
+            elif len(tracks) == 1:
+                title, video_id = tracks[0].title, tracks[0].get_video_id()
+            else:
+                mq.extend(tracks)
+                await ctx.send('Tracks added to queue!')
+                if len(tracks) == len(mq): await play_file(ctx)
                 return
         else:
             try: title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)[1:]

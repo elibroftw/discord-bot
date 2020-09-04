@@ -74,13 +74,14 @@ def timing(f):
 class Track:
     __slots__ = 'title', '_video_id', '_time_stamp', 'start_time', 'status', 'length', 'from_soundcloud'
 
-    def __init__(self, title, video_id, from_soundcloud=False, time_stamp=0):
+    def __init__(self, title, video_id, from_soundcloud=False,
+                 status='NOT PLAYING', time_stamp=0):
         # default is YouTube
         self.title = title
         self._video_id = video_id
         self._time_stamp = time_stamp
         self.start_time = None
-        self.status = 'NOT PLAYING'
+        self.status = status
         self.length = 'DOWNLOADING'
         self.from_soundcloud = from_soundcloud
 
@@ -289,7 +290,8 @@ def spotify_track_to_youtube(link):
     r = requests.get(f'https://api.spotify.com/v1/tracks/{track_id}', headers=get_spotify_auth()).json()
     track_name = r['name']
     track_artist = r['artists'][0]['name']
-    return youtube_search(f'{track_artist} - {track_name}', parse_text=False, return_info=True)
+    title, video_id = youtube_search(f'{track_artist} - {track_name}', parse_text=False, return_info=True)[1:]
+    return Track(title, video_id)
 
 
 @timing
@@ -311,7 +313,7 @@ def spotify_playlist_to_youtube(link):
     r = requests.get(f'https://api.spotify.com/v1/playlists/{playlist_id}/tracks', headers=get_spotify_auth()).json()
     tracks = []
     for track in r['items']:
-        pprint(track.keys())
+        track = track['track']
         track_artist = track['artists'][0]['name']
         track_name = track['name']
         title, video_id = youtube_search(f'{track_artist} - {track_name}', parse_text=False, return_info=True)[1:]
@@ -321,11 +323,13 @@ def spotify_playlist_to_youtube(link):
 
 def spotify_to_youtube(link):
     if 'track' in link:
-        return spotify_track_to_youtube(link)
+        return [spotify_track_to_youtube(link)]
     elif 'album' in link:
         return spotify_album_to_youtube(link)
     elif 'playlist' in link:
         return spotify_playlist_to_youtube(link)
+    else:
+        return []
 
 
 def query_to_tracks(url_or_query):
@@ -616,9 +620,9 @@ if __name__ == '__main__':
     assert extract_video_id('youtube') is None
     assert get_video_duration('JnIO6AQRS2k') == 3682
     assert get_videos_from_playlist('PLY4YLSp44QYvmvSNX3Q_0y-mOQ02ZWIbu')
-    # ytdl('https://www.youtube.com/watch?v=oEAjv2vgUGc', '', verbose=True)
-    # assert os.path.exists(f'{MUSIC_DIR}/youtube@oEAjv2vgUGc.mp3')
-    # ytdl(bipolar_remix, '', verbose=True)
+    ytdl('https://www.youtube.com/watch?v=oEAjv2vgUGc', '', verbose=True)
+    assert os.path.exists(f'{MUSIC_DIR}/youtube@oEAjv2vgUGc.mp3')
+    ytdl(bipolar_remix, '', verbose=True)
     spotify_track_to_youtube(spotify_track)
     assert type(spotify_album_to_youtube(spotify_album)) == list
     assert type(spotify_playlist_to_youtube(spotify_playlist)) == list
