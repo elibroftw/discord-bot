@@ -3,7 +3,6 @@ import glob
 import isodate
 import smtplib
 from bson.objectid import ObjectId
-from collections import OrderedDict
 from contextlib import suppress
 from email.mime.multipart import MIMEMultipart
 from environs import Env
@@ -24,6 +23,7 @@ import json
 from urllib.parse import urlparse, urlencode, parse_qs, urlsplit
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
+from youtubesearchpython import SearchVideos, SearchPlaylists
 import subprocess
 from subprocess import DEVNULL
 import pymongo.collection
@@ -204,7 +204,42 @@ def youtube_search(text, parse_text=True, return_info=False, limit_duration=Fals
     if parse_text:
         p = re.compile('--[1-4][0-9]|--[1-2]')
         with suppress(AttributeError): results = int(p.search(text).group()[2:])
-        p = re.compile('--channel|--playlist')  # defaults to video so I removed --video
+        p = re.compile('--playlist')  # defaults to video so I removed --video
+        with suppress(AttributeError): kind = p.search(text).group()[2:]
+        with suppress(ValueError): text = text[text.index(' '):text.index('--')]
+    max_results = min(results + 5, 50)
+    if kind == 'playlist': search = SearchPlaylists(text, mode='dict', max_results=max_results)
+    else: search = SearchVideos(text, mode='dict', max_results=max_results)
+    # pprint(search.result())
+    search_response = search.result()['search_result']
+    duration_dict = {}
+    valid_result = None
+    for search_result in search_response:
+        duration = 0
+        if kind == 'video':
+            for num in search_result['duration'].split(':'):
+                duration = duration * 60 + int(num)
+            if not limit_duration or duration < duration_limit:
+                valid_result = search_result
+                break
+        else:  # playlist
+            valid_result = search_result
+            break
+    if valid_result is None: return f'No {kind} found'
+    if return_info: return valid_result['link'], fix_youtube_title(valid_result['title']), valid_result['id']
+    return valid_result['link']
+
+
+def youtube_search_old(text, parse_text=True, return_info=False, limit_duration=False, duration_limit=600):
+    if text in ('maagnolia', 'magnolia') and return_info:
+        text = 'magnolia (Audio)'
+    # icon = 'https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/youtube_circle-512.png'
+    results, kind = 1, 'video'
+    if parse_text:
+        p = re.compile('--[1-4][0-9]|--[1-2]')
+        with suppress(AttributeError): results = int(p.search(text).group()[2:])
+        p = re.compile('--playlist')  # defaults to video so I removed --video
+        # channel is invalid search
         with suppress(AttributeError): kind = p.search(text).group()[2:]
         with suppress(ValueError): text = text[text.index(' '):text.index('--')]
     f = {'part': 'id,snippet', 'maxResults': min(results + 5, 50), 'order': 'relevance',
@@ -212,7 +247,7 @@ def youtube_search(text, parse_text=True, return_info=False, limit_duration=Fals
     query_string = urlencode(f)
     r = requests.get(f'{YT_API_URL}search?{query_string}')
     search_response = json.loads(r.text)
-    videos, channels, play_lists = OrderedDict(), [], []
+    videos, channels, play_lists = {}, [], []
     # Add each result to the appropriate list, and then display the lists of
     # matching videos, channels, and playlists.
     for search_result in search_response.get('items', []):
@@ -222,30 +257,23 @@ def youtube_search(text, parse_text=True, return_info=False, limit_duration=Fals
                 video_id = search_result['id']['videoId']
                 desc = search_result['snippet']['description'][:160]
                 videos[video_id] = [title, desc]
-        elif search_result['id']['kind'] == 'youtube#channel':
-            channels.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["channelId"]}'])
         elif search_result['id']['kind'] == 'youtube#playlist':
             play_lists.append([f'{search_result["snippet"]["title"]}', f'{search_result["id"]["playlistId"]}'])
-    title, video_id, desc, channel_id, playlist_id, an_id = None, None, None, None, None, None
+    title = video_id = desc = playlist_id = None
     if limit_duration:
         duration_dict = get_video_durations(videos.keys())
         for video_id, duration in duration_dict.items():
             if duration > duration_limit: videos.pop(video_id)
-
     if kind == 'video':
         results = min(len(videos), results - 1)
         video_id = list(videos.items())[results][0]
-        # video_id = videos_list[result]
         title, desc = videos[video_id]
     else:
-        a = channels if kind == 'channel' else play_lists
-        results = min(len(a), results - 1)
-        an_id = a[results][1]
-        playlist_id = channel_id = an_id
+        results = min(len(play_lists), results - 1)
+        playlist_id = play_lists[results][1]
     url_dict = {'video': f'https://www.youtube.com/watch?v={video_id}',
-                'channel': f'https://www.youtube.com/channel/{channel_id}',
                 'playlist': f'https://www.youtube.com/playlist?list={playlist_id}'}
-    # id_dict = {'video': video_id, 'channel': channel_id, 'playlist': playlist_id}
+    # id_dict = {'video': video_id, 'playlist': playlist_id}
     url = url_dict[kind]
     if 'None' in url: url = f'No {kind} found'
     if return_info and url != 'No video found': return url, fix_youtube_title(title), video_id
@@ -290,11 +318,12 @@ def spotify_track_to_youtube(link):
     r = requests.get(f'https://api.spotify.com/v1/tracks/{track_id}', headers=get_spotify_auth()).json()
     track_name = r['name']
     track_artist = r['artists'][0]['name']
-    title, video_id = youtube_search(f'{track_artist} - {track_name}', parse_text=False, return_info=True)[1:]
+    search_query = f'{track_artist} - {track_name}'
+    result = youtube_search(search_query, parse_text=False, return_info=True)[1:]
+    title, video_id = result
     return Track(title, video_id)
 
 
-@timing
 def spotify_album_to_youtube(link):
     album_id = urlparse(link).path.split('/album/', 1)[1]
     r = requests.get(f'https://api.spotify.com/v1/albums/{album_id}/tracks', headers=get_spotify_auth()).json()
@@ -307,7 +336,6 @@ def spotify_album_to_youtube(link):
     return tracks
 
 
-@timing
 def spotify_playlist_to_youtube(link):
     playlist_id = urlparse(link).path.split('/playlist/', 1)[1]
     r = requests.get(f'https://api.spotify.com/v1/playlists/{playlist_id}/tracks', headers=get_spotify_auth()).json()
@@ -421,11 +449,16 @@ def get_video_titles(video_ids):
     return [item['title'] for item in search_response]
 
 
-def get_video_title(video_id):
+def get_video_title_old(video_id):
     f = {'part': 'snippet',  'id': video_id, 'key': GOOGLE_API}
     response = json.loads(requests.get(f'{YT_API_URL}videos?{urlencode(f)}').text)
     title = response['items'][0]['snippet']['title']
     return fix_youtube_title(title)
+
+
+def get_video_title(video_id):
+    result = requests.get(f'https://noembed.com/embed?url=https://www.youtube.com/watch?v={video_id}').json()
+    return result['title']
 
 
 def get_related_video(video_id, done_queue):
@@ -434,7 +467,6 @@ def get_related_video(video_id, done_queue):
     f = {'part': 'id,snippet',  'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
          'type': 'video', 'key': GOOGLE_API}
     search_response = json.loads(requests.get(f'{YT_API_URL}search?{urlencode(f)}').text)
-    # TODO: use get_video_durations(video_ids)
     video_ids = [item['id']['videoId'] for item in search_response['items']]
     video_durations = get_video_durations(video_ids)
     for item in search_response['items']:
@@ -444,7 +476,7 @@ def get_related_video(video_id, done_queue):
         if related_track not in dq and video_durations[video_id] <= 1800:  # 30 minutes
             related_url = f'https://www.youtube.com/watch?v={video_id}'
             return related_url, fix_youtube_title(title), video_id
-    raise Exception('No related videos found :(')
+    raise Exception('No related videos found')
 
 
 async def check_net_worth(author: str):  # use a database
@@ -605,6 +637,13 @@ if __name__ == '__main__':
     # Power Hour playlist
     spotify_playlist = 'https://open.spotify.com/user/spotify/playlist/37i9dQZF1DX32NsLKyzScr?si=tp3XpSiMSUmu-DoEyXl7Mg'
     bipolar_remix = 'https://soundcloud.com/kiiaraonline/bipolar-no-mana-remix'
+
+    assert get_video_title('oEAjv2vgUGc') == get_video_titlev2('oEAjv2vgUGc') == 'Poseidon'
+    assert get_video_title('_LGnX3bTVow') == get_video_titlev2('_LGnX3bTVow') == 'Men On Mars (Extended Mix)'
+    assert get_video_title('bBNpSXAYteM') == get_video_titlev2('bBNpSXAYteM') == 'Money Trees'
+
+    quit()
+
     assert twitter_search_user('Lady Gaga')
     assert twitter_get_tweets(twitter_search_user('Elon Musk')[0][1])
     assert twitter_get_tweets('discord')
@@ -614,16 +653,17 @@ if __name__ == '__main__':
     assert extract_video_id('http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu') == '_oPAwA_Udwc'
     assert extract_video_id('http://www.youtube.com/embed/SA2iWivDJiE') == 'SA2iWivDJiE'
     assert extract_video_id('http://www.youtube.com/v/SA2iWivDJiE?version=3&amp;hl=en_US') == 'SA2iWivDJiE'
-    assert get_video_title('oEAjv2vgUGc') == 'Poseidon'
     assert extract_video_id('https:/test.ca') is None
     assert extract_video_id('This is a test') is None
     assert extract_video_id('youtube') is None
+
+    spotify_track_to_youtube(spotify_track)
+    assert type(spotify_album_to_youtube(spotify_album)) == list
+    assert type(spotify_playlist_to_youtube(spotify_playlist)) == list
+
     assert get_video_duration('JnIO6AQRS2k') == 3682
     assert get_videos_from_playlist('PLY4YLSp44QYvmvSNX3Q_0y-mOQ02ZWIbu')
     ytdl('https://www.youtube.com/watch?v=oEAjv2vgUGc', '', verbose=True)
     assert os.path.exists(f'{MUSIC_DIR}/youtube@oEAjv2vgUGc.mp3')
     ytdl(bipolar_remix, '', verbose=True)
-    spotify_track_to_youtube(spotify_track)
-    assert type(spotify_album_to_youtube(spotify_album)) == list
-    assert type(spotify_playlist_to_youtube(spotify_playlist)) == list
     print('ALL TESTS PASSED')

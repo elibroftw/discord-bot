@@ -19,3 +19,4 @@ fuzzywuzzy~=0.18.0
 python-Levenshtein
 pandas~=1.0.1
 beautifulsoup4~=4.8.1
+youtube-search-python
