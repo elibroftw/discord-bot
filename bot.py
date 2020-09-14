@@ -568,20 +568,16 @@ async def download_if_not_exists(ctx, track: Track, play_next=False):
                 else:
                     music_queue.remove(Track(title, url_or_video_id, from_soundcloud=from_soundcloud))
                 new_content = f'Video `{title}` with id `{url_or_video_id}` was deleted'
-                bot.loop.create_task(m.edit(content=new_content, delete_after=5))
-                return
+                return bot.loop.create_task(m.edit(content=new_content, delete_after=5))
+            data_dict['downloads'].pop(track)
             if from_soundcloud:
                 info_dict = future.result()
                 track.title = info_dict['title']
             if latest_id == url_or_video_id:
                 bot.loop.create_task(m.edit(content=f'Downloaded `{title}`', delete_after=5))
-                bot.loop.create_task(play_file(ctx))
-                return
-            elif play_next:
-                msg_content = f'Added `{title}` to next up'
-            else:
-                msg_content = f'Added `{title}` to the playing queue'
-            data_dict['downloads'].pop(track)
+                return bot.loop.create_task(play_file(ctx))
+            if play_next: msg_content = f'Added `{title}` to next up'
+            else: msg_content = f'Added `{title}` to the playing queue'
             bot.loop.create_task(m.edit(content=msg_content))
         outtmpl = music_filename if from_soundcloud else ''
         result: asyncio.Future = bot.loop.run_in_executor(None, ytdl, url_or_video_id, outtmpl)
