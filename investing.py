@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.10
+Version: 1.11
 Source: https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 """
 
@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 import io
 import json
 import math
+from numpy.lib.function_base import average
+from yahoo_fin import stock_info
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 # 3rd party libraries
@@ -20,7 +22,6 @@ from fuzzywuzzy import process
 import pandas as pd
 import requests
 import yfinance as yf
-
 
 
 NASDAQ_TICKERS_URL = 'https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nasdaq&render=download'
@@ -54,15 +55,15 @@ def save_cache(filename='investing_cache.json'):
 
 
 def get_dow_tickers():
-    if 'DOW' in GLOBAL_DATA and datetime.strptime(GLOBAL_DATA['DOW']['UPDATED'],
-                                                  '%m/%d/%Y').date() == datetime.today().date():
+    if ('DOW' in GLOBAL_DATA and
+        datetime.strptime(GLOBAL_DATA['DOW']['UPDATED'], '%m/%d/%Y').date() == datetime.today().date()):
         return set(GLOBAL_DATA['DOW']['TICKERS'])
-    resp = requests.get('https://money.cnn.com/data/dow30/')
+    resp = requests.get('https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average')
     soup = BeautifulSoup(resp.text, 'html.parser')
-    table = soup.find('table', {'class': 'wsod_dataTable wsod_dataTableBig'})
-    _dow_tickers = {row.find('a').text.strip() for row in table.findAll('tr')[1:]}
-    GLOBAL_DATA['DOW'] = {'UPDATED': datetime.today().strftime('%m/%d/%Y'),
-                          'TICKERS': _dow_tickers}
+    table = soup.find('table', {'id': 'constituents'}).find('tbody')
+    rows = table.find_all('tr')
+    _dow_tickers = {row.find_all('td')[1].find_all('a')[-1].text.strip() for row in rows if row.find_all('td')}
+    GLOBAL_DATA['DOW'] = {'UPDATED': datetime.today().strftime('%m/%d/%Y'), 'TICKERS': _dow_tickers}
     save_cache()
     return _dow_tickers
 
@@ -204,12 +205,13 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
     name = get_company_name_from_ticker(ticker)
     try:
         dividend = get_latest_dividend(ticker)
+        pd_ratio = round(latest_price/dividend, 2)
     except Exception as e:
-        print(e)
         dividend = 0
-    pd_ratio = round(latest_price/dividend, 2)
+        pd_ratio = 10 ** 10  # basically infinity
+
     info = {'name': name, 'price': latest_price, 'last_close_price': closing_price, 'price:dividend': pd_ratio,
-            'change': change, 'percent_change': percent_change, 'timestamp': timestamp, 'symbol': ticker}
+            'change': change, 'percent_change': percent_change, 'timestamp': timestamp, 'symbol': ticker, 'last_dividend': dividend}
     return info
 
 
@@ -426,7 +428,11 @@ def get_latest_dividend(ticker: str) -> float:
 
 
 def price_to_earnings(ticker, return_dict: dict = None, return_price=False):
-    # uses latest EPS (diluted)
+    # EPS: earnings per share
+    # PER: price over earnings ratio
+    # useful concept to keep in mind:
+    # PER = Stock price / EPS
+    # Stock price = PER * EPS
     pe = -999999
     if ticker.endswith('.TO'):
         ticker = '.'.join(ticker.split('.')[:-1])
@@ -452,6 +458,35 @@ def price_to_earnings(ticker, return_dict: dict = None, return_price=False):
     if return_dict is not None: return_dict[ticker] = (pe, price) if return_price else pe
     if return_price: return pe, price
     return pe
+
+
+def get_target_price(ticker, level=None):
+    """
+    ticker: yahoo finance ticker
+    level: either 'avg', 'low', 'high'
+        returns all target price (avg, low, high) if level is an invalid value
+    """
+    quarterly_eps  = stock_info.get_earnings(ticker)['quarterly_results']['actual'][-4:]
+    quote_table = stock_info.get_quote_table(ticker)
+    eps_estimates = stock_info.get_analysts_info(ticker)['Earnings Estimate']
+    level = level.lower()
+
+
+    price = quote_table['Quote Price']
+    eps_ttm = sum(quarterly_eps)
+    # if EPS data DNE for 4 quarters, annualize out of the current ones
+    if len(quarterly_eps) < 4: eps_ttm = quarterly_eps / len(quarterly_eps) * 4
+    iloc_levels = (1, 3, 4)  # avg, low, high
+    target_prices = []
+    for iloc_level in iloc_levels:
+        forward_eps = eps_estimates.iloc[iloc_level,-1]  # next year eps
+        target_price = price * forward_eps / eps_ttm
+        target_prices.append(round(target_price, 2))
+
+    if level == 'avg': return target_prices[0]
+    elif level == 'low': return target_prices[1]
+    elif level == 'high': return target_prices[2]
+    return target_prices + [price]
 
 
 def tickers_by_pe(tickers: set, output_to_csv='', console_output=True):

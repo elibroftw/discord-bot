@@ -1,5 +1,6 @@
 import asyncio
 from copy import deepcopy
+from ctypes.wintypes import tagRECT
 from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
@@ -15,7 +16,7 @@ import argparse
 
 import tictactoe
 from helpers import *
-from investing import get_ticker_info, losers, winners, get_parsed_data, index_futures
+from investing import get_target_price, get_ticker_info, losers, winners, get_parsed_data, index_futures
 
 
 # Check if script is already running
@@ -53,6 +54,7 @@ BLUE = discord.Color.blue()
 TWITTER_BLUE = discord.Color(5631660)
 STOCKS_GREEN = discord.Color.from_rgb(26, 197, 103)
 STOCKS_RED = discord.Color.from_rgb(255, 51, 58)
+STOCKS_YELLOW = discord.Color.from_rgb(255, 220, 72)
 MOVERS_ETAS = {'DOW': '10 seconds', 'S&P500': '30 seconds', 'NASDAQ': '6 minutes',
                'NYSE': '6 minutes', 'NYSEARCA': '3 minutes', 'AMEX': '3 minutes',
                'US': '8 minutes', 'CA': '3 minutes', 'TSX': '3 minutes', 'ALL': '9 minutes'}
@@ -1606,7 +1608,7 @@ async def command_winners(ctx, market='ALL', of='day', show=5, sorted_info: list
             msg += f'{ticker}\t{open_close}\t{percent_change}'
         embed = discord.Embed(title=f'{market} Top {show} Winners ({of})', description=msg, color=STOCKS_GREEN)
         if m is None: run_coroutine(ctx.send(embed=embed))
-        else: run_coroutine(m.edit(embed=embed, content=''))
+        else: run_coroutine(m.edit(content='', embed=embed))
     bot.loop.run_in_executor(None, _winners)
 
 
@@ -1632,7 +1634,7 @@ async def command_losers(ctx: Context, market='ALL', of='day', show=5, sorted_in
             msg += f'{ticker}    {open_close}    {percent_change}'
         embed = discord.Embed(title=f'{market} Top {show} Losers ({of})', description=msg, color=STOCKS_RED)
         if m is None: run_coroutine(ctx.send(embed=embed))
-        else: run_coroutine(m.edit(embed=embed, content=''))
+        else: run_coroutine(m.edit(content='', embed=embed))
     bot.loop.run_in_executor(None, _losers)
 
 
@@ -1666,6 +1668,23 @@ async def futures(ctx):
             return_msg += f'\n**{future}**: *price* = {price}; *change* = {change} ({percent_change})'
         run_coroutine(m.edit(content=return_msg))
     bot.loop.run_in_executor(None, _futures)
+
+
+@bot.command(aliases=['tp'])
+async def target_price(ctx, ticker):
+    def _get_target_price():
+        m = run_coroutine(ctx.send(f'Getting target price (avg) for '))
+        target_prices = get_target_price(ticker)
+        price = target_prices[-1]
+        if price > target_prices[0]: color = STOCKS_RED
+        elif price < target_prices[0]: color = STOCKS_GREEN
+        else: color = STOCKS_YELLOW
+        embed = discord.Embed(title=f'{ticker} Target Prices', color=color)
+        embed.add_field(name='Avg', value=target_prices[0])
+        embed.add_field(name='Low', value=target_prices[1])
+        embed.add_field(name='High', value=target_prices[2])
+        run_coroutine(m.edit(content='', embed=embed))
+    bot.loop.run_in_executor(None, _get_target_price)
 
 # END of Investing
 
