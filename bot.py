@@ -1464,25 +1464,31 @@ async def anon_status(ctx):
 # Investing
 @bot.command(aliases=['ticker', 'get_ticker', 'stock', 'stock_info', 'get_stock'])
 async def ticker_info(ctx, ticker: str):
-    _ticker_info = get_ticker_info(ticker.replace('$', '').upper())
-    if _ticker_info['change'] < 0:
-        embed_color = STOCKS_RED  # red
-        _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
-    elif _ticker_info['change'] > 0:
-        embed_color = STOCKS_GREEN
-        _ticker_info['change'] = f'+{_ticker_info["change"]} (+{_ticker_info["percent_change"]}%)'
-    else:
-        embed_color = discord.Color.light_grey()
-        _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
-    hour = _ticker_info['timestamp'].strftime('%I')
-    if hour[0] == '0': hour = hour[1]
-    timestamp = _ticker_info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
-    embed = discord.Embed(title=_ticker_info['name'] + f' ({ticker})', color=embed_color)
-    embed.set_footer(text=f'Last updated: {timestamp}')
-    embed.add_field(name='Last Price:', value=_ticker_info['price'], inline=True)
-    embed.add_field(name='Last Close:', value=_ticker_info['last_close_price'], inline=True)
-    embed.add_field(name='Change:', value=_ticker_info['change'], inline=True)
-    await ctx.send(embed=embed)
+
+    def _get_ticker_info():
+        nonlocal ticker
+        ticker = ticker.replace('$', '').upper()
+        m = run_coroutine(ctx.send(f'Getting stock info of {ticker}'))
+        _ticker_info = get_ticker_info(ticker)
+        if _ticker_info['change'] < 0:
+            embed_color = STOCKS_RED  # red
+            _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
+        elif _ticker_info['change'] > 0:
+            embed_color = STOCKS_GREEN
+            _ticker_info['change'] = f'+{_ticker_info["change"]} (+{_ticker_info["percent_change"]}%)'
+        else:
+            embed_color = discord.Color.light_grey()
+            _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
+        hour = _ticker_info['timestamp'].strftime('%I')
+        if hour[0] == '0': hour = hour[1]
+        timestamp = _ticker_info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
+        embed = discord.Embed(title=_ticker_info['name'] + f' ({ticker})', color=embed_color)
+        embed.set_footer(text=f'Last updated: {timestamp}')
+        embed.add_field(name='Last Price:', value=_ticker_info['price'], inline=True)
+        embed.add_field(name='Last Close:', value=_ticker_info['last_close_price'], inline=True)
+        embed.add_field(name='Change:', value=_ticker_info['change'], inline=True)
+        run_coroutine(m.edit(embed=embed))
+    bot.loop.run_in_executor(None, _get_ticker_info)
 
 
 # noinspection PyTypeChecker
@@ -1671,18 +1677,24 @@ async def futures(ctx):
 
 
 @bot.command(aliases=['tp'])
-async def target_price(ctx, ticker):
+async def target_price(ctx, ticker: str):
     def _get_target_price():
-        m = run_coroutine(ctx.send(f'Getting target price (avg) for '))
+        nonlocal ticker
+        ticker = ticker.replace('$', '').upper()
+        m = run_coroutine(ctx.send(f'Getting target prices for {ticker}'))
         target_prices = get_target_price(ticker)
-        price = target_prices[-1]
+        price = target_prices[3]
+        eps_ttm = target_prices[4]
         if price > target_prices[0]: color = STOCKS_RED
         elif price < target_prices[0]: color = STOCKS_GREEN
         else: color = STOCKS_YELLOW
-        embed = discord.Embed(title=f'{ticker} Target Prices', color=color)
+        title = f'{ticker} Target Prices'
+        embed = discord.Embed(title=title, color=color)
         embed.add_field(name='Avg', value=target_prices[0])
         embed.add_field(name='Low', value=target_prices[1])
         embed.add_field(name='High', value=target_prices[2])
+        embed.add_field(name='Price', value=price)
+        embed.add_field(name='EPS (TTM)', value=eps_ttm)
         run_coroutine(m.edit(content='', embed=embed))
     bot.loop.run_in_executor(None, _get_target_price)
 

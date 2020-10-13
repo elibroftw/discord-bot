@@ -464,29 +464,26 @@ def get_target_price(ticker, level=None):
     """
     ticker: yahoo finance ticker
     level: either 'avg', 'low', 'high'
-        returns all target price (avg, low, high) if level is an invalid value
+        returns (avg, low, high, price, eps_ttm) if level is an invalid value
     """
     quarterly_eps  = stock_info.get_earnings(ticker)['quarterly_results']['actual'][-4:]
     quote_table = stock_info.get_quote_table(ticker)
     eps_estimates = stock_info.get_analysts_info(ticker)['Earnings Estimate']
-    level = level.lower()
-
 
     price = quote_table['Quote Price']
     eps_ttm = sum(quarterly_eps)
     # if EPS data DNE for 4 quarters, annualize out of the current ones
     if len(quarterly_eps) < 4: eps_ttm = quarterly_eps / len(quarterly_eps) * 4
-    iloc_levels = (1, 3, 4)  # avg, low, high
+    iloc_levels = (1, 2, 3)  # avg, low, high
     target_prices = []
     for iloc_level in iloc_levels:
         forward_eps = eps_estimates.iloc[iloc_level,-1]  # next year eps
         target_price = price * forward_eps / eps_ttm
         target_prices.append(round(target_price, 2))
-
     if level == 'avg': return target_prices[0]
     elif level == 'low': return target_prices[1]
     elif level == 'high': return target_prices[2]
-    return target_prices + [price]
+    return target_prices + [round(price, 2), round(eps_ttm, 2)]
 
 
 def tickers_by_pe(tickers: set, output_to_csv='', console_output=True):
