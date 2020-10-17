@@ -6,7 +6,6 @@ import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
 from discord.ext.commands import has_permissions, Context, CommandNotFound, CheckFailure
-import ffsend
 import logging
 from math import ceil
 import psutil
@@ -608,33 +607,34 @@ async def download_related_video(ctx):
             if not related_m: await ctx.send(related_msg_content)
 
 
-@bot.command(aliases=['dls', 'dlt'])
-@commands.check(in_guild)
-async def download_track(ctx):
-    args = ctx.message.content.split()
-    # is_query = False
-    try:
-        index = 0 if len(args) == 1 else int(args[1])
-        guild = ctx.guild
-        guild_data = data_dict[guild.id]
-        if index >= 0:  que = guild_data['music']
-        else:
-            que = guild_data['done']
-            index = -index - 1
-        try: track = que[index]
-        except IndexError:
-            return await ctx.send('Invalid index argument')
-    except ValueError:
-        # is_query = True  # TODO
-        return
-    # if len(args) > 1 or is_query:
-    #     query = ' '.join(args[1:])
-    file = track.get_path()
-    url = ffsend.upload('https://send.firefox.com/', track.title + '.mp3', file)[0]
-    msg = await ctx.author.send('Uploading the track')
-    content = f'Here is the download link <{url}>. You can rename the file and set the metadata and album art ' \
-              '(Spotify API) using this metadata editor <https://github.com/elibroftw/mp3-editor>'
-    await msg.edit(content=content, file=file)
+# @bot.command(aliases=['dls', 'dlt'])
+# @commands.check(in_guild)
+# async def download_track(ctx):
+#     args = ctx.message.content.split()
+#     # is_query = False
+#     try:
+#         index = 0 if len(args) == 1 else int(args[1])
+#         guild = ctx.guild
+#         guild_data = data_dict[guild.id]
+#         if index >= 0:  que = guild_data['music']
+#         else:
+#             que = guild_data['done']
+#             index = -index - 1
+#         try: track = que[index]
+#         except IndexError:
+#             return await ctx.send('Invalid index argument')
+#     except ValueError:
+#         # is_query = True  # TODO
+#         return
+#     # if len(args) > 1 or is_query:
+#     #     query = ' '.join(args[1:])
+#     file = track.get_path()
+#     NOTE: Firefox send is deprecated
+#     url = ffsend.upload('https://send.firefox.com/', track.title + '.mp3', file)[0]
+#     msg = await ctx.author.send('Uploading the track')
+#     content = f'Here is the download link <{url}>. You can rename the file and set the metadata and album art ' \
+#               '(Spotify API) using this metadata editor <https://github.com/elibroftw/mp3-editor>'
+#     await msg.edit(content=content, file=file)
 
 
 @bot.command(aliases=['mute'])
