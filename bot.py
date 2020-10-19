@@ -195,7 +195,7 @@ async def save(ctx):
 
 
 @bot.command(name='exit', aliases=['quit'])
-async def _exit(ctx, save_data=True):
+async def shutdown_bot(ctx, save_data=True):
     if ctx.author.id == MY_USER_ID:
         if save_data:
             await bot.change_presence(activity=discord.Game('Saving Data'))

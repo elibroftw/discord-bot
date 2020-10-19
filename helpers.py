@@ -5,7 +5,6 @@ import smtplib
 from bson.objectid import ObjectId
 from contextlib import suppress
 from email.mime.multipart import MIMEMultipart
-from environs import Env
 import base64
 from email.mime.text import MIMEText
 from functools import wraps
@@ -34,6 +33,16 @@ if __name__ != '__main__':
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     subprocess.call('pip install --user --upgrade youtube-dl', startupinfo=startupinfo, stdout=DEVNULL, stderr=DEVNULL)
 from youtube_dl import YoutubeDL
+
+
+# load environment variables from .env file
+with open('.env') as f:
+    line = f.readline()
+    while line:
+        k, v = line.split('=')
+        os.environ[k] = v
+        line = f.readline()
+
 
 db_client = MongoClient('localhost', 27017)
 db = db_client.discord_bot
@@ -174,10 +183,6 @@ class Track:
         return {'title': self.title, 'video_id': self._video_id, 'status': self.status,
                 'time_stamp': self.get_time_stamp()}
 
-
-
-env = Env()
-env.read_env()
 
 YT_API_URL = 'https://www.googleapis.com/youtube/v3/'
 GOOGLE_API = os.environ['google']
