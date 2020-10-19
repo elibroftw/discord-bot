@@ -8,7 +8,6 @@ from discord.ext import commands
 from discord.ext.commands import has_permissions, Context, CommandNotFound, CheckFailure
 import logging
 from math import ceil
-import psutil
 from random import shuffle, randint
 import sys
 import argparse
@@ -22,8 +21,12 @@ from investing import get_target_price, get_ticker_info, losers, winners, get_pa
 script = os.path.basename(__file__)
 parser = argparse.ArgumentParser(description='Start the discord bot')
 parser.add_argument('--prod', default=False, action='store_true')
+parser.add_argument('--restarted', default=False, action='store_true')
 parsed_args = parser.parse_args()
-
+# in case restarted
+if parsed_args.restarted:
+    print('--restarted was passed')
+    time.sleep(5)
 
 try:
     os.remove('discord.log')
@@ -222,8 +225,8 @@ async def restart(ctx, save_data=True):
                 await voice_client.disconnect()
         await bot.change_presence(activity=discord.Game('Restarting...'))
         # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
-        if parsed_args.prod: subprocess.Popen('pythonw bot.py --prod')
-        else: subprocess.Popen('python bot.py')
+        if parsed_args.prod: subprocess.Popen('pythonw bot.py --prod --restarted')
+        else: subprocess.Popen('python bot.py --restarted')
         await bot.logout()
 
 
