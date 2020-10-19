@@ -24,16 +24,14 @@ parser = argparse.ArgumentParser(description='Start the discord bot')
 parser.add_argument('--prod', default=False, action='store_true')
 parsed_args = parser.parse_args()
 
-for q in psutil.process_iter():
-    if q.name().startswith('python'):
-        try:
-            script_in_items = [item for item in q.cmdline() if script in item]
-            if q.pid != os.getpid() and script_in_items:
-                print(f'Bot is already running!')
-                sys.exit()
-        except psutil.AccessDenied:
-            print('Bot is malfunctioning. Try to stop it in Task Manager')
-            sys.exit()
+
+try:
+    os.remove('discord.log')
+except OSError:
+    print(f'Bot is already running!')
+    sys.exit()
+except FileNotFoundError: pass
+
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)

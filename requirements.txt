@@ -4,7 +4,6 @@ environs~=6.1.0
 GitPython
 isodate~=0.6.0
 mutagen
-psutil~=5.6.7
 pypiwin32
 pymongo>=3.10.1,<4.0.0
 PyNaCl
