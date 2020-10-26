@@ -5,14 +5,15 @@ Version: 1.11
 Source: https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 """
 
-import calendar
 from contextlib import suppress
 import csv
 from datetime import datetime, timedelta
 import io
 import json
 import math
+from threading import main_thread
 from numpy.lib.function_base import average
+import pandas
 from yahoo_fin import stock_info
 # noinspection PyUnresolvedReferences
 from pprint import pprint
@@ -233,7 +234,10 @@ def parse_info(_data, ticker, start_date, end_date, start_price_key='Open'):
     start_price_key: can be 'Open' or 'Close'
     TODO: change parse_info keys to snake_case
     """
+
     start_price = _data[ticker][start_price_key][start_date]
+    if math.isnan(_data[ticker]['Open'][end_date]):
+        end_date = _data[ticker]['Open'].last_valid_index()
     end_price = _data[ticker]['Close'][end_date]
     change = end_price - start_price
     percent_change = change / start_price
@@ -278,12 +282,17 @@ def get_parsed_data(_data=None, tickers: list = None, market='ALL', sort_key='Pe
         _data = get_data(tickers, period='5d', interval='1m')  # ALWAYS USE LATEST DATA
         market_day = _data.last_valid_index().date() == todays_date
         if not market_day or (_today.hour * 60 + _today.minute >= 645):  # >= 10:45 AM
-            # movers of the latest market day
+            # movers of the latest market day [TODAY]
             recent_day = _data.last_valid_index()
+            recent_start_day = recent_day.replace(hour=9, minute=30, second=0)
             parsed_info = {}
             for ticker in tickers:
-                info = parse_info(_data, ticker, recent_day, recent_day)
-                if not math.isnan(info['Start']): parsed_info[ticker] = info
+                try:
+                    info = parse_info(_data, ticker, recent_start_day, recent_day)
+                    if not math.isnan(info['Start']): parsed_info[ticker] = info
+                except ValueError:
+                    # TODO: fix
+                    print('ERROR: Could not get info for', ticker)
         else:  # movers of the second last market day
             yest = _data.tail(2).first_valid_index()  # assuming interval = 1d
             parsed_info = {}
@@ -536,3 +545,5 @@ def index_futures():
 
 
 load_cache()
+if __name__ == "__main__":
+    get_parsed_data(of='day', market='DOW')
