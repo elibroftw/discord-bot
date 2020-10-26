@@ -1488,7 +1488,7 @@ async def ticker_info(ctx, ticker: str):
         embed.add_field(name='Last Price:', value=_ticker_info['price'], inline=True)
         embed.add_field(name='Last Close:', value=_ticker_info['last_close_price'], inline=True)
         embed.add_field(name='Change:', value=_ticker_info['change'], inline=True)
-        run_coroutine(m.edit(embed=embed))
+        run_coroutine(m.edit(embed=embed, content=''))
     bot.loop.run_in_executor(None, _get_ticker_info)
 
 
