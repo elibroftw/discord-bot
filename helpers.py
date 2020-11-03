@@ -40,7 +40,7 @@ with open('.env') as f:
     line = f.readline()
     while line:
         k, v = line.split('=')
-        os.environ[k] = v
+        os.environ[k] = v.strip()
         line = f.readline()
 
 
@@ -191,7 +191,6 @@ SPOTIFY_AUTH_STR = f"{os.environ['SPOTIFY_CLIENT_ID']}:{os.environ['SPOTIFY_SECR
 SPOTIFY_B64_AUTH_STR = base64.urlsafe_b64encode(SPOTIFY_AUTH_STR.encode()).decode()
 spotify_token_creation = time.time() - 7 * 360  # -7 hours to ensure token regen
 spotify_token = ''
-
 twitter_auth = tweepy.OAuthHandler(os.environ['twitter_consumer_key'], os.environ['twitter_consumer_secret'])
 twitter_auth.set_access_token(os.environ['twitter_access_token'], os.environ['twitter_access_token_secret'])
 TWITTER_API = tweepy.API(twitter_auth)
@@ -643,15 +642,14 @@ if __name__ == '__main__':
     spotify_playlist = 'https://open.spotify.com/user/spotify/playlist/37i9dQZF1DX32NsLKyzScr?si=tp3XpSiMSUmu-DoEyXl7Mg'
     bipolar_remix = 'https://soundcloud.com/kiiaraonline/bipolar-no-mana-remix'
 
-    assert get_video_title('oEAjv2vgUGc') == get_video_titlev2('oEAjv2vgUGc') == 'Poseidon'
-    assert get_video_title('_LGnX3bTVow') == get_video_titlev2('_LGnX3bTVow') == 'Men On Mars (Extended Mix)'
-    assert get_video_title('bBNpSXAYteM') == get_video_titlev2('bBNpSXAYteM') == 'Money Trees'
-
-    quit()
-
     assert twitter_search_user('Lady Gaga')
     assert twitter_get_tweets(twitter_search_user('Elon Musk')[0][1])
     assert twitter_get_tweets('discord')
+
+    assert get_video_title('oEAjv2vgUGc') == 'Poseidon'
+    assert get_video_title('_LGnX3bTVow') == 'Men On Mars (Extended Mix)'
+    assert get_video_title('bBNpSXAYteM') == 'Money Trees'
+
     assert extract_video_id('https://www.youtube.com/watch?v=JnIO6AQRS2k') == 'JnIO6AQRS2k'
     assert extract_video_id('https://www.youtube.com/watch?v=oEAjv2vgUGc') == 'oEAjv2vgUGc'
     assert extract_video_id('http://youtu.be/SA2iWivDJiE') == 'SA2iWivDJiE'
@@ -671,4 +669,5 @@ if __name__ == '__main__':
     ytdl('https://www.youtube.com/watch?v=oEAjv2vgUGc', '', verbose=True)
     assert os.path.exists(f'{MUSIC_DIR}/youtube@oEAjv2vgUGc.mp3')
     ytdl(bipolar_remix, '', verbose=True)
+
     print('ALL TESTS PASSED')
