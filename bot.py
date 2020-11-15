@@ -20,8 +20,8 @@ from investing import get_random_stocks, get_sp500_tickers, get_target_price, ge
 # Check if script is already running
 script = os.path.basename(__file__)
 parser = argparse.ArgumentParser(description='Start the discord bot')
-parser.add_argument('--prod', default=False, action='store_true')
-parser.add_argument('--restarted', default=False, action='store_true')
+parser.add_argument('--prod', '-p', default=False, action='store_true')
+parser.add_argument('--restarted', '-r', default=False, action='store_true')
 parsed_args = parser.parse_args()
 # in case restarted
 if parsed_args.restarted:
@@ -35,6 +35,18 @@ except OSError:
     sys.exit()
 except FileNotFoundError: pass
 
+
+def positive_int(value):
+    ivalue = int(value)
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(f'{value} is an invalid positive int value')
+    return ivalue
+
+
+# see search_playlists(ctx) for help messages
+search_playlists_parser = argparse.ArgumentParser(description='Search for playlists')
+search_playlists_parser.add_argument('--query', '-q', default=None, nargs='+')
+search_playlists_parser.add_argument('--page', '-p', default=1, type=positive_int)
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -1209,7 +1221,7 @@ async def volume(ctx):
         else: await ctx.send(f'{vc.source.volume * 100}%')
 
 
-@bot.command(aliases=['sa'])
+@bot.command(aliases=['sa', 'save-playlist', 'save_playlist', 'savep'])
 @commands.check(in_guild)
 async def save_as(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
@@ -1230,7 +1242,7 @@ async def save_as(ctx):
 
 # for example, --creator <name/id>
 # and also !pp <post_id>
-@bot.command(aliases=['pp', 'sp'])
+@bot.command(aliases=['pp', 'sp', 'play-playlist'])
 @commands.check(in_guild)
 async def play_playlist(ctx):
     split_content = ctx.message.content.split()
@@ -1253,7 +1265,7 @@ async def play_playlist(ctx):
         else: await ctx.send('No playlist found with that name')
 
 
-@bot.command(aliases=['lp', 'load_pl', 'load', 'l'])
+@bot.command(aliases=['lp', 'load_pl', 'load', 'l', 'load-playlist'])
 @commands.check(in_guild)
 async def load_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
@@ -1265,7 +1277,7 @@ async def load_playlist(ctx):
         else: await ctx.send('No playlist found with that name')
 
 
-@bot.command(aliases=['vp'])
+@bot.command(aliases=['vp', 'view-playlist'])
 @commands.check(in_guild)
 async def view_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
@@ -1282,28 +1294,33 @@ async def view_playlist(ctx):
         else: await ctx.send('No playlist found with that name')
 
 
-@bot.command(aliases=['bp'])
+@bot.command(aliases=['bp', 'sp', 'browse-playlists', 'browse_playlists', 'search-playlists'])
 @commands.check(in_guild)
-async def browse_playlists(ctx, page=1):
+async def search_playlists(ctx):
     # 10 playlists per page
-    all_playlists = sorted(get_all_playlists(), key=lambda p: p['playlist_name'])
-    max_pages = ceil(len(all_playlists) / 10)
-    if page > max_pages: page = max_pages
-    playlists = all_playlists[10 * (page - 1): 10 * page]
-    members = bot.get_all_members()
-    # formatted_playlists = []
-    msg = ''
-    temp_creators = {}
-    for playlist in playlists:
-        creator_id = playlist['creator_id']
-        if creator_id not in temp_creators:
-            creator = discord.utils.find(lambda m: m.id == creator_id, members)
-            if creator is None: creator = 'Unknown'
-            temp_creators[creator_id] = creator
-        msg += f"`{playlist['playlist_name']}` by {temp_creators[creator_id]}\n"
-    msg.strip()
-    embed = discord.Embed(title=f'PLAYLISTS INDEX | Page {page} of {max_pages}', description=msg, color=BLUE)
-    await ctx.send(embed=embed)
+    try:
+        bp_args = search_playlists_parser.parse_args(ctx.message.split())
+        all_playlists = sorted(get_all_playlists(), key=lambda p: p['playlist_name'])
+        max_pages = ceil(len(all_playlists) / 10)
+        page = bp_args.page
+        if page > max_pages: page = max_pages
+        playlists = all_playlists[10 * (page - 1): 10 * page]
+        members = bot.get_all_members()
+        # formatted_playlists = []
+        msg = ''
+        temp_creators = {}
+        for playlist in playlists:
+            creator_id = playlist['creator_id']
+            if creator_id not in temp_creators:
+                creator = discord.utils.find(lambda m: m.id == creator_id, members)
+                if creator is None: creator = 'Unknown'
+                temp_creators[creator_id] = creator
+            msg += f"`{playlist['playlist_name']}` by {temp_creators[creator_id]}\n"
+        msg.strip()
+        embed = discord.Embed(title=f'PLAYLISTS INDEX | Page {page} of {max_pages}', description=msg, color=BLUE)
+        await ctx.send(embed=embed)
+    except SystemExit:
+        await ctx.send(message='usage: [--page positive_integer] [--query string to search for]')
 
 
 @bot.command(aliases=['delete_pl', 'dp'])
@@ -1435,21 +1452,30 @@ async def reply(ctx):
         await ctx.message.delete()
 
 
-@bot.command(aliases=['enable', 'enablemessages'])
+@bot.command(aliases=['enable-msgs', 'enablemessages', 'enable-messages'])
 async def enable_messages(ctx):
     user_id = ctx.author.id
     dm_coll.update_one({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': True}}, upsert=True)
     await ctx.send('Anonymous messaging has been **ENABLED**')
 
 
-@bot.command(aliases=['disable', 'disablemessages'])
+@bot.command(aliases=['disable-msgs', 'disablemessages', 'disable-messages'])
 async def disable_messages(ctx):
     user_id = ctx.author.id
     dm_coll.update_one({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': False}}, upsert=True)
     await ctx.send('Anonymous messaging has been **DISABLED**')
 
 
-@bot.command(aliases=['anonstatus'])
+@bot.command(aliases=['toggle-msgs', 'togglemessages', 'toggle-messages'])
+async def toggle_messages(ctx):
+    user_id = ctx.author.id
+    coll = dm_coll.find_one({'user_id': user_id, 'type': 'user_settings'})
+    setting = True if coll is None else coll['allows_messages']
+    if setting: await ctx.invoke(bot.get_command('disable_messages'))
+    else:       await ctx.invoke(bot.get_command('enable_messages'))
+
+
+@bot.command(aliases=['anonstatus', 'anon-status'])
 async def anon_status(ctx):
     user_id = ctx.author.id
     user_settings = dm_coll.find_one({'user_id': user_id, 'type': 'user_settings'})
@@ -1492,7 +1518,7 @@ async def ticker_info(ctx, ticker: str):
     bot.loop.run_in_executor(None, _get_ticker_info)
 
 
-@bot.command(aliases=['random_ticker'])
+@bot.command(aliases=['random_ticker', 'random-stock', 'random-ticker'])
 async def random_stock(ctx, n: int):
     await ctx.send(', '.join(get_random_stocks(n)))
 

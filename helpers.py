@@ -47,6 +47,8 @@ with open('.env') as f:
 db_client = MongoClient('localhost', 27017)
 db = db_client.discord_bot
 playlists_coll: pymongo.collection.Collection = db.playlists
+playlists_coll.create_index([('playlist_name', 'text')])
+
 dm_coll: pymongo.collection.Collection = db.anon_messages
 portfolio_coll: pymongo.collection.Collection = db.portfolios
 FFMPEG = Path(subprocess.check_output('where ffmpeg').decode()).parent
@@ -441,8 +443,13 @@ def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
     return tracks
 
 
-def get_all_playlists():
-    playlists = playlists_coll.find({'type': 'playlist'}, {'_id': 0, 'playlist_name': 1, 'creator_id': 1})
+def get_all_playlists(query=''):
+    if not query:
+        playlists = playlists_coll.find({'type': 'playlist'},
+                                        projection={'_id': 0, 'playlist_name': 1, 'creator_id': 1})
+    else:
+        playlists = playlists_coll.find({'type': 'playlist', '$text': {'$search': query}},
+                                        projection={'_id': 0, 'playlist_name': 1, 'creator_id': 1})
     return playlists
 
 
@@ -634,6 +641,10 @@ def remove_silence(input_file, output_file):
 
 if __name__ == '__main__':
     # tests go here
+    all_playlists = get_all_playlists()
+    playlists_from_search = get_all_playlists('chill trance')
+    # MUSIC RELATED TESTS
+
     # ZHU - Cold Blooded
     spotify_track = 'https://open.spotify.com/track/1HvOkMQua2nC7CQpKNGLNE?si=TOz6DGa2SyaYYBwBLB2b2Q'
     # ZHU - GENERATIONWHY

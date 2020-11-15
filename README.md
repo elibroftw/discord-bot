@@ -38,10 +38,10 @@ For more info, view [bot.py](../master/bot.py)
     - Move song (!move <from> <to>)
     - Shuffle (!shuffle)
     - Clear queue (!cq)
-    - Play from Playlist (!pp <playlist_name/url> <--s for shuffle>)
+    - Play from Playlist (!pp <playlist_name/url> [--s])  // use --s for shuffle
     - Save to playlist (!sa <playlist_name>)
     - View playlist (!vp <playlist_name/url>)  // use --2/3 for different scopes
-    - Browse playlists (!bp <page=1>)  // alphabetically sorted
+    - Search playlists (!sp [--page 1] [--query query])  // alphabetically sorted
     - Load playlist (!lp <playlist_name/url>)  // adds songs to current queue
     - Delete playlist (!dp <playlist_name>)
     - Set volume (!volume, !v)  // prints volume if no int given
@@ -75,8 +75,6 @@ For more info, view [bot.py](../master/bot.py)
 # Future
 - Set and get invite codes (currently only gets my invite code)
 - report user for bot abuse
-- Search playlist (!sp <playlist_name>)
-    - All playlists can be used by other people using the bot
 
 # Installation
 Note that this bot has only been tested on Windows
