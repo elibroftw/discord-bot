@@ -14,7 +14,7 @@ import argparse
 
 import tictactoe
 from helpers import *
-from investing import get_target_price, get_ticker_info, losers, winners, get_parsed_data, index_futures
+from investing import get_random_stocks, get_sp500_tickers, get_target_price, get_ticker_info, losers, tickers_from_csv, winners, get_parsed_data, index_futures
 
 
 # Check if script is already running
@@ -58,7 +58,7 @@ STOCKS_YELLOW = discord.Color.from_rgb(255, 220, 72)
 MOVERS_ETAS = {'DOW': '10 seconds', 'S&P500': '30 seconds', 'NASDAQ': '6 minutes',
                'NYSE': '6 minutes', 'NYSEARCA': '3 minutes', 'AMEX': '3 minutes',
                'US': '8 minutes', 'CA': '3 minutes', 'TSX': '3 minutes', 'ALL': '9 minutes'}
-# LATEST_SORTED_INFO = {'market': [0.0, []]}
+
 LATEST_SORTED_INFO = {}  # last update, sorted_info list
 tic_tac_toe_data = {}
 data_dict = {'downloads': {}}
@@ -1490,6 +1490,11 @@ async def ticker_info(ctx, ticker: str):
         embed.add_field(name='Change:', value=_ticker_info['change'], inline=True)
         run_coroutine(m.edit(embed=embed, content=''))
     bot.loop.run_in_executor(None, _get_ticker_info)
+
+
+@bot.command(aliases=['random_ticker'])
+async def random_stock(ctx, n: int):
+    await ctx.send(', '.join(get_random_stocks(n)))
 
 
 # noinspection PyTypeChecker
