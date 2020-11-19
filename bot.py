@@ -1221,7 +1221,7 @@ async def volume(ctx):
         else: await ctx.send(f'{vc.source.volume * 100}%')
 
 
-@bot.command(aliases=['sa', 'save-playlist', 'save_playlist', 'savep'])
+@bot.command(aliases=['sa', 'spa', 'save-playlist', 'save_playlist', 'savep'])
 @commands.check(in_guild)
 async def save_as(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
@@ -1330,7 +1330,7 @@ async def delete_playlist(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
     if playlist_name:
         r = playlists_coll.delete_one({'playlist_name': playlist_name, 'creator_id': ctx.author.id})
-        if r.deleted_count: await ctx.send(f'Deleted playlist `{playlist_name}``')
+        if r.deleted_count: await ctx.send(f'Deleted playlist `{playlist_name}`')
         else: await ctx.send(f'No playlist found with that name')
 
 
