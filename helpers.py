@@ -60,7 +60,7 @@ ydl_opts = {
     'postprocessors': [{
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'mp3',
-        'preferredquality': '192'
+        'preferredquality': '320'
     }],
     'postprocessor_args': ['-threads', '1'],
     'ffmpeg_location': FFMPEG,
