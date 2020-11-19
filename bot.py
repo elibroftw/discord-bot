@@ -45,7 +45,7 @@ def positive_int(value):
 
 # see search_playlists(ctx) for help messages
 search_playlists_parser = argparse.ArgumentParser(description='Search for playlists')
-search_playlists_parser.add_argument('--query', '-q', default=None, nargs='+')
+search_playlists_parser.add_argument('--query', '-q', default=[], nargs='*')
 search_playlists_parser.add_argument('--page', '-p', default=1, type=positive_int)
 
 logger = logging.getLogger('discord')
@@ -1299,20 +1299,22 @@ async def view_playlist(ctx):
 async def search_playlists(ctx):
     # 10 playlists per page
     try:
-        bp_args = search_playlists_parser.parse_args(ctx.message.split())
-        all_playlists = sorted(get_all_playlists(), key=lambda p: p['playlist_name'])
+        bp_args = search_playlists_parser.parse_args(ctx.message.content.split()[1:])
+        query = ' '.join(bp_args.query)
+        all_playlists = sorted(get_all_playlists(query), key=lambda p: p['playlist_name'])
         max_pages = ceil(len(all_playlists) / 10)
         page = bp_args.page
         if page > max_pages: page = max_pages
         playlists = all_playlists[10 * (page - 1): 10 * page]
         members = bot.get_all_members()
+
         # formatted_playlists = []
         msg = ''
         temp_creators = {}
         for playlist in playlists:
             creator_id = playlist['creator_id']
             if creator_id not in temp_creators:
-                creator = discord.utils.find(lambda m: m.id == creator_id, members)
+                creator = bot.get_user(creator_id)
                 if creator is None: creator = 'Unknown'
                 temp_creators[creator_id] = creator
             msg += f"`{playlist['playlist_name']}` by {temp_creators[creator_id]}\n"
@@ -1320,7 +1322,7 @@ async def search_playlists(ctx):
         embed = discord.Embed(title=f'PLAYLISTS INDEX | Page {page} of {max_pages}', description=msg, color=BLUE)
         await ctx.send(embed=embed)
     except SystemExit:
-        await ctx.send(message='usage: [--page positive_integer] [--query string to search for]')
+        await ctx.send('usage: [--page positive_integer] [--query string to search for]')
 
 
 @bot.command(aliases=['delete_pl', 'dp'])
