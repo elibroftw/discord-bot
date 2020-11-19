@@ -14,7 +14,7 @@ import argparse
 
 import tictactoe
 from helpers import *
-from investing import get_random_stocks, get_sp500_tickers, get_target_price, get_ticker_info, losers, tickers_from_csv, winners, get_parsed_data, index_futures
+from investing import get_random_stocks, get_sp500_tickers, get_target_price, get_ticker_info, losers, tickers_from_csv, winners, get_parsed_data, get_index_futures
 
 
 # Check if script is already running
@@ -1242,7 +1242,7 @@ async def save_as(ctx):
 
 # for example, --creator <name/id>
 # and also !pp <post_id>
-@bot.command(aliases=['pp', 'sp', 'play-playlist'])
+@bot.command(aliases=['pp', 'play-playlist'])
 @commands.check(in_guild)
 async def play_playlist(ctx):
     split_content = ctx.message.content.split()
@@ -1258,7 +1258,7 @@ async def play_playlist(ctx):
             if voice_client is None: voice_client = await ctx.invoke(bot.get_command('summon'))
             guild_data = data_dict[guild_id]
             no_after_play(guild_data, voice_client)
-            if parsed_out_name != playlist_name or key_word == '!sp': shuffle(tracks)
+            if parsed_out_name != playlist_name: shuffle(tracks)
             guild_data['music'] = tracks
             guild_data['done'].clear()
             await play_file(ctx)
@@ -1695,7 +1695,7 @@ async def movers(ctx: Context, market='ALL', of='day', show=5):
 async def futures(ctx):
     def _futures():
         m = run_coroutine(ctx.send('Getting futures data'))
-        futures_data = index_futures()
+        futures_data = get_index_futures()
         important_futures = ['S&P 500', 'DOW JONES 30', 'NASDAQ', 'RUSSELL 2000']
         return_msg = ''
         for future in important_futures:
