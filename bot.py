@@ -1,6 +1,5 @@
 import asyncio
 from copy import deepcopy
-from ctypes.wintypes import tagRECT
 from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
