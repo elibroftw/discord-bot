@@ -34,7 +34,7 @@ if __name__ != '__main__':
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         subprocess.call('pip install --user --upgrade youtube-dl', startupinfo=startupinfo, stdout=DEVNULL, stderr=DEVNULL)
     else:
-        subprocess.call('pip install --upgrade youtube-dl', stdout=DEVNULL, stderr=DEVNULL)
+        subprocess.call(['pip3', 'install', '--upgrade', 'youtube-dl'], stdout=DEVNULL, stderr=DEVNULL)
 from youtube_dl import YoutubeDL
 
 
