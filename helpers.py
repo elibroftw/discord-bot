@@ -44,6 +44,7 @@ with open('.env') as f:
         line = f.readline()
 
 
+MAX_TRACK_DURATION = 90 * 60  # 90 minutes is the max
 db_client = MongoClient('localhost', 27017)
 db = db_client.discord_bot
 playlists_coll: pymongo.collection.Collection = db.playlists
@@ -432,7 +433,7 @@ def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
         tracks_dict = {item['snippet']['resourceId']['videoId']: item['snippet']['title'] for item in response['items']}
         video_ids = list(tracks_dict.keys())
         durations = get_video_durations(video_ids).items()
-        tracks = [Track(tracks_dict[video_id], video_id) for video_id, duration in durations if duration <= 1800]
+        tracks = [Track(tracks_dict[video_id], video_id) for video_id, duration in durations if duration <= MAX_TRACK_DURATION]
     else:
         tracks = [Track(it['snippet']['title'], it['snippet']['resourceId']['videoId']) for it in response['items']]
 
@@ -484,7 +485,7 @@ def get_related_video(video_id, done_queue):
         title = item['snippet']['title']
         video_id = item['id']['videoId']
         related_track = Track(title, video_id)
-        if related_track not in dq and video_durations[video_id] <= 1800:  # 30 minutes
+        if related_track not in dq and video_durations[video_id] <= MAX_TRACK_DURATION:
             related_url = f'https://www.youtube.com/watch?v={video_id}'
             return related_url, fix_youtube_title(title), video_id
     raise Exception('No related videos found')

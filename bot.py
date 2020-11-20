@@ -784,8 +784,8 @@ async def play(ctx):
         # TODO: cleanup. Use query_to_tracks
         if video_id is not None:
             title = get_video_title(video_id)
-            if get_video_duration(video_id) > 1800:
-                await ctx.send('That track is too long! (> 30 minutes)')
+            if get_video_duration(video_id) > MAX_TRACK_DURATION:
+                await ctx.send(f'That track is longer than {MAX_TRACK_DURATION // 60} minutes!')
                 return
         elif url_or_query.startswith('https://www.youtube.com/playlist'):
             playlist_id = parse_qs(urlsplit(url_or_query).query)['list'][0]
