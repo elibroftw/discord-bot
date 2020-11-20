@@ -644,6 +644,7 @@ def remove_silence(input_file, output_file):
 
 
 if __name__ == '__main__':
+    print('running tests')
     # tests go here
     all_playlists = get_all_playlists()
     playlists_from_search = get_all_playlists('chill trance')
