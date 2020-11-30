@@ -21,7 +21,7 @@ For more info, view [bot.py](../master/bot.py)
 - Listen to Music
     - Summon (!summon, !play <query/youtube_url>)
     - Play or Add to queue (!play, !p)
-    - Play next (adds the song to play right after, will rework this later !pn, !play_next)
+    - Play next (adds the track to play right after, will rework this later !pn, !play_next)
     - Pause/Resume (!pause, !p, !resume)
     - Skip (!skip, !next, !n)
     - Go Back (!back, !b, !previous, !prev)
@@ -34,15 +34,15 @@ For more info, view [bot.py](../master/bot.py)
     - View Now Playing (!np)
     - View Upcoming tracks (!q)
     - View Recently Played (!dq)
-    - Remove song (!rm <index>)
-    - Move song (!move <from> <to>)
+    - Remove track (!rm <index>)
+    - Move track (!move <from> <to>)
     - Shuffle (!shuffle)
     - Clear queue (!cq)
     - Play from Playlist (!pp <playlist_name/url> [--s])  // use --s for shuffle
     - Save to playlist (!sa <playlist_name>)
     - View playlist (!vp <playlist_name/url>)  // use --2/3 for different scopes
     - Search playlists (!sp [--page 1] [--query query])  // alphabetically sorted
-    - Load playlist (!lp <playlist_name/url>)  // adds songs to current queue
+    - Load playlist (!lp <playlist_name/url>)  // adds tracks to current queue
     - Delete playlist (!dp <playlist_name>)
     - Set volume (!volume, !v)  // prints volume if no int given
         - !v 100  # this will set volume to 100/100
@@ -67,7 +67,7 @@ For more info, view [bot.py](../master/bot.py)
         - A game my friend and I made (sends a link to the chat)
 - Youtube Search
     - Search for a video (!yt, !youtube)
-    - See "Listen to Music" for playing songs from YouTube
+    - See "Listen to Music" for playing tracks from YouTube
 - Twitter (DISABLED; Rework pending)
     - Get the latest tweet from a user (!twitter <user>)
     - Search for a twitter user (!tu_search <query>)
