@@ -92,17 +92,17 @@ def get_sp500_tickers():
 
 @time_cache(24 * 3600)  # cache for a full day
 def get_nasdaq_tickers():
-    return tickers_from_csv(NASDAQ_TICKERS_URL, name='NASDAQ')
+    return tickers_from_csv(NASDAQ_TICKERS_URL)
 
 
 @time_cache(24 * 3600)  # cache for a full day
 def get_nyse_tickers():
-    return tickers_from_csv(NYSE_TICKERS_URL, name='NYSE')
+    return tickers_from_csv(NYSE_TICKERS_URL)
 
 
 @time_cache(24 * 3600)  # cache for a full day
 def get_amex_tickers():
-    return tickers_from_csv(AMEX_TICKERS_URL, name='AMEX')
+    return tickers_from_csv(AMEX_TICKERS_URL)
 
 
 @time_cache(24 * 3600)  # cache for a full day
@@ -128,7 +128,7 @@ def get_nyse_arca_tickers():
 
 
 @time_cache(24 * 3600)  # cache for a full day
-def tickers_from_csv(url, name=''):
+def tickers_from_csv(url):
     s = requests.get(url).content
     _tickers = set(pd.read_csv(io.StringIO(s.decode('utf-8')))['Symbol'])
     return _tickers
@@ -182,50 +182,52 @@ def get_company_name_from_ticker(ticker: str):
             results[s['symbol']]=s
         best_match=process.extractOne(ticker, list(results.keys()))[0]
         return results[best_match]['name']
-    else:
-        if not US_COMPANY_LIST:
-            r = requests.get('https://api.iextrading.com/1.0/ref-data/symbols')
-            US_COMPANY_LIST={s['symbol']: s for s in r.json()}
-        best_match=process.extractOne(ticker, list(US_COMPANY_LIST.keys()))[0]
-        # noinspection PyTypeChecker
-        return US_COMPANY_LIST[best_match]['name']
+    if not US_COMPANY_LIST:
+        r = requests.get('https://api.iextrading.com/1.0/ref-data/symbols')
+        US_COMPANY_LIST={s['symbol']: s for s in r.json()}
+    best_match=process.extractOne(ticker, list(US_COMPANY_LIST.keys()))[0]
+    # noinspection PyTypeChecker
+    return US_COMPANY_LIST[best_match]['name']
 
 
 @time_cache(30)  # cache for 30 seconds
 def get_ticker_info(ticker: str, round_values=True) -> dict:
     # TODO: test pre-market values
-    data_latest=yf.download(ticker, interval='1m', period='1d', threads=3, prepost=True, progress=False,
+    data_latest = yf.download(ticker, interval='1m', period='1d', threads=3, prepost=True, progress=False,
                               group_by='ticker')
-    data_last_close=yf.download(ticker, interval='1m', period='5d', threads=3, progress=False)['Close']
-    latest_price=float(data_latest.tail(1)['Close'])
-    closing_price=float(data_last_close.tail(1))
-    timestamp=data_latest.last_valid_index()
+    data_last_close = yf.download(
+        ticker, interval='1m', period='5d', threads=3, progress=False)['Close']
+    latest_price = float(data_latest.tail(1)['Close'])
+    closing_price = float(data_last_close.tail(1))
+    timestamp = data_latest.last_valid_index()
     if closing_price == latest_price:
-        _today=datetime.today()
-        _today=datetime(_today.year, _today.month, _today.day, 15, 59)
+        _today = datetime.today()
+        _today = datetime(_today.year, _today.month, _today.day, 15, 59)
         _today -= timedelta(days=1)
         while _today.strftime('%Y-%m-%d %H:%M:%S-04:00') not in data_last_close:
             _today -= timedelta(days=1)
-        closing_price=data_last_close[_today.strftime('%Y-%m-%d %H:%M:%S-04:00')]
+        closing_price = data_last_close[_today.strftime(
+            '%Y-%m-%d %H:%M:%S-04:00')]
         # as_of = f'Market Open: {timestamp["Datetime"]}'
     # else:
         # as_of = f'After hours: {timestamp["Datetime"]}'
-    change=latest_price - closing_price
+    change = latest_price - closing_price
     if round_values:
-        change=round(change, 4)
-        percent_change=round(change/closing_price * 100, 2)
-        latest_price=round(latest_price, 4)
-        closing_price=round(closing_price, 4)
-    else: percent_change=change/closing_price * 100
-    name=get_company_name_from_ticker(ticker)
+        change = round(change, 4)
+        percent_change = round(change/closing_price * 100, 2)
+        latest_price = round(latest_price, 4)
+        closing_price = round(closing_price, 4)
+    else:
+        percent_change = change/closing_price * 100
+    name = get_company_name_from_ticker(ticker)
     try:
-        dividend=get_latest_dividend(ticker)
-        pd_ratio=round(latest_price/dividend, 2)
-    except Exception as e:
-        dividend=0
-        pd_ratio=10 ** 10  # basically infinity
+        dividend = get_latest_dividend(ticker)
+        pd_ratio = round(latest_price/dividend, 2)
+    except Exception:
+        dividend = 0
+        pd_ratio = 10 ** 10  # basically infinity
 
-    info={'name': name, 'price': latest_price, 'last_close_price': closing_price, 'price:dividend': pd_ratio,
+    info = {'name': name, 'price': latest_price, 'last_close_price': closing_price, 'price:dividend': pd_ratio,
             'change': change, 'percent_change': percent_change, 'timestamp': timestamp, 'symbol': ticker, 'last_dividend': dividend}
     return info
 
