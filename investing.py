@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.15
+Version: 1.17
 Created: April 3rd 2020
 Updated: February 10th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -18,7 +18,7 @@ Volatility (Standard Deviation) of a stock:
 from contextlib import suppress
 import csv
 from datetime import datetime, timedelta
-import io
+import multiprocessing
 import math
 from statistics import NormalDist
 # noinspection PyUnresolvedReferences
@@ -29,9 +29,9 @@ from fuzzywuzzy import process
 import random
 import pandas as pd
 import requests
+# import grequests
 import yfinance as yf
 from yahoo_fin import stock_info
-import yahoo_fin
 from enum import IntEnum
 import numpy as np
 from functools import lru_cache, wraps
@@ -65,13 +65,14 @@ NASDAQ_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nasdaq
 NYSE_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nyse&download=true'
 AMEX_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=amex&download=true'
 PREMARKET_FUTURES = 'https://ca.investing.com/indices/indices-futures'
+SP500_URL = 'http://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+DOW_URL = 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average'
 SORTED_INFO_CACHE = {}  # for when its past 4 PM
 GENERIC_HEADERS = {
     'accept': 'text/html,application/xhtml+xml',
     'user-agent': 'Mozilla/5.0'
 }
 # NOTE: something for later https://www.alphavantage.co/
-
 
 
 @time_cache(24 * 3600)  # cache request for a full day
@@ -85,7 +86,7 @@ def make_request(url, method='GET', headers=GENERIC_HEADERS, json=None):
 
 
 def get_dow_tickers() -> dict:
-    resp = make_request('https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average')
+    resp = make_request(DOW_URL)
     soup = BeautifulSoup(resp.text, 'html.parser')
     table = soup.find('table', {'id': 'constituents'}).find('tbody')
     rows = table.find_all('tr')
@@ -99,15 +100,16 @@ def get_dow_tickers() -> dict:
 
 
 def get_sp500_tickers() -> dict:
-    resp = make_request('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    resp = make_request(SP500_URL)
     soup = BeautifulSoup(resp.text, 'html.parser')
     table = soup.find('table', {'id': 'constituents'})
     tickers = {}
     for row in table.findAll('tr')[1:]:
         tds = row.findAll('td')
         ticker = tds[0].text.strip()
-        name = tds[1].text.strip()
-        tickers[ticker] = {'symbol': ticker, 'name': name}
+        if '.' not in ticker:
+            name = tds[1].text.strip()
+            tickers[ticker] = {'symbol': ticker, 'name': name}
     return tickers
 
 
@@ -145,7 +147,8 @@ def get_tsx_tickers() -> dict:
 def get_nyse_arca_tickers() -> dict:
     post_data = {'instrumentType': 'EXCHANGE_TRADED_FUND', 'pageNumber': 1, 'sortColumn': 'NORMALIZED_TICKER',
                  'sortOrder': 'ASC', 'maxResultsPerPage': 5000, 'filterToken': ''}
-    r = requests.post('https://www.nyse.com/api/quotes/filter', json=post_data).json()
+    r = requests.post('https://www.nyse.com/api/quotes/filter',
+                      json=post_data).json()
     tickers = {}
     for stock in r:
         ticker = stock['symbolTicker']
@@ -158,8 +161,10 @@ def get_tickers(market) -> dict:
     # OPTIONS: CUSTOM, ALL, US, NYSE, NASDAQ, S&P500, DOW/DJIA, TSX/CA
     tickers = dict()
     # EXCHANGES
-    if market in {'S&P500', 'S&P 500'}: tickers.update(get_sp500_tickers())
-    if market in {'DOW', 'DJIA'}: tickers.update(get_dow_tickers())
+    if market in {'S&P500', 'S&P 500'}:
+        tickers.update(get_sp500_tickers())
+    if market in {'DOW', 'DJIA'}:
+        tickers.update(get_dow_tickers())
 
     if market in {'NASDAQ', 'US', 'ALL'}:
         tickers.update(get_nasdaq_tickers())
@@ -188,7 +193,6 @@ def get_tickers(market) -> dict:
     return tickers
 
 
-@time_cache(24 * 3600)  # cache for a full day
 def get_company_name_from_ticker(ticker: str):
     ticker = ticker.upper()
     with suppress(KeyError):
@@ -198,7 +202,8 @@ def get_company_name_from_ticker(ticker: str):
             return get_tsx_tickers()[ticker]['name']
         except KeyError:
             ticker = ticker.replace('.TO', '')
-            r = requests.get(f'https://www.tsx.com/json/company-directory/search/tsx/{ticker}')
+            r = requests.get(
+                f'https://www.tsx.com/json/company-directory/search/tsx/{ticker}')
             results = {}
             for s in r.json()['results']:
                 s['name'] = s['name'].upper()
@@ -217,7 +222,7 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
     yf_ticker = yf.Ticker(ticker)
     try:
         info = yf_ticker.info
-    except KeyError:
+    except (KeyError, ValueError):
         raise ValueError(f'Invalid ticker "{ticker}"')
     data_latest = yf_ticker.history(period='5d', interval='1m', prepost=True)
     timestamp = data_latest.last_valid_index()
@@ -227,12 +232,15 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
     timestamp_ending = str(timestamp)[-6:]
     if (timestamp.hour >= 16):  # post market
         today = datetime(timestamp.year, timestamp.month, timestamp.day, 15, 59)
-        closing_price = data_latest[today.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')]
+        _closing_timestamp = today.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')
+        closing_price = data_latest.loc[_closing_timestamp]['Close']
     else:  # market is currently open / pre-market
-        prev_day = datetime(timestamp.year, timestamp.month, timestamp.day, 15, 59) - timedelta(days=1)
+        prev_day = datetime(timestamp.year, timestamp.month,
+                            timestamp.day, 15, 59) - timedelta(days=1)
         while True:
             try:
-                closing_price = data_latest.loc[prev_day.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')]['Close']
+                prev_day_timestamp = prev_day.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')
+                closing_price = data_latest.loc[prev_day_timestamp]['Close']
                 break
             except KeyError:
                 prev_day -= timedelta(days=1)
@@ -263,8 +271,8 @@ def get_data(tickers: set, start_date=None, end_date=None, period='3mo', group_b
              show_progress=True):
     # http://www.datasciencemadesimple.com/union-and-union-all-in-pandas-dataframe-in-python-2/
     # new format
-    _key=' '.join(tickers) + f' {start_date} {end_date} {period} {group_by}'
-    _data=yf.download(tickers, start_date, end_date, period=period, group_by=group_by, threads=3,
+    _key = ' '.join(tickers) + f' {start_date} {end_date} {period} {group_by}'
+    _data = yf.download(tickers, start_date, end_date, period=period, group_by=group_by, threads=3,
                         progress=show_progress, interval=interval)
     return _data
 
@@ -274,21 +282,21 @@ def parse_info(_data, ticker, start_date, end_date, start_price_key='Open'):
     start_price_key: can be 'Open' or 'Close'
     TODO: change parse_info keys to snake_case
     """
-    start_price=_data[ticker][start_price_key][start_date]
+    start_price = _data[ticker][start_price_key][start_date]
     if math.isnan(_data[ticker]['Open'][end_date]):
-        end_date=_data[ticker]['Open'].last_valid_index()
-    end_price=_data[ticker]['Close'][end_date]
-    change=end_price - start_price
-    percent_change=change / start_price
-    start_volume=round(_data[ticker]['Volume'][start_date])
-    end_volume=round(_data[ticker]['Volume'][end_date])
-    avg_volume=(start_volume + end_volume) / 2
+        end_date = _data[ticker]['Open'].last_valid_index()
+    end_price = _data[ticker]['Close'][end_date]
+    change = end_price - start_price
+    percent_change = change / start_price
+    start_volume = round(_data[ticker]['Volume'][start_date])
+    end_volume = round(_data[ticker]['Volume'][end_date])
+    avg_volume = (start_volume + end_volume) / 2
     return {'Start': start_price, 'End': end_price, 'Change': change, 'Percent Change': percent_change,
             'Open Volume': start_volume, 'Close Volume': end_volume, 'Avg Volume': avg_volume}
 
 
-def get_parsed_data(_data=None, tickers: list=None, market='ALL', sort_key='Percent Change',
-                    of='day', start_date: datetime=None, end_date: datetime=None):
+def get_parsed_data(_data=None, tickers: list = None, market='ALL', sort_key='Percent Change',
+                    of='day', start_date: datetime = None, end_date: datetime = None):
     """
     returns the parsed trading data sorted by percent change
     :param _data: if you are doing a lot of parsing but None is recommended unless you are dealing with >= 1 month
@@ -300,10 +308,11 @@ def get_parsed_data(_data=None, tickers: list=None, market='ALL', sort_key='Perc
     :param start_date: if of == 'custom' specify this values
     :param end_date: if of == 'custom' specify this value
     """
-    of=of.lower()
-    _today=datetime.today()
-    todays_date=_today.date()
-    if tickers is None: tickers=get_tickers(market)
+    of = of.lower()
+    _today = datetime.today()
+    todays_date = _today.date()
+    if tickers is None:
+        tickers = list(get_tickers(market).keys())
     if _today.hour >= 16 and of == 'day':
         # TODO: cache pre-market as well
         # key format will be
@@ -311,117 +320,127 @@ def get_parsed_data(_data=None, tickers: list=None, market='ALL', sort_key='Perc
             return SORTED_INFO_CACHE[of][str(todays_date)][','.join(tickers)]
     if of == 'custom':
         assert start_date and end_date
-        if _data is None: _data=get_data(
-            tickers, start_date=start_date, end_date=end_date)
-        start_date, end_date=_data.first_valid_index(), _data.last_valid_index()
-        parsed_info={}
+        if _data is None:
+            _data = get_data(tickers, start_date=start_date, end_date=end_date)
+        start_date, end_date = _data.first_valid_index(), _data.last_valid_index()
+        parsed_info = {}
         for ticker in tickers:
-            info=parse_info(_data, ticker, start_date, end_date)
-            if not math.isnan(info['Start']): parsed_info[ticker]=info
+            info = parse_info(_data, ticker, start_date, end_date)
+            if not math.isnan(info['Start']):
+                parsed_info[ticker] = info
     elif of in {'day', '1d'}:
         # ALWAYS USE LATEST DATA
-        _data=get_data(tickers, period='5d', interval='1m')
-        market_day=_data.last_valid_index().date() == todays_date
+        _data = get_data(tickers, period='5d', interval='1m')
+        market_day = _data.last_valid_index().date() == todays_date
         if not market_day or (_today.hour * 60 + _today.minute >= 645):  # >= 10:45 AM
             # movers of the latest market day [TODAY]
-            recent_day=_data.last_valid_index()
-            recent_start_day=recent_day.replace(hour=9, minute=30, second=0)
-            parsed_info={}
+            recent_day = _data.last_valid_index()
+            recent_start_day = recent_day.replace(hour=9, minute=30, second=0)
+            parsed_info = {}
             for ticker in tickers:
                 try:
-                    info=parse_info(
-                        _data, ticker, recent_start_day, recent_day)
-                    if not math.isnan(info['Start']): parsed_info[ticker]=info
+                    info = parse_info(_data, ticker, recent_start_day, recent_day)
+                    if not math.isnan(info['Start']):
+                        parsed_info[ticker] = info
                 except ValueError:
                     # TODO: fix
                     print('ERROR: Could not get info for', ticker)
         else:  # movers of the second last market day
-            yest=_data.tail(2).first_valid_index()  # assuming interval = 1d
-            parsed_info={}
+            yest = _data.tail(2).first_valid_index()  # assuming interval = 1d
+            parsed_info = {}
             for ticker in tickers:
-                info=parse_info(_data, ticker, yest, yest)
-                if not math.isnan(info['Start']): parsed_info[ticker]=info
+                info = parse_info(_data, ticker, yest, yest)
+                if not math.isnan(info['Start']):
+                    parsed_info[ticker] = info
     # TODO: custom day amount
     elif of in {'mtd', 'month_to_date', 'monthtodate'}:
-        start_date=todays_date.replace(day=1)
-        if _data is None: _data=get_data(
-            tickers, start_date=start_date, end_date=_today)
+        start_date = todays_date.replace(day=1)
+        if _data is None:
+            _data = get_data(tickers, start_date=start_date, end_date=_today)
         while start_date not in _data.index and start_date < todays_date:
             start_date += timedelta(days=1)
-        if start_date >= todays_date: raise RuntimeError(
-            'No market days this month')
-        parsed_info={}
+        if start_date >= todays_date:
+            raise RuntimeError(
+                'No market days this month')
+        parsed_info = {}
         for ticker in tickers:
-            info=parse_info(_data, ticker, start_date, todays_date)
+            info = parse_info(_data, ticker, start_date, todays_date)
             if not math.isnan(info['Start']):
-                parsed_info[ticker]=info
+                parsed_info[ticker] = info
     elif of in {'month', '1m', 'm'}:
-        start_date=todays_date - timedelta(days=30)
-        if _data is None: _data=get_data(
-            tickers, start_date=start_date, end_date=_today)
+        start_date = todays_date - timedelta(days=30)
+        if _data is None:
+            _data = get_data(
+                tickers, start_date=start_date, end_date=_today)
         while start_date not in _data.index:
             start_date += timedelta(days=1)
-        parsed_info={}
+        parsed_info = {}
         for ticker in tickers:
-            info=parse_info(_data, ticker, start_date, todays_date)
+            info = parse_info(_data, ticker, start_date, todays_date)
             if not math.isnan(info['Start']):
-                parsed_info[ticker]=info
+                parsed_info[ticker] = info
     # TODO: x months
     elif of in {'ytd', 'year_to_date', 'yeartodate'}:
         if _data is None:
-            _data=get_data(tickers, start_date=_today.replace(
-                day=1, month=1), end_date=_today)
-            start_date=_data.first_valid_index()  # first market day of the year
+            _temp = _today.replace(day=1, month=1)
+            _data = get_data(tickers, start_date=_temp, end_date=_today)
+            start_date = _data.first_valid_index()  # first market day of the year
         else:
-            start_date=_today.replace(day=1, month=1).date()  # Jan 1st
+            start_date = _today.replace(day=1, month=1).date()  # Jan 1st
             # find first market day of the year
             while start_date not in _data.index:
                 start_date += timedelta(days=1)
-        end_date=_data.last_valid_index()
-        parsed_info={}
+        end_date = _data.last_valid_index()
+        parsed_info = {}
         for ticker in tickers:
-            info=parse_info(_data, ticker, start_date, end_date)
-            if not math.isnan(info['Start']): parsed_info[ticker]=info
+            info = parse_info(_data, ticker, start_date, end_date)
+            if not math.isnan(info['Start']):
+                parsed_info[ticker] = info
     elif of in {'year', '1yr', 'yr', 'y'}:
         if _data is None:
-            _data=get_data(tickers, start_date=_today - \
-                           timedelta(days=365), end_date=_today)
-            start_date=_data.first_valid_index()  # first market day of the year
+            _data = get_data(tickers, start_date=_today -
+                             timedelta(days=365), end_date=_today)
+            start_date = _data.first_valid_index()  # first market day of the year
         else:
-            start_date=_today.date() - timedelta(days=365)
-            _data=get_data(tickers, start_date=_today.replace(
+            start_date = _today.date() - timedelta(days=365)
+            _data = get_data(tickers, start_date=_today.replace(
                 day=1, month=1), end_date=_today)
-        end_date=_data.last_valid_index()
-        parsed_info={}
+        end_date = _data.last_valid_index()
+        parsed_info = {}
         for ticker in tickers:
-            info=parse_info(_data, ticker, start_date, end_date)
-            if not math.isnan(info['Start']): parsed_info[ticker]=info
+            info = parse_info(_data, ticker, start_date, end_date)
+            if not math.isnan(info['Start']):
+                parsed_info[ticker] = info
     # TODO: x years
-    else: parsed_info={}  # invalid of
-    if sort_key is None: return parsed_info
-    sorted_info=sorted(parsed_info.items(), key=lambda item: item[1][sort_key])
+    else:
+        parsed_info = {}  # invalid of
+    if sort_key is None:
+        return parsed_info
+    sorted_info = sorted(parsed_info.items(),
+                         key=lambda item: item[1][sort_key])
     if _today.hour >= 16 and of == 'day':
-        if of not in SORTED_INFO_CACHE: SORTED_INFO_CACHE[of]={}
-        if str(todays_date) not in SORTED_INFO_CACHE[of]: SORTED_INFO_CACHE[of][str(
-            todays_date)]={}
-        SORTED_INFO_CACHE[of][str(todays_date)][','.join(tickers)]=sorted_info
+        if of not in SORTED_INFO_CACHE:
+            SORTED_INFO_CACHE[of] = {}
+        if str(todays_date) not in SORTED_INFO_CACHE[of]:
+            SORTED_INFO_CACHE[of][str(todays_date)] = {}
+        SORTED_INFO_CACHE[of][str(todays_date)][','.join(tickers)] = sorted_info
     return sorted_info
 
 
 @time_cache(60)  # cache for 1 minute
-def winners(sorted_info=None, tickers: list=None, market='ALL', of='day', start_date=None, end_date=None, show=5):
+def winners(sorted_info=None, tickers: list = None, market='ALL', of='day', start_date=None, end_date=None, show=5):
     # sorted_info is the return of get_parsed_data with non-None sort_key
     if sorted_info is None:
-        sorted_info=get_parsed_data(
+        sorted_info = get_parsed_data(
             tickers=tickers, market=market, of=of, start_date=start_date, end_date=end_date)
     return list(reversed(sorted_info[-show:]))
 
 
 @time_cache(60)  # cache for 1 minute
-def losers(sorted_info=None, tickers: list=None, market='ALL', of='day', start_date=None, end_date=None, show=5):
+def losers(sorted_info=None, tickers: list = None, market='ALL', of='day', start_date=None, end_date=None, show=5):
     # sorted_info is the return of get_parsed_data with non-None sort_key
     if sorted_info is None:
-        sorted_info=get_parsed_data(
+        sorted_info = get_parsed_data(
             tickers=tickers, market=market, of=of, start_date=start_date, end_date=end_date)
     return sorted_info[:show]
 
@@ -429,28 +448,27 @@ def losers(sorted_info=None, tickers: list=None, market='ALL', of='day', start_d
 @time_cache(60)  # cache for 1 minute
 def winners_and_losers(_data=None, tickers=None, market='ALL', of='day', start_date=None, end_date=None, show=5,
                        console_output=True, csv_output=''):
-    sorted_info=get_parsed_data(
-        _data, tickers, market, of=of, start_date=start_date, end_date=end_date)
+    sorted_info = get_parsed_data(_data, tickers, market, of=of, start_date=start_date, end_date=end_date)
     if console_output:
-        bulls=''
-        bears=''
-        length=min(show, len(sorted_info))
+        bulls = ''
+        bears = ''
+        length = min(show, len(sorted_info))
         for i in range(length):
-            better_stock=sorted_info[-i - 1]
-            worse_stock=sorted_info[i]
-            open_close1=f'{round(better_stock[1]["Start"], 2)}, {round(better_stock[1]["End"], 2)}'
-            open_close2=f'{round(worse_stock[1]["Start"], 2)}, {round(worse_stock[1]["End"], 2)}'
+            better_stock = sorted_info[-i - 1]
+            worse_stock = sorted_info[i]
+            open_close1 = f'{round(better_stock[1]["Start"], 2)}, {round(better_stock[1]["End"], 2)}'
+            open_close2 = f'{round(worse_stock[1]["Start"], 2)}, {round(worse_stock[1]["End"], 2)}'
             bulls += f'\n{better_stock[0]} [{open_close1}]: {round(better_stock[1]["Percent Change"] * 100, 2)}%'
             bears += f'\n{worse_stock[0]} [{open_close2}]: {round(worse_stock[1]["Percent Change"] * 100, 2)}%'
-        header1=f'TOP {length} WINNERS of ({of})'
-        header2=f'TOP {length} LOSERS ({of})'
-        line='-' * len(header1)
+        header1 = f'TOP {length} WINNERS of ({of})'
+        header2 = f'TOP {length} LOSERS ({of})'
+        line = '-' * len(header1)
         print(f'{line}\n{header1}\n{line}{bulls}')
-        line='-' * len(header2)
+        line = '-' * len(header2)
         print(f'{line}\n{header2}\n{line}{bears}')
     if csv_output:
         with open(csv_output, 'w', newline='') as f:
-            writer=csv.writer(f)
+            writer = csv.writer(f)
             writer.writerow(['TICKER'] + list(sorted_info[0][1].keys()))
             for ticker in sorted_info:
                 writer.writerow([ticker[0]] + list(ticker[1].values()))
@@ -465,7 +483,7 @@ def top_movers(_data=None, tickers=None, market='ALL', of='day', start_date=None
 
 
 def create_headers(subdomain):
-    hdrs={'authority': 'finance.yahoo.com',
+    hdrs = {'authority': 'finance.yahoo.com',
             'method': 'GET',
             'path': subdomain,
             'scheme': 'https',
@@ -495,41 +513,6 @@ def get_latest_dividend(ticker: str) -> float:
 
 
 @time_cache(3600)  # cache for 1 hour
-def price_to_earnings(ticker, return_dict: dict=None, return_price=False):
-    # EPS: earnings per share
-    # PER: price over earnings ratio
-    # useful concept to keep in mind:
-    # PER = Stock price / EPS
-    # Stock price = PER * EPS
-    pe = -999999
-    if ticker.endswith('.TO'):
-        ticker = '.'.join(ticker.split('.')[:-1])
-        url = f'https://www.marketwatch.com/investing/stock/{ticker}/financials?country=ca'
-    else:
-        url = f'https://www.marketwatch.com/investing/stock/{ticker}/financials'
-    try:
-        text_soup = BeautifulSoup(requests.get(url, headers=GENERIC_HEADERS).text, 'html.parser')
-    except requests.TooManyRedirects:
-        return pe
-    try:
-        price = float(text_soup.find('p', {'class': 'bgLast'}).text.replace(',', ''))
-        titles = text_soup.findAll('td', {'class': 'rowTitle'})
-
-        for title in titles:
-            if 'EPS (Diluted)' in title.text:
-                eps = [td.text for td in title.findNextSiblings(attrs={'class': 'valueCell'}) if td.text]
-                try: latest_eps = float(eps[-1])
-                except ValueError: latest_eps = -float(eps[-1][1:-1])
-                pe = price / latest_eps
-                break
-    except AttributeError: price=-1
-    if return_dict is not None:
-        return_dict[ticker] = (pe, price) if return_price else pe
-    if return_price: return pe, price
-    return pe
-
-
-@time_cache(3600)  # cache for 1 hour
 def get_target_price(ticker):
     """
     ticker: yahoo finance ticker
@@ -539,7 +522,8 @@ def get_target_price(ticker):
         ticker = ticker.upper()
         quarterly_eps = stock_info.get_earnings(ticker)['quarterly_results']['actual'][-4:]
         quote_table = stock_info.get_quote_table(ticker)
-        eps_estimates = stock_info.get_analysts_info(ticker)['Earnings Estimate']
+        eps_estimates = stock_info.get_analysts_info(ticker)[
+            'Earnings Estimate']
         price = quote_table['Quote Price']
         eps_ttm = sum(quarterly_eps)
         # if EPS data DNE for 4 quarters, annualize out of the current ones
@@ -559,20 +543,21 @@ def get_target_price(ticker):
         raise ValueError(f'Invalid ticker "{ticker}"')
 
 
-def tickers_by_pe(tickers: set, output_to_csv='', console_output=True):
+def tickers_by_pe(tickers, output_to_csv='', console_output=True):
     """
     Returns the tickers by price-earnings ratio (remove negatives)
-    :param tickers:
+    :param tickers: iterable
     :param output_to_csv:
     :param console_output:
     :return:
     """
-    pes = {}
+    # TODO: use grequests
     for ticker in tickers:
-        pe = price_to_earnings(ticker)
-        if pe > 0:
-            pes[ticker] = pe
-    pes = sorted(pes.items(), key=lambda item: item[1])
+        with suppress(ValueError):
+            pe = price_to_earnings(ticker)
+            if pe > 0:
+                pes.append((ticker, pe))
+    pes.sort(key=lambda item: item[1])
     if console_output:
         header = 'TOP 5 TICKERS BY P/E'
         line = '-' * len(header)
@@ -588,6 +573,21 @@ def tickers_by_pe(tickers: set, output_to_csv='', console_output=True):
             for ticker in pes:
                 writer.writerow(ticker)
     return pes
+
+
+def price_to_earnings(ticker):
+    '''
+    EPS: earnings per share
+    PER: price over earnings ratio
+    useful concept to keep in mind:
+    PER = Stock price / EPS
+    Stock price = PER * EPS
+    raises: ValueError
+    '''
+    url = 'http://finviz.com/quote.ashx?t=' + ticker.upper()
+    soup = BeautifulSoup(make_request(url).content, 'html.parser')
+    return float(soup.find(text = 'P/E').find_next(class_='snapshot-td2').text)
+
 
 
 def sort_by_volume(tickers):
@@ -612,7 +612,8 @@ def get_index_futures():
 
 def get_random_stocks(n=1) -> set:
     # return n stocks from NASDAQ and NYSE
-    if n < 1: n = 1
+    if n < 1:
+        n = 1
     us_stocks = get_nasdaq_tickers()
     us_stocks.update(get_nyse_tickers())
     return_stocks = set()
@@ -633,7 +634,8 @@ class Option(IntEnum):
 
 def get_month_and_year():
     date = datetime.today()
-    month = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUNE', 'JULY', 'AUG', 'SEP', 'DEC'][date.month - 1]
+    month = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUNE',
+             'JULY', 'AUG', 'SEP', 'DEC'][date.month - 1]
     year = date.year
     return f'{month} {year}'
 
@@ -646,7 +648,6 @@ def get_risk_free_interest_rate(month_and_year=None):
         the average interest rate of US Treasury Bills
     throws: RunTimeError if interest rate could not be fetched
     """
-    # TODO: make two requests?
     del month_and_year
     us_treasury_api = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service'
     endpoint = f'{us_treasury_api}/v2/accounting/od/avg_interest_rates'
@@ -680,7 +681,8 @@ def get_volatility(stock_ticker, tll_hash=None):
 def d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield):
     block_3 = volatility * math.sqrt(days_to_expiry)
     block_1 = math.log(market_price / strike_price)
-    block_2 = days_to_expiry * (risk_free - dividend_yield + volatility ** 2 / 2)
+    block_2 = days_to_expiry * \
+        (risk_free - dividend_yield + volatility ** 2 / 2)
     return (block_1 + block_2) / block_3
 
 
@@ -704,9 +706,11 @@ def snd(y):
 
 def calc_option_price(market_price, strike_price, days_to_expiry, volatility,
                       risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
-    _d1 = option_type * d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    _d1 = option_type * d1(market_price, strike_price,
+                           days_to_expiry, volatility, risk_free, dividend_yield)
     _d2 = _d1 - option_type * volatility * math.sqrt(days_to_expiry)
-    block_1 = market_price * math.e ** (-dividend_yield * days_to_expiry) * csn(_d1)
+    block_1 = market_price * \
+        math.e ** (-dividend_yield * days_to_expiry) * csn(_d1)
     block_2 = strike_price * math.e ** (-risk_free * days_to_expiry) * csn(_d2)
     return option_type * (block_1 - block_2)
 
@@ -714,37 +718,45 @@ def calc_option_price(market_price, strike_price, days_to_expiry, volatility,
 def calc_option_delta(market_price, strike_price, days_to_expiry, volatility,
                       risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
     block_1 = math.e ** (-dividend_yield * days_to_expiry)
-    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    _d1 = d1(market_price, strike_price, days_to_expiry,
+             volatility, risk_free, dividend_yield)
     return option_type * block_1 * csn(option_type * _d1)
 
 
 def calc_option_gamma(market_price, strike_price, days_to_expiry, volatility,
                       risk_free=get_risk_free_interest_rate(), dividend_yield=0):
     block_1 = math.e ** (-dividend_yield * days_to_expiry)
-    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    _d1 = d1(market_price, strike_price, days_to_expiry,
+             volatility, risk_free, dividend_yield)
     return block_1 / (market_price * volatility * math.sqrt(days_to_expiry)) * snd(_d1)
 
 
 def calc_option_vega(market_price, strike_price, days_to_expiry, volatility,
-                      risk_free=get_risk_free_interest_rate(), dividend_yield=0):
+                     risk_free=get_risk_free_interest_rate(), dividend_yield=0):
     block_1 = market_price * math.e ** (-dividend_yield * days_to_expiry)
-    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    _d1 = d1(market_price, strike_price, days_to_expiry,
+             volatility, risk_free, dividend_yield)
     return block_1 * math.sqrt(days_to_expiry) * snd(_d1)
 
 
 def calc_option_rho(market_price, strike_price, days_to_expiry, volatility,
-                      risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
-    block_1 = strike_price * math.e ** (-risk_free * days_to_expiry) * days_to_expiry
-    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+                    risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
+    block_1 = strike_price * \
+        math.e ** (-risk_free * days_to_expiry) * days_to_expiry
+    _d1 = d1(market_price, strike_price, days_to_expiry,
+             volatility, risk_free, dividend_yield)
     _d2 = option_type * (_d1 - volatility * math.sqrt(days_to_expiry))
     return option_type * block_1 * csn(_d2)
 
 
 def calc_option_theta(market_price, strike_price, days_to_expiry, volatility,
                       risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
-    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
-    block_1 = market_price * math.e ** (-dividend_yield * days_to_expiry) * csn(option_type * _d1)
-    block_2 = strike_price * math.e ** (-risk_free * days_to_expiry) * risk_free
+    _d1 = d1(market_price, strike_price, days_to_expiry,
+             volatility, risk_free, dividend_yield)
+    block_1 = market_price * \
+        math.e ** (-dividend_yield * days_to_expiry) * csn(option_type * _d1)
+    block_2 = strike_price * \
+        math.e ** (-risk_free * days_to_expiry) * risk_free
     blocK_3 = market_price * math.e ** (-dividend_yield * days_to_expiry)
     blocK_3 *= volatility / (2 * math.sqrt(days_to_expiry)) * snd(_d1)
     return option_type * (block_1 - block_2) - blocK_3
@@ -782,6 +794,10 @@ def run_tests():
         get_target_price('ZWC')
     with suppress(ValueError):
         get_ticker_info('ZWC')
+    print('Testing tickers by pe')
+    tickers_by_pe(get_dow_tickers())
+    print('Testing top movers')
+    top_movers(market='DOW')
 
 
 ALL_STOCKS = get_tickers('ALL')
