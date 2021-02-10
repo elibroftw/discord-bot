@@ -1,10 +1,60 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.12
-Source: https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
-"""
+Version: 1.13
+Created: April 3rd 2020
+Updated: November 15th 2020
+https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
+CHANGELOG
+1.13
+- Fixed NASDAQ API
+
+1.12
+- Added timed memoization
+- Fixed DOW
+- Added random us stock getter
+
+1.11
+- Added get target prices
+
+1.10
+- Added premarket futures
+
+1.9
+- Added Utilities
+- Added get_latest_dividend
+
+1.8
+- Added Index Futures as a market
+
+1.7
+- Added caching for sorted_info if the time is past 4 PM
+
+1.6
+- Added NYSE-ARCA ETF's
+
+1.5
+- Made winners_and_losers more customizable and better
+
+1.4
+- Added get_ticker_info
+- gets the latest price and the change for the ticker
+- Added CARS sector
+
+1.3
+- Added OIL sector
+
+1.2
+- Added TSX
+- Added Mortgage REIT's sector
+- Added price-earnings ratio
+- Added basic caching features
+- Making top_movers_and_losers to be more versatile
+
+1.1
+- Added DOW
+"""
 from contextlib import suppress
 import csv
 from datetime import datetime, timedelta
@@ -14,19 +64,20 @@ import math
 from threading import main_thread
 from numpy.lib.function_base import average
 import pandas
+from requests.api import head
 from yahoo_fin import stock_info
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 # 3rd party libraries
 from bs4 import BeautifulSoup
 from fuzzywuzzy import process
+import random
 import pandas as pd
 import requests
 import yfinance as yf
 
 import functools
 import time
-import random
 
 
 def time_cache(max_age, maxsize=128, typed=False):
@@ -52,22 +103,29 @@ def time_cache(max_age, maxsize=128, typed=False):
     return _decorator
 
 
-NASDAQ_TICKERS_URL = 'https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nasdaq&render=download'
-NYSE_TICKERS_URL = 'https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=nyse&render=download'
-AMEX_TICKERS_URL = 'https://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange=amex&render=download'
+NASDAQ_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nasdaq'
+NYSE_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nyse'
+AMEX_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=amex'
 PREMARKET_FUTURES = 'https://ca.investing.com/indices/indices-futures'
 US_COMPANY_LIST = []
 SORTED_INFO_CACHE = {}  # for when its past 4 PM
 GENERIC_HEADERS = {
     'accept': 'text/html,application/xhtml+xml',
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'
+    'user-agent': 'Mozilla/5.0'
 }
 # NOTE: something for later https://www.alphavantage.co/
 
 
 @time_cache(24 * 3600)  # cache for a full day
+def tickers_from_csv(url):
+    s = requests.get(url, headers=GENERIC_HEADERS).content
+    _tickers = set(pd.read_csv(io.StringIO(s.decode('utf-8')))['Symbol'])
+    return _tickers
+
+
+@time_cache(24 * 3600)  # cache for a full day
 def get_dow_tickers():
-    resp = requests.get('https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average')
+    resp = requests.get('https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average', headers=GENERIC_HEADERS)
     soup = BeautifulSoup(resp.text, 'html.parser')
     table = soup.find('table', {'id': 'constituents'}).find('tbody')
     rows = table.find_all('tr')
@@ -81,28 +139,29 @@ def get_dow_tickers():
 
 @time_cache(24 * 3600)  # cache for a full day
 def get_sp500_tickers():
-    resp = requests.get(
-        'http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    resp = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies', headers=GENERIC_HEADERS)
     soup = BeautifulSoup(resp.text, 'html.parser')
     table = soup.find('table', {'id': 'constituents'})
-    _sp500_tickers = {row.find('td').text.strip()
-                               for row in table.findAll('tr')[1:]}
+    _sp500_tickers = {row.find('td').text.strip() for row in table.findAll('tr')[1:]}
     return _sp500_tickers
 
 
 @time_cache(24 * 3600)  # cache for a full day
-def get_nasdaq_tickers():
-    return tickers_from_csv(NASDAQ_TICKERS_URL)
+def get_nasdaq_tickers() -> set:
+    r = requests.get(NASDAQ_TICKERS_URL, headers=GENERIC_HEADERS).json()
+    return {stock['symbol'] for stock in r['data']['table']['rows']}
 
 
 @time_cache(24 * 3600)  # cache for a full day
-def get_nyse_tickers():
-    return tickers_from_csv(NYSE_TICKERS_URL)
+def get_nyse_tickers() -> set:
+    r = requests.get(NYSE_TICKERS_URL, headers=GENERIC_HEADERS).json()
+    return {stock['symbol'] for stock in r['data']['table']['rows']}
 
 
 @time_cache(24 * 3600)  # cache for a full day
-def get_amex_tickers():
-    return tickers_from_csv(AMEX_TICKERS_URL)
+def get_amex_tickers() -> set:
+    r = requests.get(AMEX_TICKERS_URL, headers=GENERIC_HEADERS).json()
+    return {stock['symbol'] for stock in r['data']['table']['rows']}
 
 
 @time_cache(24 * 3600)  # cache for a full day
@@ -110,7 +169,7 @@ def get_tsx_tickers():
     base_url = 'http://eoddata.com/stocklist/TSX/'
     _tsx_tickers = []
     for i in range(26):
-        resp = requests.get(base_url + chr(65 + i) + '.html')
+        resp = requests.get(base_url + chr(65 + i) + '.html', headers=GENERIC_HEADERS)
         soup = BeautifulSoup(resp.text, 'html.parser')
         table = soup.find('table', {'class': 'quotes'})
         _tsx_tickers += {row.find('a').text.strip().upper() +
@@ -122,16 +181,9 @@ def get_tsx_tickers():
 def get_nyse_arca_tickers():
     post_data = {'instrumentType': 'EXCHANGE_TRADED_FUND', 'pageNumber': 1, 'sortColumn': 'NORMALIZED_TICKER',
                  'sortOrder': 'ASC', 'maxResultsPerPage': 5000, 'filterToken': ''}
-    r = requests.post('https://www.nyse.com/api/quotes/filter', json=post_data)
+    r = requests.post('https://www.nyse.com/api/quotes/filter', json=post_data, headers=GENERIC_HEADERS)
     _arca_tickers = {item['normalizedTicker'] for item in r.json()}
     return _arca_tickers
-
-
-@time_cache(24 * 3600)  # cache for a full day
-def tickers_from_csv(url):
-    s = requests.get(url).content
-    _tickers = set(pd.read_csv(io.StringIO(s.decode('utf-8')))['Symbol'])
-    return _tickers
 
 
 @time_cache(24 * 3600)  # cache for a full day
@@ -192,11 +244,16 @@ def get_company_name_from_ticker(ticker: str):
 
 @time_cache(30)  # cache for 30 seconds
 def get_ticker_info(ticker: str, round_values=True) -> dict:
+    '''
+    Throws ValueError
+    '''
     # TODO: test pre-market values
+    ticker = ticker.upper()
     data_latest = yf.download(ticker, interval='1m', period='1d', threads=3, prepost=True, progress=False,
                               group_by='ticker')
-    data_last_close = yf.download(
-        ticker, interval='1m', period='5d', threads=3, progress=False)['Close']
+    if data_latest.empty:
+        raise ValueError(f'Invalid ticker "{ticker}"')
+    data_last_close = yf.download(ticker, interval='1m', period='5d', threads=3, progress=False)['Close']
     latest_price = float(data_latest.tail(1)['Close'])
     closing_price = float(data_last_close.tail(1))
     timestamp = data_latest.last_valid_index()
@@ -505,31 +562,33 @@ def price_to_earnings(ticker, return_dict: dict=None, return_price=False):
 
 
 @time_cache(3600)  # cache for 1 hour
-def get_target_price(ticker, level=None):
+def get_target_price(ticker):
     """
     ticker: yahoo finance ticker
-    level: either 'avg', 'low', 'high'
-        returns (avg, low, high, price, eps_ttm) if level is an invalid value
+    returns: {'avg': float, 'low': float, 'high': float, 'price': float, 'eps_ttm': float}
     """
-    quarterly_eps=stock_info.get_earnings(
-        ticker)['quarterly_results']['actual'][-4:]
-    quote_table=stock_info.get_quote_table(ticker)
-    eps_estimates=stock_info.get_analysts_info(ticker)['Earnings Estimate']
-
-    price=quote_table['Quote Price']
-    eps_ttm=sum(quarterly_eps)
-    # if EPS data DNE for 4 quarters, annualize out of the current ones
-    if len(quarterly_eps) < 4: eps_ttm=quarterly_eps / len(quarterly_eps) * 4
-    iloc_levels=(1, 2, 3)  # avg, low, high
-    target_prices=[]
-    for iloc_level in iloc_levels:
-        forward_eps=eps_estimates.iloc[iloc_level, -1]  # next year eps
-        target_price=price * forward_eps / eps_ttm
-        target_prices.append(round(target_price, 2))
-    if level == 'avg': return target_prices[0]
-    elif level == 'low': return target_prices[1]
-    elif level == 'high': return target_prices[2]
-    return target_prices + [round(price, 2), round(eps_ttm, 2)]
+    try:
+        ticker = ticker.upper()
+        quarterly_eps = stock_info.get_earnings(ticker)['quarterly_results']['actual'][-4:]
+        quote_table = stock_info.get_quote_table(ticker)
+        eps_estimates = stock_info.get_analysts_info(ticker)['Earnings Estimate']
+        price = quote_table['Quote Price']
+        eps_ttm = sum(quarterly_eps)
+        # if EPS data DNE for 4 quarters, annualize out of the current ones
+        if len(quarterly_eps) < 4:
+            eps_ttm = quarterly_eps / len(quarterly_eps) * 4
+        iloc_levels = {1: 'avg', 2: 'low', 3: 'high'}
+        target_prices = {
+            'price': round(price, 2),
+            'eps_ttm': round(eps_ttm, 2)
+        }
+        for iloc_level, level in iloc_levels.items():
+            forward_eps = eps_estimates.iloc[iloc_level, -1]  # next year eps
+            target_price = price * forward_eps / eps_ttm
+            target_prices[level] = round(target_price, 2)
+        return target_prices
+    except KeyError:
+        raise ValueError(f'Invalid ticker "{ticker}"')
 
 
 def tickers_by_pe(tickers: set, output_to_csv='', console_output=True):
@@ -607,3 +666,17 @@ def test_get_tickers():
     get_nyse_tickers()
     print('Getting FUTURES')
     get_index_futures()
+
+
+if __name__ == '__main__':
+    test_get_tickers()
+    pprint(get_random_stocks(10))
+    get_target_price('DOC')
+    sample_target_prices = get_target_price('DOC')
+    assert len(sample_target_prices) == 5
+    assert isinstance(sample_target_prices, dict)
+    # test invalid ticker
+    with suppress(ValueError):
+        get_target_price('ZWC')
+    with suppress(ValueError):
+        get_ticker_info('ZWC')
