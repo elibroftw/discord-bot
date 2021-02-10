@@ -1,70 +1,26 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.13
+Version: 1.14
 Created: April 3rd 2020
 Updated: February 9th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
-CHANGELOG
-1.13
-- Fixed NASDAQ API
-
-1.12
-- Added timed memoization
-- Fixed DOW
-- Added random us stock getter
-
-1.11
-- Added get target prices
-
-1.10
-- Added premarket futures
-
-1.9
-- Added Utilities
-- Added get_latest_dividend
-
-1.8
-- Added Index Futures as a market
-
-1.7
-- Added caching for sorted_info if the time is past 4 PM
-
-1.6
-- Added NYSE-ARCA ETF's
-
-1.5
-- Made winners_and_losers more customizable and better
-
-1.4
-- Added get_ticker_info
-- gets the latest price and the change for the ticker
-- Added CARS sector
-
-1.3
-- Added OIL sector
-
-1.2
-- Added TSX
-- Added Mortgage REIT's sector
-- Added price-earnings ratio
-- Added basic caching features
-- Making top_movers_and_losers to be more versatile
-
-1.1
-- Added DOW
+Resources:
+Black-Scholes variables:
+    https://aaronschlegel.me/black-scholes-formula-python.html#Dividend-Paying-Black-Scholes-Formula
+Black-Scholes formulas:
+    https://quantpie.co.uk/bsm_formula/bs_summary.php
+Volatility (Standard Deviation) of a stock:
+    https://tinytrader.io/how-to-calculate-historical-price-volatility-with-python/
 """
+
 from contextlib import suppress
 import csv
 from datetime import datetime, timedelta
 import io
-import json
 import math
-from threading import main_thread
-from numpy.lib.function_base import average
-import pandas
-from requests.api import head
+from statistics import NormalDist
 from yahoo_fin import stock_info
 # noinspection PyUnresolvedReferences
 from pprint import pprint
@@ -75,8 +31,9 @@ import random
 import pandas as pd
 import requests
 import yfinance as yf
-
-import functools
+from enum import IntEnum
+import numpy as np
+from functools import lru_cache, wraps
 import time
 
 
@@ -85,16 +42,16 @@ def time_cache(max_age, maxsize=128, typed=False):
 
     Args:
         max_age: Time to live for cached results (in seconds).
-        maxsize: Maximum cache size (see `functools.lru_cache`).
+        maxsize: Maximum cache size (see `functoolslru_cache`).
         typed: Cache on distinct input types (see `functools.lru_cache`).
     """
 
     def _decorator(fn):
-        @functools.lru_cache(maxsize=maxsize, typed=typed)
+        @lru_cache(maxsize=maxsize, typed=typed)
         def _new(*args, __time_salt, **kwargs):
             return fn(*args, **kwargs)
 
-        @functools.wraps(fn)
+        @wraps(fn)
         def _wrapped(*args, **kwargs):
             return _new(*args, **kwargs, __time_salt=int(time.time() / max_age))
 
@@ -599,22 +556,24 @@ def tickers_by_pe(tickers: set, output_to_csv='', console_output=True):
     :param console_output:
     :return:
     """
-    pes={}
+    pes = {}
     # TODO: thread
     for ticker in tickers:
-        pe=price_to_earnings(ticker)
-        if pe > 0: pes[ticker]=pe
-    pes=sorted(pes.items(), key=lambda item: item[1])
+        pe = price_to_earnings(ticker)
+        if pe > 0:
+            pes[ticker] = pe
+    pes = sorted(pes.items(), key=lambda item: item[1])
     if console_output:
-        header='TOP 5 TICKERS BY P/E'
-        line='-' * len(header)
+        header = 'TOP 5 TICKERS BY P/E'
+        line = '-' * len(header)
         print(f'{header}\n{line}')
         for i, (ticker, pe) in enumerate(pes):
-            if i == 5: break
+            if i == 5:
+                break
             print(f'{ticker}: {round(pe, 2)}')
     if output_to_csv:
         with open(output_to_csv, 'w', newline='') as f:
-            writer=csv.writer(f)
+            writer = csv.writer(f)
             writer.writerow(['TICKER', 'Price-earnings'])
             for ticker in pes:
                 writer.writerow(ticker)
@@ -626,18 +585,18 @@ def sort_by_volume(tickers):
 
 
 def get_index_futures():
-    resp=requests.get(PREMARKET_FUTURES, headers=GENERIC_HEADERS)
-    soup=BeautifulSoup(resp.text, 'html.parser')
-    quotes=soup.find('tbody').findAll('tr')
-    return_obj={}
+    resp = requests.get(PREMARKET_FUTURES, headers=GENERIC_HEADERS)
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    quotes = soup.find('tbody').findAll('tr')
+    return_obj = {}
     for quote in quotes:
-        index_name=quote.find('a').text.upper()
-        nums=quote.findAll('td')[3:]
-        price=nums[0].text
-        change=nums[3].text
-        percent_change=nums[4].text
-        return_obj[index_name]={'name': index_name, 'price': price,
-            'change': change, 'percent_change': percent_change}
+        index_name = quote.find('a').text.upper()
+        nums = quote.findAll('td')[3:]
+        price = nums[0].text
+        change = nums[3].text
+        percent_change = nums[4].text
+        return_obj[index_name] = {'name': index_name, 'price': price,
+                                  'change': change, 'percent_change': percent_change}
     return return_obj
 
 
@@ -651,6 +610,133 @@ def get_random_stocks(n=1):
         if not stock.count('.') and not stock.count('^'):
             return_stocks.add(stock)
     return return_stocks
+
+
+# Options Section
+
+# Enums are used for some calculations
+class Option(IntEnum):
+    CALL = 1
+    PUT = -1
+
+
+def get_month_and_year():
+    date = datetime.today()
+    month = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUNE', 'JULY', 'AUG', 'SEP', 'DEC'][date.month - 1]
+    year = date.year
+    return f'{month} {year}'
+
+
+@lru_cache(100)
+def get_risk_free_interest_rate(month_and_year=None):
+    """
+    e.g. month_and_year = 'FEB 2021'
+    returns the risk free interest rate:
+        the average interest rate of US Treasury Bills
+    throws: RunTimeError if interest rate could not be fetched
+    """
+    # TODO: make two requests?
+    del month_and_year
+    us_treasury_api = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service'
+    endpoint = f'{us_treasury_api}/v2/accounting/od/avg_interest_rates'
+    link = f'{endpoint}?page[size]=10000'
+    r = requests.get(link).json()
+    last_count = r['meta']['total-count']
+    i = last_count - 2
+    for i in range(last_count - 1, 0, -1):
+        node = r['data'][i]
+        if node['security_desc'] == 'Treasury Bills':
+            return float(node['avg_interest_rate_amt']) / 100
+    raise RuntimeError('Could not get risk free interest rate')
+
+
+@lru_cache(10000)
+def get_volatility(stock_ticker, tll_hash=None):
+    """
+    ttl_hash = time.time() / (3600 * 24)
+    Returns the (annualized) daily standard deviation return of the stock
+        for the last 365 days
+    """
+    del tll_hash
+    end = datetime.today()
+    start = end - timedelta(days=365)
+    data = yf.download(stock_ticker, start=start, end=end, progress=False)
+    data['Returns'] = np.log(data['Close'] / data['Close'].shift(-1))
+    # annualize daily standard deviation
+    return np.std(data['Returns']) * math.sqrt(252)
+
+
+def d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield):
+    block_3 = volatility * math.sqrt(days_to_expiry)
+    block_1 = math.log(market_price / strike_price)
+    block_2 = days_to_expiry * (risk_free - dividend_yield + volatility ** 2 / 2)
+    return (block_1 + block_2) / block_3
+
+
+def csn(y):
+    """
+    returns the Cumulative Standard Normal of y
+        which is the cumulative distribution function of y with
+        mean = 0 and standard deviation = 1
+    """
+    return NormalDist().cdf(y)
+
+
+def snd(y):
+    """
+    returns the Standard Normal Density of y
+        which is the probability density function of y with
+        mean = 0 and standard deviation = 1
+    """
+    return NormalDist().pdf(y)
+
+
+def calc_option_price(market_price, strike_price, days_to_expiry, volatility,
+                      risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
+    _d1 = option_type * d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    _d2 = _d1 - option_type * volatility * math.sqrt(days_to_expiry)
+    block_1 = market_price * math.e ** (-dividend_yield * days_to_expiry) * csn(_d1)
+    block_2 = strike_price * math.e ** (-risk_free * days_to_expiry) * csn(_d2)
+    return option_type * (block_1 - block_2)
+
+
+def calc_option_delta(market_price, strike_price, days_to_expiry, volatility,
+                      risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
+    block_1 = math.e ** (-dividend_yield * days_to_expiry)
+    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    return option_type * block_1 * csn(option_type * _d1)
+
+
+def calc_option_gamma(market_price, strike_price, days_to_expiry, volatility,
+                      risk_free=get_risk_free_interest_rate(), dividend_yield=0):
+    block_1 = math.e ** (-dividend_yield * days_to_expiry)
+    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    return block_1 / (market_price * volatility * math.sqrt(days_to_expiry)) * snd(_d1)
+
+
+def calc_option_vega(market_price, strike_price, days_to_expiry, volatility,
+                      risk_free=get_risk_free_interest_rate(), dividend_yield=0):
+    block_1 = market_price * math.e ** (-dividend_yield * days_to_expiry)
+    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    return block_1 * math.sqrt(days_to_expiry) * snd(_d1)
+
+
+def calc_option_rho(market_price, strike_price, days_to_expiry, volatility,
+                      risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
+    block_1 = strike_price * math.e ** (-risk_free * days_to_expiry) * days_to_expiry
+    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    _d2 = option_type * (_d1 - volatility * math.sqrt(days_to_expiry))
+    return option_type * block_1 * csn(_d2)
+
+
+def calc_option_theta(market_price, strike_price, days_to_expiry, volatility,
+                      risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
+    _d1 = d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield)
+    block_1 = market_price * math.e ** (-dividend_yield * days_to_expiry) * csn(option_type * _d1)
+    block_2 = strike_price * math.e ** (-risk_free * days_to_expiry) * risk_free
+    blocK_3 = market_price * math.e ** (-dividend_yield * days_to_expiry)
+    blocK_3 *= volatility / (2 * math.sqrt(days_to_expiry)) * snd(_d1)
+    return option_type * (block_1 - block_2) - blocK_3
 
 
 def test_get_tickers():
@@ -675,6 +761,7 @@ if __name__ == '__main__':
     sample_target_prices = get_target_price('DOC')
     assert len(sample_target_prices) == 5
     assert isinstance(sample_target_prices, dict)
+    assert 0 < get_risk_free_interest_rate(0) < 1
     # test invalid ticker
     with suppress(ValueError):
         get_target_price('ZWC')
