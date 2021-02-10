@@ -14,5 +14,9 @@ lxml
 fuzzywuzzy~=0.18.0
 python-Levenshtein
 pandas~=1.0.1
+requests~=2.22.0
 beautifulsoup4~=4.8.1
-youtube-search-python
+yahoo_fin
+requests_html
+numpy
+pytz

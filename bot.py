@@ -13,7 +13,7 @@ import argparse
 
 import tictactoe
 from helpers import *
-from investing import get_random_stocks, get_sp500_tickers, get_target_price, get_ticker_info, losers, tickers_from_csv, winners, get_parsed_data, get_index_futures
+from investing import *
 
 
 # Check if script is already running

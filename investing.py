@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.14
+Version: 1.15
 Created: April 3rd 2020
-Updated: February 9th 2021
+Updated: February 10th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -21,7 +21,6 @@ from datetime import datetime, timedelta
 import io
 import math
 from statistics import NormalDist
-from yahoo_fin import stock_info
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 # 3rd party libraries
@@ -31,6 +30,8 @@ import random
 import pandas as pd
 import requests
 import yfinance as yf
+from yahoo_fin import stock_info
+import yahoo_fin
 from enum import IntEnum
 import numpy as np
 from functools import lru_cache, wraps
@@ -60,11 +61,10 @@ def time_cache(max_age, maxsize=128, typed=False):
     return _decorator
 
 
-NASDAQ_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nasdaq'
-NYSE_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nyse'
-AMEX_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=amex'
+NASDAQ_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nasdaq&download=true'
+NYSE_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nyse&download=true'
+AMEX_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=amex&download=true'
 PREMARKET_FUTURES = 'https://ca.investing.com/indices/indices-futures'
-US_COMPANY_LIST = []
 SORTED_INFO_CACHE = {}  # for when its past 4 PM
 GENERIC_HEADERS = {
     'accept': 'text/html,application/xhtml+xml',
@@ -73,130 +73,139 @@ GENERIC_HEADERS = {
 # NOTE: something for later https://www.alphavantage.co/
 
 
-@time_cache(24 * 3600)  # cache for a full day
-def tickers_from_csv(url):
-    s = requests.get(url, headers=GENERIC_HEADERS).content
-    _tickers = set(pd.read_csv(io.StringIO(s.decode('utf-8')))['Symbol'])
-    return _tickers
+
+@time_cache(24 * 3600)  # cache request for a full day
+def make_request(url, method='GET', headers=GENERIC_HEADERS, json=None):
+    if method == 'GET':
+        return requests.get(url, headers=headers)
+    elif method == 'POST':
+        return requests.post(url, json=json, headers=headers)
+    else:
+        raise ValueError(f'Invalid method {method}')
 
 
-@time_cache(24 * 3600)  # cache for a full day
-def get_dow_tickers():
-    resp = requests.get('https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average', headers=GENERIC_HEADERS)
+def get_dow_tickers() -> dict:
+    resp = make_request('https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average')
     soup = BeautifulSoup(resp.text, 'html.parser')
     table = soup.find('table', {'id': 'constituents'}).find('tbody')
     rows = table.find_all('tr')
-    _dow_tickers = set()
+    tickers = dict()
     for row in rows:
         with suppress(IndexError):
-            ticker = row.find_all('td')[2].text.split(':')[-1].strip()
-            _dow_tickers.add(ticker)
-    return _dow_tickers
+            ticker = row.find_all('td')[1].text.split(':')[-1].strip()
+            name = row.find('th').text.strip()
+            tickers[ticker] = {'symbol': ticker, 'name': name}
+    return tickers
 
 
-@time_cache(24 * 3600)  # cache for a full day
-def get_sp500_tickers():
-    resp = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies', headers=GENERIC_HEADERS)
+def get_sp500_tickers() -> dict:
+    resp = make_request('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     soup = BeautifulSoup(resp.text, 'html.parser')
     table = soup.find('table', {'id': 'constituents'})
-    _sp500_tickers = {row.find('td').text.strip() for row in table.findAll('tr')[1:]}
-    return _sp500_tickers
+    tickers = {}
+    for row in table.findAll('tr')[1:]:
+        tds = row.findAll('td')
+        ticker = tds[0].text.strip()
+        name = tds[1].text.strip()
+        tickers[ticker] = {'symbol': ticker, 'name': name}
+    return tickers
 
 
-@time_cache(24 * 3600)  # cache for a full day
-def get_nasdaq_tickers() -> set:
-    r = requests.get(NASDAQ_TICKERS_URL, headers=GENERIC_HEADERS).json()
-    return {stock['symbol'] for stock in r['data']['table']['rows']}
+def clean_stock_info(stock_info):
+    stock_info['name'] = stock_info['name'].replace('Common Stock', '').strip()
+    return stock_info
 
 
-@time_cache(24 * 3600)  # cache for a full day
-def get_nyse_tickers() -> set:
-    r = requests.get(NYSE_TICKERS_URL, headers=GENERIC_HEADERS).json()
-    return {stock['symbol'] for stock in r['data']['table']['rows']}
+def get_nasdaq_tickers() -> dict:
+    r = make_request(NASDAQ_TICKERS_URL).json()
+    return {stock['symbol']: clean_stock_info(stock) for stock in r['data']['rows']}
 
 
-@time_cache(24 * 3600)  # cache for a full day
-def get_amex_tickers() -> set:
-    r = requests.get(AMEX_TICKERS_URL, headers=GENERIC_HEADERS).json()
-    return {stock['symbol'] for stock in r['data']['table']['rows']}
+def get_nyse_tickers() -> dict:
+    r = make_request(NYSE_TICKERS_URL).json()
+    return {stock['symbol']: clean_stock_info(stock) for stock in r['data']['rows']}
 
 
-@time_cache(24 * 3600)  # cache for a full day
-def get_tsx_tickers():
-    base_url = 'http://eoddata.com/stocklist/TSX/'
-    _tsx_tickers = []
-    for i in range(26):
-        resp = requests.get(base_url + chr(65 + i) + '.html', headers=GENERIC_HEADERS)
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        table = soup.find('table', {'class': 'quotes'})
-        _tsx_tickers += {row.find('a').text.strip().upper() +
-                                  '.TO' for row in table.findAll('tr')[1:]}
-    return _tsx_tickers
+def get_amex_tickers() -> dict:
+    r = make_request(AMEX_TICKERS_URL).json()
+    return {stock['symbol']: clean_stock_info(stock) for stock in r['data']['rows']}
 
 
-@time_cache(24 * 3600)  # cache for a full day
-def get_nyse_arca_tickers():
+def get_tsx_tickers() -> dict:
+    url = 'https://www.tsx.com/json/company-directory/search/tsx/.*'
+    r = make_request(url).json()
+    tickers = {}
+    for stock in r['results']:
+        ticker = stock['symbol'] + '.TO'
+        name = stock['name'].replace('Common Stock', '').strip()
+        tickers[ticker] = {'symbol': ticker, 'name': name}
+    return tickers
+
+
+def get_nyse_arca_tickers() -> dict:
     post_data = {'instrumentType': 'EXCHANGE_TRADED_FUND', 'pageNumber': 1, 'sortColumn': 'NORMALIZED_TICKER',
                  'sortOrder': 'ASC', 'maxResultsPerPage': 5000, 'filterToken': ''}
-    r = requests.post('https://www.nyse.com/api/quotes/filter', json=post_data, headers=GENERIC_HEADERS)
-    _arca_tickers = {item['normalizedTicker'] for item in r.json()}
-    return _arca_tickers
+    r = requests.post('https://www.nyse.com/api/quotes/filter', json=post_data).json()
+    tickers = {}
+    for stock in r:
+        ticker = stock['symbolTicker']
+        tickers[ticker] = {'symbol': ticker, 'name': stock['instrumentName']}
+    return tickers
 
 
-@time_cache(24 * 3600)  # cache for a full day
-def get_tickers(market):
-    # TODO: add ETFs to the markets
+def get_tickers(market) -> dict:
     market = market.upper()
-    # OPTIONS: CUSTOM, ALL, US, NYSE, NASDAQ, S&P500, DOW/DJIA, TSX/CA, Mortgage REITs
-    tickers_to_download = set()
-    if market in {'S&P500', 'S&P 500'}: tickers_to_download = tickers_to_download.union(get_sp500_tickers())
-    if market in {'DOW', 'DJIA'}: tickers_to_download = tickers_to_download.union(get_dow_tickers())
+    # OPTIONS: CUSTOM, ALL, US, NYSE, NASDAQ, S&P500, DOW/DJIA, TSX/CA
+    tickers = dict()
+    # EXCHANGES
+    if market in {'S&P500', 'S&P 500'}: tickers.update(get_sp500_tickers())
+    if market in {'DOW', 'DJIA'}: tickers.update(get_dow_tickers())
+
     if market in {'NASDAQ', 'US', 'ALL'}:
-        tickers_to_download = tickers_to_download.union(get_nasdaq_tickers())
+        tickers.update(get_nasdaq_tickers())
     if market in {'NYSE', 'US', 'ALL'}:
-        tickers_to_download=tickers_to_download.union(get_nyse_tickers())
+        tickers.update(get_nyse_tickers())
     if market in {'AMEX', 'US', 'ALL'}:
-        tickers_to_download=tickers_to_download.union(get_amex_tickers())
+        tickers.update(get_amex_tickers())
     if market in {'NYSEARCA', 'US', 'ALL'}:
-        tickers_to_download=tickers_to_download.union(get_nyse_arca_tickers())
-    if market in {'TSX', 'CA', 'ALL'}: tickers_to_download=tickers_to_download.union(get_tsx_tickers())
-    elif market == 'Mortgage REITs':
-        tickers_to_download={'NLY', 'STWD', 'AGNC', 'TWO', 'PMT', 'MITT', 'NYMT', 'MFA',
-                               'IVR', 'NRZ', 'TRTX', 'RWT', 'DX', 'XAN', 'WMC'}
-    elif market == 'OIL': tickers_to_download={'DNR', 'PVAC', 'ROYT', 'SWN', 'CPE', 'CEQP', 'PAA', 'PUMP', 'PBF'}
-    elif market in {'AUTO', 'AUTOMOBILE', 'CARS'}:
-        tickers_to_download={'TSLA', 'GM', 'F',
-            'RACE', 'FCAU', 'HMC', 'NIO', 'TTM', 'TM'}
-    elif market in {'INDEXFUTURES', 'INDEX_FUTURES'}: tickers_to_download={'YM=F', 'NQ=F', 'RTY=F', 'ES=F'}
-    elif market == 'TANKERS':
-        tickers_to_download={'EURN', 'TNK', 'TK', 'TNP', 'DSX', 'NAT',
-            'STNG', 'SFL', 'DHT', 'CPLP', 'DSSI', 'FRO', 'INSW', 'NNA', 'SBNA'}
-    elif market in {'UTILS', 'UTILITIES'}:
-        tickers_to_download={'PCG', 'ELLO', 'AT', 'ELP', 'ES', 'EDN', 'IDA', 'HNP', 'GPJA', 'NEP', 'SO', 'CEPU', 'AES', 'ETR', 'KEP', 'OGE', 'EIX', 'NEE', 'TVC', 'TAC', 'EE', 'CIG', 'PNW', 'EMP', 'EBR.B', 'CPL', 'DTE', 'POR', 'EAI',
-            'NRG', 'CWEN', 'KEN', 'AGR', 'BEP', 'ORA', 'EAE', 'PPX', 'AZRE', 'ENIC', 'FE', 'CVA', 'BKH', 'ELJ', 'EZT', 'HE', 'VST', 'ELU', 'ELC', 'TVE', 'AQN', 'PAM', 'AEP', 'ENIA', 'EAB', 'PPL', 'CNP', 'D', 'PNM', 'EBR', 'FTS'}
-    elif market == 'CUSTOM': pass
-    # TODO: add more sectors
-    return tickers_to_download
+        tickers.update(get_nyse_arca_tickers())
+    if market in {'TSX', 'CA', 'ALL'}:
+        tickers.update(get_tsx_tickers())
+    # elif market in {'MORTGAGE REITS', 'MREITS'}:
+    #     tickers_to_download = {'NLY', 'STWD', 'AGNC', 'TWO', 'PMT', 'MITT', 'NYMT', 'MFA',
+    #                            'IVR', 'NRZ', 'TRTX', 'RWT', 'DX', 'XAN', 'WMC'}
+    # elif market == 'OIL': tickers_to_download = {'DNR', 'PVAC', 'ROYT', 'SWN', 'CPE', 'CEQP', 'PAA', 'PUMP', 'PBF'}
+    # elif market in {'AUTO', 'AUTOMOBILE', 'CARS'}:
+    #     tickers_to_download={'TSLA', 'GM', 'F', 'NIO', 'RACE', 'FCAU', 'HMC', 'NIO', 'TTM', 'TM'}
+    # elif market in {'INDEXFUTURES', 'INDEX_FUTURES'}: tickers_to_download = {'YM=F', 'NQ=F', 'RTY=F', 'ES=F'}
+    # elif market == 'TANKERS':
+    #     tickers_to_download = {'EURN', 'TNK', 'TK', 'TNP', 'DSX', 'NAT',
+    #         'STNG', 'SFL', 'DHT', 'CPLP', 'DSSI', 'FRO', 'INSW', 'NNA', 'SBNA'}
+    # elif market in {'UTILS', 'UTILITIES'}:
+    #     tickers_to_download = {'PCG', 'ELLO', 'AT', 'ELP', 'ES', 'EDN', 'IDA', 'HNP', 'GPJA', 'NEP', 'SO', 'CEPU', 'AES', 'ETR', 'KEP', 'OGE', 'EIX', 'NEE', 'TVC', 'TAC', 'EE', 'CIG', 'PNW', 'EMP', 'EBR.B', 'CPL', 'DTE', 'POR', 'EAI',
+    #         'NRG', 'CWEN', 'KEN', 'AGR', 'BEP', 'ORA', 'EAE', 'PPX', 'AZRE', 'ENIC', 'FE', 'CVA', 'BKH', 'ELJ', 'EZT', 'HE', 'VST', 'ELU', 'ELC', 'TVE', 'AQN', 'PAM', 'AEP', 'ENIA', 'EAB', 'PPL', 'CNP', 'D', 'PNM', 'EBR', 'FTS'}
+    # elif market == 'CUSTOM': pass
+    return tickers
 
 
 @time_cache(24 * 3600)  # cache for a full day
 def get_company_name_from_ticker(ticker: str):
-    global US_COMPANY_LIST
+    ticker = ticker.upper()
+    with suppress(KeyError):
+        return ALL_STOCKS[ticker]['name']
     if ticker.count('.TO'):
-        ticker=ticker.replace('.TO', '')
-        r=requests.get(f'https://www.tsx.com/json/company-directory/search/tsx/{ticker}')
-        results={}
-        for s in r.json()['results']:
-            s['name']=s['name'].upper()
-            results[s['symbol']]=s
-        best_match=process.extractOne(ticker, list(results.keys()))[0]
-        return results[best_match]['name']
-    if not US_COMPANY_LIST:
-        r = requests.get('https://api.iextrading.com/1.0/ref-data/symbols')
-        US_COMPANY_LIST={s['symbol']: s for s in r.json()}
-    best_match=process.extractOne(ticker, list(US_COMPANY_LIST.keys()))[0]
-    # noinspection PyTypeChecker
-    return US_COMPANY_LIST[best_match]['name']
+        try:
+            return get_tsx_tickers()[ticker]['name']
+        except KeyError:
+            ticker = ticker.replace('.TO', '')
+            r = requests.get(f'https://www.tsx.com/json/company-directory/search/tsx/{ticker}')
+            results = {}
+            for s in r.json()['results']:
+                s['name'] = s['name'].upper()
+                results[s['symbol']] = s
+            best_match = process.extractOne(ticker, list(results.keys()))[0]
+            return results[best_match]['name']
+    raise ValueError('Something went wrong')
 
 
 @time_cache(30)  # cache for 30 seconds
@@ -204,27 +213,29 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
     '''
     Throws ValueError
     '''
-    # TODO: test pre-market values
     ticker = ticker.upper()
-    data_latest = yf.download(ticker, interval='1m', period='1d', threads=3, prepost=True, progress=False,
-                              group_by='ticker')
-    if data_latest.empty:
+    yf_ticker = yf.Ticker(ticker)
+    try:
+        info = yf_ticker.info
+    except KeyError:
         raise ValueError(f'Invalid ticker "{ticker}"')
-    data_last_close = yf.download(ticker, interval='1m', period='5d', threads=3, progress=False)['Close']
-    latest_price = float(data_latest.tail(1)['Close'])
-    closing_price = float(data_last_close.tail(1))
+    data_latest = yf_ticker.history(period='5d', interval='1m', prepost=True)
     timestamp = data_latest.last_valid_index()
-    if closing_price == latest_price:
-        _today = datetime.today()
-        _today = datetime(_today.year, _today.month, _today.day, 15, 59)
-        _today -= timedelta(days=1)
-        while _today.strftime('%Y-%m-%d %H:%M:%S-04:00') not in data_last_close:
-            _today -= timedelta(days=1)
-        closing_price = data_last_close[_today.strftime(
-            '%Y-%m-%d %H:%M:%S-04:00')]
-        # as_of = f'Market Open: {timestamp["Datetime"]}'
-    # else:
-        # as_of = f'After hours: {timestamp["Datetime"]}'
+    latest_price = float(data_latest.tail(1)['Close'].iloc[0])
+    # get previous closing price
+    # TODO: test in different time zones
+    timestamp_ending = str(timestamp)[-6:]
+    if (timestamp.hour >= 16):  # post market
+        today = datetime(timestamp.year, timestamp.month, timestamp.day, 15, 59)
+        closing_price = data_latest[today.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')]
+    else:  # market is currently open / pre-market
+        prev_day = datetime(timestamp.year, timestamp.month, timestamp.day, 15, 59) - timedelta(days=1)
+        while True:
+            try:
+                closing_price = data_latest.loc[prev_day.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')]['Close']
+                break
+            except KeyError:
+                prev_day -= timedelta(days=1)
     change = latest_price - closing_price
     if round_values:
         change = round(change, 4)
@@ -233,17 +244,19 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
         closing_price = round(closing_price, 4)
     else:
         percent_change = change/closing_price * 100
-    name = get_company_name_from_ticker(ticker)
-    try:
-        dividend = get_latest_dividend(ticker)
-        pd_ratio = round(latest_price/dividend, 2)
-    except Exception:
-        dividend = 0
-        pd_ratio = 10 ** 10  # basically infinity
-
-    info = {'name': name, 'price': latest_price, 'last_close_price': closing_price, 'price:dividend': pd_ratio,
-            'change': change, 'percent_change': percent_change, 'timestamp': timestamp, 'symbol': ticker, 'last_dividend': dividend}
-    return info
+    name = info['longName']
+    dividend_yield = info['trailingAnnualDividendYield']
+    eps_ttm = info['trailingEps']
+    return_info = {'name': name,
+                   'price': latest_price,
+                   'last_close_price': closing_price,
+                   'dividend_yield': dividend_yield,
+                   'change': change, 'percent_change': percent_change,
+                   'timestamp': timestamp, 'symbol': ticker,
+                   'eps_ttm': eps_ttm,
+                   'volume': info['volume'],
+                   'last_dividend': info['lastDividendValue']}
+    return return_info
 
 
 def get_data(tickers: set, start_date=None, end_date=None, period='3mo', group_by='ticker', interval='1d',
@@ -473,11 +486,11 @@ def create_headers(subdomain):
 
 @time_cache(3600)  # cache for 1 hour
 def get_latest_dividend(ticker: str) -> float:
-    url=f'https://finance.yahoo.com/quote/{ticker}/history'
-    hdr=create_headers(f'{ticker}/history')
-    soup=BeautifulSoup(requests.get(url, headers=hdr).text, 'html.parser')
-    soup=soup.find('tbody')
-    dividend=soup.find('strong').text
+    url = f'https://finance.yahoo.com/quote/{ticker}/history'
+    hdr = create_headers(f'{ticker}/history')
+    soup = BeautifulSoup(requests.get(url, headers=hdr).text, 'html.parser')
+    soup = soup.find('tbody')
+    dividend = soup.find('strong').text
     return float(dividend)
 
 
@@ -488,32 +501,30 @@ def price_to_earnings(ticker, return_dict: dict=None, return_price=False):
     # useful concept to keep in mind:
     # PER = Stock price / EPS
     # Stock price = PER * EPS
-    pe=-999999
+    pe = -999999
     if ticker.endswith('.TO'):
-        ticker='.'.join(ticker.split('.')[:-1])
-        url=f'https://www.marketwatch.com/investing/stock/{ticker}/financials?country=ca'
+        ticker = '.'.join(ticker.split('.')[:-1])
+        url = f'https://www.marketwatch.com/investing/stock/{ticker}/financials?country=ca'
     else:
-        url=f'https://www.marketwatch.com/investing/stock/{ticker}/financials'
+        url = f'https://www.marketwatch.com/investing/stock/{ticker}/financials'
     try:
-        text_soup=BeautifulSoup(requests.get(url, headers=GENERIC_HEADERS).text, 'html.parser')
+        text_soup = BeautifulSoup(requests.get(url, headers=GENERIC_HEADERS).text, 'html.parser')
     except requests.TooManyRedirects:
         return pe
     try:
-        price=float(text_soup.find(
-            'p', {'class': 'bgLast'}).text.replace(',', ''))
-        titles=text_soup.findAll('td', {'class': 'rowTitle'})
+        price = float(text_soup.find('p', {'class': 'bgLast'}).text.replace(',', ''))
+        titles = text_soup.findAll('td', {'class': 'rowTitle'})
 
         for title in titles:
             if 'EPS (Diluted)' in title.text:
-                eps=[td.text for td in title.findNextSiblings(
-                    attrs={'class': 'valueCell'}) if td.text]
-                try: latest_eps=float(eps[-1])
-                except ValueError: latest_eps=-float(eps[-1][1:-1])
-                pe=price / latest_eps
+                eps = [td.text for td in title.findNextSiblings(attrs={'class': 'valueCell'}) if td.text]
+                try: latest_eps = float(eps[-1])
+                except ValueError: latest_eps = -float(eps[-1][1:-1])
+                pe = price / latest_eps
                 break
     except AttributeError: price=-1
-    if return_dict is not None: return_dict[ticker]=(
-        pe, price) if return_price else pe
+    if return_dict is not None:
+        return_dict[ticker] = (pe, price) if return_price else pe
     if return_price: return pe, price
     return pe
 
@@ -557,7 +568,6 @@ def tickers_by_pe(tickers: set, output_to_csv='', console_output=True):
     :return:
     """
     pes = {}
-    # TODO: thread
     for ticker in tickers:
         pe = price_to_earnings(ticker)
         if pe > 0:
@@ -585,7 +595,7 @@ def sort_by_volume(tickers):
 
 
 def get_index_futures():
-    resp = requests.get(PREMARKET_FUTURES, headers=GENERIC_HEADERS)
+    resp = make_request(PREMARKET_FUTURES)
     soup = BeautifulSoup(resp.text, 'html.parser')
     quotes = soup.find('tbody').findAll('tr')
     return_obj = {}
@@ -600,13 +610,14 @@ def get_index_futures():
     return return_obj
 
 
-def get_random_stocks(n=1):
+def get_random_stocks(n=1) -> set:
     # return n stocks from NASDAQ and NYSE
     if n < 1: n = 1
-    us_stocks = get_nasdaq_tickers().union(get_nyse_tickers())
+    us_stocks = get_nasdaq_tickers()
+    us_stocks.update(get_nyse_tickers())
     return_stocks = set()
     while len(return_stocks) < n:
-        stock = random.sample(us_stocks, 1)[0]
+        stock = random.sample(list(us_stocks.keys()), 1)[0]
         if not stock.count('.') and not stock.count('^'):
             return_stocks.add(stock)
     return return_stocks
@@ -739,31 +750,40 @@ def calc_option_theta(market_price, strike_price, days_to_expiry, volatility,
     return option_type * (block_1 - block_2) - blocK_3
 
 
-def test_get_tickers():
+def run_tests():
     print('Getting DOW')
-    get_dow_tickers()
+    assert get_dow_tickers()['AAPL']['name'] == 'Apple Inc.'
     print('Getting S&P500')
-    get_sp500_tickers()
+    assert get_sp500_tickers()['TSLA']['name'] == 'Tesla, Inc.'
     print('Getting NASDAQ')
-    get_nasdaq_tickers()
+    assert get_nasdaq_tickers()['AMD']['name'] == 'Advanced Micro Devices Inc.'
     print('Getting AMEX')
     get_amex_tickers()
     print('Getting NYSE')
-    get_nyse_tickers()
+    assert get_nyse_tickers()['V']['name'] == 'Visa Inc.'
+    print('Getting NYSE ARCA')
+    assert get_nyse_arca_tickers()['SPY']['name'] == 'SPDR S&P 500 ETF TRUST'
+    print('Getting TSX')
+    assert 'SHOP.TO' in get_tsx_tickers()
     print('Getting FUTURES')
     get_index_futures()
-
-
-if __name__ == '__main__':
-    test_get_tickers()
+    print('Testing get company name')
+    assert get_company_name_from_ticker('NVDA') == 'NVIDIA Corporation'
     pprint(get_random_stocks(10))
+    pprint(get_ticker_info('AMD'))
     get_target_price('DOC')
     sample_target_prices = get_target_price('DOC')
     assert len(sample_target_prices) == 5
     assert isinstance(sample_target_prices, dict)
     assert 0 < get_risk_free_interest_rate(0) < 1
     # test invalid ticker
+    print('Testing Invalid Tickers')
     with suppress(ValueError):
         get_target_price('ZWC')
     with suppress(ValueError):
         get_ticker_info('ZWC')
+
+
+ALL_STOCKS = get_tickers('ALL')
+if __name__ == '__main__':
+    run_tests()
