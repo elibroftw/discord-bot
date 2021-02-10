@@ -3,7 +3,7 @@ Investing Quick Analytics
 Author: Elijah Lopez
 Version: 1.13
 Created: April 3rd 2020
-Updated: November 15th 2020
+Updated: February 9th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 CHANGELOG
