@@ -1634,10 +1634,12 @@ async def transactions_template(ctx):
 
 @bot.command(aliases=['gainers', 'winners', 'top_gainers'])
 async def command_winners(ctx, market='ALL', of='day', show=5, sorted_info: list = None):
+    # TODO: custom decorator that adds time taken filed to message
     def _winners():
         nonlocal market, show, sorted_info
         market = market.upper()
         eta = MOVERS_ETAS.get(market, '?')
+        start_time = time.time()
         if sorted_info is None:
             m = run_coroutine(ctx.send(f'Calculating Top Winners for {market} (ETA. {eta})'))
             sorted_info = get_latest_sorted_info(of, market)
@@ -1649,11 +1651,12 @@ async def command_winners(ctx, market='ALL', of='day', show=5, sorted_info: list
             if i != 0: msg += '\n'
             ticker = winner[0]
             open_close = f'[{round(winner[1]["Start"], 2)}, {round(winner[1]["End"], 2)}]'
-            percent_change = str(round(winner[1]["Percent Change"] * 100, 2)) + '%'
+            percent_change = str(round(winner[1]['Percent Change'] * 100, 2)) + '%'
             msg += f'{ticker}\t{open_close}\t{percent_change}'
         embed = discord.Embed(title=f'{market} Top {show} Winners ({of})', description=msg, color=STOCKS_GREEN)
         if m is None: run_coroutine(ctx.send(embed=embed))
         else: run_coroutine(m.edit(content='', embed=embed))
+        return m
     bot.loop.run_in_executor(None, _winners)
 
 
@@ -1663,7 +1666,6 @@ async def command_losers(ctx: Context, market='ALL', of='day', show=5, sorted_in
         nonlocal market, show, sorted_info
         market = market.upper()
         eta = MOVERS_ETAS.get(market, '?')
-
         if sorted_info is None:
             m = run_coroutine(ctx.send(f'Calculating Top Losers for {market} (ETA. {eta})'))
             sorted_info = get_latest_sorted_info(of, market)
