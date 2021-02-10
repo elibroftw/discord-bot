@@ -427,7 +427,6 @@ def get_parsed_data(_data=None, tickers: list = None, market='ALL', sort_key='Pe
     return sorted_info
 
 
-@time_cache(60)  # cache for 1 minute
 def winners(sorted_info=None, tickers: list = None, market='ALL', of='day', start_date=None, end_date=None, show=5):
     # sorted_info is the return of get_parsed_data with non-None sort_key
     if sorted_info is None:
@@ -436,7 +435,6 @@ def winners(sorted_info=None, tickers: list = None, market='ALL', of='day', star
     return list(reversed(sorted_info[-show:]))
 
 
-@time_cache(60)  # cache for 1 minute
 def losers(sorted_info=None, tickers: list = None, market='ALL', of='day', start_date=None, end_date=None, show=5):
     # sorted_info is the return of get_parsed_data with non-None sort_key
     if sorted_info is None:
@@ -445,7 +443,6 @@ def losers(sorted_info=None, tickers: list = None, market='ALL', of='day', start
     return sorted_info[:show]
 
 
-@time_cache(60)  # cache for 1 minute
 def winners_and_losers(_data=None, tickers=None, market='ALL', of='day', start_date=None, end_date=None, show=5,
                        console_output=True, csv_output=''):
     sorted_info = get_parsed_data(_data, tickers, market, of=of, start_date=start_date, end_date=end_date)
@@ -475,7 +472,6 @@ def winners_and_losers(_data=None, tickers=None, market='ALL', of='day', start_d
     return sorted_info
 
 
-@time_cache(60)  # cache for 1 minute
 def top_movers(_data=None, tickers=None, market='ALL', of='day', start_date=None, end_date=None, show=5,
                console_output=True, csv_output=''):
     return winners_and_losers(_data=_data, tickers=tickers, market=market, of=of, start_date=start_date,
