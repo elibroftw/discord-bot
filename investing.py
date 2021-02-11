@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.17
+Version: 1.18
 Created: April 3rd 2020
 Updated: February 10th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -312,7 +312,7 @@ def get_parsed_data(_data=None, tickers: list = None, market='ALL', sort_key='Pe
     _today = datetime.today()
     todays_date = _today.date()
     if tickers is None:
-        tickers = list(get_tickers(market).keys())
+        tickers = list(get_tickers(market))
     if _today.hour >= 16 and of == 'day':
         # TODO: cache pre-market as well
         # key format will be
@@ -548,6 +548,7 @@ def tickers_by_pe(tickers, output_to_csv='', console_output=True):
     :return:
     """
     # TODO: use grequests
+    pes = []
     for ticker in tickers:
         with suppress(ValueError):
             pe = price_to_earnings(ticker)
