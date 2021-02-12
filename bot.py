@@ -1508,7 +1508,14 @@ async def ticker_info(ctx, *tickers):
         for ticker in tickers:
             ticker = ticker.replace('$', '').upper()
             try:
-                _ticker_info = get_ticker_info(ticker)
+                try:
+                    _ticker_info = get_ticker_info(ticker)
+                except ValueError as e:
+                    # try to search for stock if user doesn't know ticker
+                    results = find_stock(ticker)
+                    if not results: raise e
+                    else:
+                        _ticker_info = get_ticker_info(results[0][0])
                 if _ticker_info['change'] < 0:
                     embed_color = STOCKS_RED  # red
                     _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
