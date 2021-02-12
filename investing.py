@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.20
+Version: 1.21
 Created: April 3rd 2020
 Updated: February 11th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -640,10 +640,11 @@ def find_stock(query):
             match += len(symbol)
             parts_matched += 1
         for part in query:
-            part_factor = company_name.count(part) * len(part)
+            occurrences = company_name.count(part)
+            part_factor = occurrences * len(part)
             if part_factor:
                 match += part_factor
-                parts_matched += 1
+                parts_matched += occurrences
         match /= len(company_name)
         if match:
             results.append((symbol, stock_info['name'], parts_matched, match))
