@@ -1583,7 +1583,7 @@ async def get_watchlist(ctx, print_info=False):
     if print_info:
         await ctx.invoke(bot.get_command('ticker_info', watch_list))
     else:
-        msg = f'Watchlist for {ctx.author}: ' + (', '.join(watch_list) if watch_list else '<empty>'
+        msg = f'Watchlist for {ctx.author}: ' + (', '.join(watch_list) if watch_list else '<empty>')
         await ctx.send(msg)
 
 
