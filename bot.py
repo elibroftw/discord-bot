@@ -1590,7 +1590,7 @@ async def get_watchlist(ctx, print_info=False):
     portfolio = portfolio_coll.find_one({'user': ctx.author.id})
     watch_list = [] if portfolio is None else portfolio.get('watchlist', [])
     if print_info:
-        await ctx.invoke(bot.get_command('ticker_info', watch_list))
+        await ctx.invoke(bot.get_command('ticker_info', *watch_list))
     else:
         msg = f'Watchlist for {ctx.author}: ' + (', '.join(watch_list) if watch_list else '<empty>')
         await ctx.send(msg)
