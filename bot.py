@@ -116,7 +116,6 @@ async def on_ready():
         if os.path.exists('save.json'):
             with open('save.json') as f:
                 _save_dict = json.load(f)
-        os.remove('save.json')
     for guild_id, v in _save_dict['data_dict'].items():
         if guild_id != 'downloads':
             mq = v['music'] = [Track(s['title'], s['video_id'], time_stamp=s['time_stamp']) for s in v['music']]
@@ -1164,7 +1163,7 @@ async def now_playing(ctx):
         embed.set_author(name='Now Playing')
         await ctx.send(embed=embed)
     else:
-        await ctx.send(content='Nothing playing right now')
+        await ctx.send('Nothing playing right now')
     # https://cog-creators.github.io/discord-embed-sandbox/
 
 
@@ -1543,7 +1542,7 @@ async def ticker_info(ctx, *tickers):
 async def search_stock(ctx, *query):
     stock_results = find_stock(query)
     if not stock_results:
-        await ctx.send(content=f'No search results for query: {" ".join(query)}')
+        await ctx.send(f'No search results for query: {" ".join(query)}')
     else:
         embed = discord.Embed(title=f'Search Results ({len(stock_results)})', color=SKY_BLUE)
         for stock in stock_results:
@@ -1563,7 +1562,7 @@ async def add_to_watchlist(ctx, *tickers):
     portfolio = portfolio_coll.find_one({'user': ctx.author.id})
     watch_list = set() if portfolio is None else set(portfolio.get('watchlist', []))
     for ticker in tickers: watch_list.add(ticker)
-    portfolio = portfolio_coll.update_one({'user': ctx.author.id}, {'$set': {'watchlist': list(watch_list)}})
+    portfolio_coll.update_one({'user': ctx.author.id}, {'$set': {'watchlist': list(watch_list)}}, upsert=True)
     await ctx.send(f'Added {", ".join(tickers)} to your watchlist')
 
 
@@ -1573,7 +1572,7 @@ async def remove_from_watchlist(ctx, *tickers):
     portfolio = portfolio_coll.find_one({'user': ctx.author.id})
     watch_list = [] if portfolio is None else portfolio.get('watchlist', [])
     watch_list = list(filter(lambda item: item not in tickers, watch_list))
-    portfolio = portfolio_coll.update_one({'user': ctx.author.id}, {'$set': {'watchlist': watch_list}})
+    portfolio_coll.update_one({'user': ctx.author.id}, {'$set': {'watchlist': watch_list}}, upsert=True)
     await ctx.send(f'Removed {", ".join(tickers)} from your watchlist')
 
 
@@ -1584,7 +1583,8 @@ async def get_watchlist(ctx, print_info=False):
     if print_info:
         await ctx.invoke(bot.get_command('ticker_info', watch_list))
     else:
-        await ctx.send(f'Watchlist for {ctx.author}: {", ".join(watch_list)}')
+        msg = f'Watchlist for {ctx.author}: ' + (', '.join(watch_list) if watch_list else '<empty>'
+        await ctx.send(msg)
 
 
 # noinspection PyTypeChecker
