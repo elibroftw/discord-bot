@@ -1515,7 +1515,8 @@ async def ticker_info(ctx, *tickers):
                     results = find_stock(ticker)
                     if not results: raise e
                     else:
-                        _ticker_info = get_ticker_info(results[0][0])
+                        ticker = results[0][0]
+                        _ticker_info = get_ticker_info(ticker)
                 if _ticker_info['change'] < 0:
                     embed_color = STOCKS_RED  # red
                     _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
