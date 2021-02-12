@@ -1503,7 +1503,10 @@ async def anon_status(ctx):
 async def ticker_info(ctx, *tickers):
 
     def _get_ticker_info():
-        m = run_coroutine(ctx.send(f'Getting stock info for: {", ".join(tickers)}'))
+        # send to dm if more than 5 tickers provided
+        to_dm, author = len(tickers) > 5, ctx.author
+        msg = f'Getting stock info for: {", ".join(tickers)}'
+        m = run_coroutine(author.send(msg) if to_dm else ctx.send(msg))
         errors = []
         for ticker in tickers:
             ticker = ticker.replace('$', '').upper()
@@ -1535,7 +1538,8 @@ async def ticker_info(ctx, *tickers):
                 embed.add_field(name='Last Price:', value=info['price'])
                 embed.add_field(name='Last Close:', value=info['last_close_price'])
                 embed.add_field(name='Change:', value=info['change'])
-                run_coroutine(ctx.send(embed=embed))
+                if to_dm: run_coroutine(author.send(embed=embed))
+                else: run_coroutine(ctx.send(embed=embed))
             except ValueError as e:
                 errors.append(str(e))
         if errors:
