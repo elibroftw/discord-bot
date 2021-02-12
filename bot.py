@@ -1509,31 +1509,32 @@ async def ticker_info(ctx, *tickers):
             ticker = ticker.replace('$', '').upper()
             try:
                 try:
-                    _ticker_info = get_ticker_info(ticker)
+                    info = get_ticker_info(ticker)
                 except ValueError as e:
                     # try to search for stock if user doesn't know ticker
                     results = find_stock(ticker)
                     if not results: raise e
                     else:
                         ticker = results[0][0]
-                        _ticker_info = get_ticker_info(ticker)
-                if _ticker_info['change'] < 0:
+                        info = get_ticker_info(ticker)
+                if info['change'] < 0:
                     embed_color = STOCKS_RED  # red
-                    _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
-                elif _ticker_info['change'] > 0:
+                    info['change'] = f'{info["change"]} ({info["percent_change"]}%)'
+                elif info['change'] > 0:
                     embed_color = STOCKS_GREEN
-                    _ticker_info['change'] = f'+{_ticker_info["change"]} (+{_ticker_info["percent_change"]}%)'
+                    info['change'] = f'+{info["change"]} (+{info["percent_change"]}%)'
                 else:
                     embed_color = discord.Color.light_grey()
-                    _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
-                hour = _ticker_info['timestamp'].strftime('%I')
+                    info['change'] = f'{info["change"]} ({info["percent_change"]}%)'
+                hour = info['timestamp'].strftime('%I')
                 if hour[0] == '0': hour = hour[1]
-                timestamp = _ticker_info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
-                embed = discord.Embed(title=_ticker_info['name'] + f' ({ticker})', color=embed_color)
+                timestamp = info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
+                url = f'https://finance.yahoo.com/quote/{ticker}'
+                embed = discord.Embed(title=info['name'] + f' ({ticker})', color=embed_color, url=url)
                 embed.set_footer(text=f'Last updated: {timestamp}')
-                embed.add_field(name='Last Price:', value=_ticker_info['price'])
-                embed.add_field(name='Last Close:', value=_ticker_info['last_close_price'])
-                embed.add_field(name='Change:', value=_ticker_info['change'])
+                embed.add_field(name='Last Price:', value=info['price'])
+                embed.add_field(name='Last Close:', value=info['last_close_price'])
+                embed.add_field(name='Change:', value=info['change'])
                 run_coroutine(ctx.send(embed=embed))
             except ValueError as e:
                 errors.append(str(e))

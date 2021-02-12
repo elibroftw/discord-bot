@@ -34,6 +34,7 @@ from enum import IntEnum
 import numpy as np
 from functools import lru_cache, wraps
 import time
+import re
 
 
 def time_cache(max_age, maxsize=128, typed=False):
@@ -112,7 +113,10 @@ def get_sp500_tickers() -> dict:
 
 
 def clean_ticker(ticker):
-    return ticker.strip().replace('$', '').upper()
+    # remove everything except for letters and periods
+    regex = re.compile('[^a-zA-Z\.]')
+    return regex.sub('', ticker).strip().upper()
+
 
 
 def clean_stock_info(stock_info):
@@ -792,6 +796,9 @@ def calc_option_theta(market_price, strike_price, days_to_expiry, volatility,
 
 
 def run_tests():
+    print('Testing clean_ticker')
+    assert clean_ticker('ac.to') == 'AC.TO'
+    assert clean_ticker('23ac.to23@#0  ') == 'AC.TO'
     print('Getting DOW')
     assert get_dow_tickers()['AAPL']['name'] == 'Apple Inc.'
     print('Getting S&P500')
