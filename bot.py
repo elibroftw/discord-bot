@@ -1551,7 +1551,7 @@ async def ticker_info(ctx, *tickers):
     bot.loop.run_in_executor(None, _get_ticker_info)
 
 
-@bot.command(aliases=['find_stock', 'find-stock', 'search-stock', 'find-ticker', 'find_ticker', 'fticker', 'fstock'])
+@bot.command(aliases=['find_stock', 'find-stock', 'fs', 'search-stock', 'find-ticker', 'find_ticker', 'fticker', 'fstock'])
 async def search_stock(ctx, *query):
     stock_results = find_stock(query)
     if not stock_results:
@@ -1590,7 +1590,7 @@ async def remove_from_watchlist(ctx, *tickers):
 
 
 @bot.command(aliases=['watchlist', 'wl'])
-async def get_watchlist(ctx, print_info=False):
+async def view_watchlist(ctx, print_info=False):
     portfolio = portfolio_coll.find_one({'user': ctx.author.id})
     watch_list = [] if portfolio is None else portfolio.get('watchlist', [])
     if print_info:

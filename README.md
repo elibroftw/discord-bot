@@ -3,13 +3,14 @@ My custom madeDiscord bot (called El Chapo) I self host and use in my personal s
 Rather than having a sole purpose, this bot is aimed at doing all the tasks I want it to do. I made it for a singular server so it may not work for multiple servers (regarding the music playing features).
 
 ## Features
-For more info, view [bot.py](../master/bot.py)
+For more info, view [bot.py](bot.py)
 
 ### Admin
 - Clear chat (!clear int)
     - Can clear up to 100 messages in chat (at the moment)
 - Ban (!ban nick/username)
 - Get creation date of user (!created_at <user=YOU>)
+
 ### Anonymous Messaging Service
 - Send a dm to a user (!dm <user/nick> <message>) // send it to the bot
 - Reply to a dm (!re <thread_id> <message>)
@@ -17,6 +18,7 @@ For more info, view [bot.py](../master/bot.py)
 - Disable anonymous messages (!disable)
 - Toggle status (!anontoggle, !anon)  // Future replacement
 - See if you are opted in or out of the messages (!anonstatus)
+
 ### Music
 - Summon (!summon, !play <query/youtube_url>)
 - Play or Add to queue (!play, !p)
@@ -50,20 +52,21 @@ For more info, view [bot.py](../master/bot.py)
   - !v +  # increase volume by 10
   - !v -  # decrease volume by 10
 - Leave Voice chat (!leave, !disconnect, !unsummon, !desummon, !dismiss)
+
 ### Investing
-- Get the price of stock(s) (!stock <tickers>)
+- Get the prices of stock(s) (!stock <tickers>)
 - Get top movers (!movers <market='ALL'> <of='day'> <show=5>)
 - Get top winners (!gainers <market='ALL'> <of='day'> <show=5>)
 - Get top losers (!losers <market='ALL'> <of='day'> <show=5>)
 - Get random stock(s) (!random-stock <n=1>)
-- Search for a company's ticker (!fstock query)
+- Search for a company's ticker (!fs query)
 - Add stocks to your watchlist (!watch <tickers>)
 - Remove stocks from your watchlist (!unwatch <tickers>)
-- Get stocks in your watchlist (!watchlist <show_info=False>)
-- Add shares to portfolio (!buy <ticker> <cost_per_share> <shares> <commission_fee=0>)
-- Remove shares from portfolio (!sell <ticker> <price_per_share> <shares> <commission_fee=0>)
-- View your portfolio (!holdings <to_dm=False>)
-- Get a copy of your portfolio/transactions (!dlholdings <to_dm=True>)
+- View stocks in your watchlist (!wl <show_info=False>)
+<!-- - Add shares to portfolio (!buy <ticker> <cost_per_share> <shares> <commission_fee=0>) -->
+<!-- - Remove shares from portfolio (!sell <ticker> <price_per_share> <shares> <commission_fee=0>) -->
+<!-- - View your portfolio (!holdings <to_dm=False>) -->
+<!-- - Get a copy of your portfolio/transactions (!dlholdings <to_dm=True>) -->
 
 ### Games
 - Get a list of games (!games)
