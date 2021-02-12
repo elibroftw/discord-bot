@@ -1499,7 +1499,7 @@ async def anon_status(ctx):
 
 
 # Investing
-@bot.command(aliases=['ticker', 'get_ticker', 'stock', 'stock_info', 'get_stock'])
+@bot.command(aliases=['ticker', 'get_ticker', 'stock', 'stock_info', 'get_stock', 'quote'])
 async def ticker_info(ctx, *tickers):
 
     def _get_ticker_info():
@@ -1585,12 +1585,12 @@ async def remove_from_watchlist(ctx, *tickers):
     await ctx.send(f'Removed {", ".join(tickers)} from your watchlist')
 
 
-@bot.command(aliases=['watchlist'])
+@bot.command(aliases=['watchlist', 'wl'])
 async def get_watchlist(ctx, print_info=False):
     portfolio = portfolio_coll.find_one({'user': ctx.author.id})
     watch_list = [] if portfolio is None else portfolio.get('watchlist', [])
     if print_info:
-        await ctx.invoke(bot.get_command('ticker_info', *watch_list))
+        await ctx.invoke(bot.get_command('ticker_info'), *watch_list)
     else:
         msg = f'Watchlist for {ctx.author}: ' + (', '.join(watch_list) if watch_list else '<empty>')
         await ctx.send(msg)
