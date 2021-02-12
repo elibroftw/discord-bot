@@ -1697,9 +1697,9 @@ async def sell(ctx, ticker, price_per_share: float, shares_sold: int, commission
 #     await ctx.send('Feature coming soon')
 
 
-@bot.command()
-async def transactions_template(ctx):
-    await ctx.send('https://1drv.ms/x/s!AnQNFW1ohAx2hpEjhlgHkbvcaPLy2Q?e=jZCsn3')
+# @bot.command()
+# async def transactions_template(ctx):
+#     await ctx.send('')
 
 
 @bot.command(aliases=['gainers', 'winners', 'top_gainers'])
