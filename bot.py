@@ -66,6 +66,7 @@ MY_USER_ID = int(os.environ['user_id'])
 DEFAULT_ROLE = os.environ['default_role']
 BLUE = discord.Color.blue()
 TWITTER_BLUE = discord.Color(5631660)
+SKY_BLUE = discord.Color.from_rgb(0, 191, 255)
 STOCKS_GREEN = discord.Color.from_rgb(26, 197, 103)
 STOCKS_RED = discord.Color.from_rgb(255, 51, 58)
 STOCKS_YELLOW = discord.Color.from_rgb(255, 220, 72)
@@ -1156,25 +1157,31 @@ async def rewind(ctx, seconds: int = 5):
 async def now_playing(ctx):
     guild = ctx.guild
     mq = data_dict[guild.id]['music']
-    track = mq[0]
-    embed = discord.Embed(title=track.title, url=f'https://www.youtube.com/watch?v={track.get_video_id()}',
-                          description=track.get_time_stamp(True), color=0xff0000)
-    embed.set_author(name='Now Playing')
-    await ctx.send(embed=embed)
+    if mq:
+        track = mq[0]
+        embed = discord.Embed(title=track.title, url=f'https://www.youtube.com/watch?v={track.get_video_id()}',
+                            description=track.get_time_stamp(True), color=0xff0000)
+        embed.set_author(name='Now Playing')
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send(content='Nothing playing right now')
     # https://cog-creators.github.io/discord-embed-sandbox/
 
 
 @bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
 @commands.check(in_guild)
-async def leave(ctx):
+async def leave(ctx, clear_queue=False):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
         await voice_client.disconnect()
-        guild_data = data_dict[guild.id]
-        guild_data['music'].clear()
-        guild_data['auto_play'] = False
-        await ctx.send('Stopped playing music and cleared the music queue')
+        msg = 'Stopped playing music'
+        if clear_queue:
+            guild_data = data_dict[guild.id]
+            guild_data['music'].clear()
+            guild_data['auto_play'] = False
+            msg += ' and cleared the music queue'
+        await ctx.send(msg)
 
 
 @bot.command(aliases=['s', 'end'])
@@ -1403,8 +1410,8 @@ async def dm(ctx):
                 thread_id = str(thread_id)
                 embed = discord.Embed(title='Message Received :mailbox_with_mail:', color=thread_id_color,
                                       description=f'Reply with `!reply {thread_id} <msg>`')
-                embed.add_field(name='Thread ID:', value=thread_id, inline=True)
-                embed.add_field(name='Message:', value=message, inline=True)
+                embed.add_field(name='Thread ID:', value=thread_id)
+                embed.add_field(name='Message:', value=message)
                 await receiver.send(embed=embed)
                 embed = discord.Embed(title='Message Sent :airplane:', color=thread_id_color)
                 embed.add_field(name='To:', value=str(receiver))
@@ -1441,8 +1448,8 @@ async def reply(ctx):
                 thread_id_color = discord.Color(thread_id)
                 embed = discord.Embed(title=embed_title, color=thread_id_color,
                                       description=f'Use `!reply {thread_id} <msg>` to respond')
-                embed.add_field(name='Thread ID:', value=str(thread_id), inline=True)
-                embed.add_field(name='Message:', value=message, inline=True)
+                embed.add_field(name='Thread ID:', value=str(thread_id))
+                embed.add_field(name='Message:', value=message)
                 receiver = bot.get_user(receiver_id)
                 await receiver.send(embed=embed)
                 await ctx.author.send('Reply sent! :airplane:')
@@ -1459,14 +1466,14 @@ async def reply(ctx):
 @bot.command(aliases=['enable-msgs', 'enablemessages', 'enable-messages'])
 async def enable_messages(ctx):
     user_id = ctx.author.id
-    dm_coll.update_one({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': True}}, upsert=True)
+    dm_coll.update_one({'user_id': user_id, 'type': 'user_settings'}, {'$set': {'allows_messages': True}}, upsert=True)
     await ctx.send('Anonymous messaging has been **ENABLED**')
 
 
 @bot.command(aliases=['disable-msgs', 'disablemessages', 'disable-messages'])
 async def disable_messages(ctx):
     user_id = ctx.author.id
-    dm_coll.update_one({'user_id': user_id, 'type': 'user_settings'}, {'$set', {'allows_messages': False}}, upsert=True)
+    dm_coll.update_one({'user_id': user_id, 'type': 'user_settings'}, {'$set': {'allows_messages': False}}, upsert=True)
     await ctx.send('Anonymous messaging has been **DISABLED**')
 
 
@@ -1494,40 +1501,90 @@ async def anon_status(ctx):
 
 # Investing
 @bot.command(aliases=['ticker', 'get_ticker', 'stock', 'stock_info', 'get_stock'])
-async def ticker_info(ctx, ticker: str):
+async def ticker_info(ctx, *tickers):
 
     def _get_ticker_info():
-        nonlocal ticker
-        ticker = ticker.replace('$', '').upper()
-        m = run_coroutine(ctx.send(f'Getting stock info of {ticker}'))
-        try:
-            _ticker_info = get_ticker_info(ticker)
-            if _ticker_info['change'] < 0:
-                embed_color = STOCKS_RED  # red
-                _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
-            elif _ticker_info['change'] > 0:
-                embed_color = STOCKS_GREEN
-                _ticker_info['change'] = f'+{_ticker_info["change"]} (+{_ticker_info["percent_change"]}%)'
-            else:
-                embed_color = discord.Color.light_grey()
-                _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
-            hour = _ticker_info['timestamp'].strftime('%I')
-            if hour[0] == '0': hour = hour[1]
-            timestamp = _ticker_info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
-            embed = discord.Embed(title=_ticker_info['name'] + f' ({ticker})', color=embed_color)
-            embed.set_footer(text=f'Last updated: {timestamp}')
-            embed.add_field(name='Last Price:', value=_ticker_info['price'], inline=True)
-            embed.add_field(name='Last Close:', value=_ticker_info['last_close_price'], inline=True)
-            embed.add_field(name='Change:', value=_ticker_info['change'], inline=True)
-            run_coroutine(m.edit(embed=embed, content=''))
-        except ValueError as e:
-            run_coroutine(m.edit(content=str(e)))
+        m = run_coroutine(ctx.send(f'Getting stock info for: {", ".join(tickers)}'))
+        errors = []
+        for ticker in tickers:
+            ticker = ticker.replace('$', '').upper()
+            try:
+                _ticker_info = get_ticker_info(ticker)
+                if _ticker_info['change'] < 0:
+                    embed_color = STOCKS_RED  # red
+                    _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
+                elif _ticker_info['change'] > 0:
+                    embed_color = STOCKS_GREEN
+                    _ticker_info['change'] = f'+{_ticker_info["change"]} (+{_ticker_info["percent_change"]}%)'
+                else:
+                    embed_color = discord.Color.light_grey()
+                    _ticker_info['change'] = f'{_ticker_info["change"]} ({_ticker_info["percent_change"]}%)'
+                hour = _ticker_info['timestamp'].strftime('%I')
+                if hour[0] == '0': hour = hour[1]
+                timestamp = _ticker_info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
+                embed = discord.Embed(title=_ticker_info['name'] + f' ({ticker})', color=embed_color)
+                embed.set_footer(text=f'Last updated: {timestamp}')
+                embed.add_field(name='Last Price:', value=_ticker_info['price'])
+                embed.add_field(name='Last Close:', value=_ticker_info['last_close_price'])
+                embed.add_field(name='Change:', value=_ticker_info['change'])
+                run_coroutine(ctx.send(embed=embed))
+            except ValueError as e:
+                errors.append(str(e))
+        if errors:
+            embed = discord.Embed(title=f'Error(s) ({len(errors)})', description='\n'.join(errors))
+            run_coroutine(m.edit(content='', embed=embed))
+        else:
+            run_coroutine(m.delete())
+
     bot.loop.run_in_executor(None, _get_ticker_info)
 
 
+@bot.command(aliases=['find_stock', 'find-stock', 'search-stock', 'find-ticker', 'find_ticker', 'fticker', 'fstock'])
+async def search_stock(ctx, *query):
+    stock_results = find_stock(query)
+    if not stock_results:
+        await ctx.send(content=f'No search results for query: {" ".join(query)}')
+    else:
+        embed = discord.Embed(title=f'Search Results ({len(stock_results)})', color=SKY_BLUE)
+        for stock in stock_results:
+            embed.add_field(name=stock[0], value=stock[1])
+        embed.set_footer(text='query: ' + ' '.join(query))
+        await ctx.send(embed=embed)
+
+
 @bot.command(aliases=['random_ticker', 'random-stock', 'random-ticker'])
-async def random_stock(ctx, n: int):
+async def random_stock(ctx, n=1):
     await ctx.send(', '.join(get_random_stocks(n)))
+
+
+@bot.command(aliases=['watch'])
+async def add_to_watchlist(ctx, *tickers):
+    tickers = [clean_ticker(ticker) for ticker in tickers]
+    portfolio = portfolio_coll.find_one({'user': ctx.author.id})
+    watch_list = set() if portfolio is None else set(portfolio.get('watchlist', []))
+    for ticker in tickers: watch_list.add(ticker)
+    portfolio = portfolio_coll.update_one({'user': ctx.author.id}, {'$set': {'watchlist': list(watch_list)}})
+    await ctx.send(f'Added {", ".join(tickers)} to your watchlist')
+
+
+@bot.command(aliases=['unwatch'])
+async def remove_from_watchlist(ctx, *tickers):
+    tickers = {clean_ticker(ticker) for ticker in tickers}
+    portfolio = portfolio_coll.find_one({'user': ctx.author.id})
+    watch_list = [] if portfolio is None else portfolio.get('watchlist', [])
+    watch_list = list(filter(lambda item: item not in tickers, watch_list))
+    portfolio = portfolio_coll.update_one({'user': ctx.author.id}, {'$set': {'watchlist': watch_list}})
+    await ctx.send(f'Removed {", ".join(tickers)} from your watchlist')
+
+
+@bot.command(aliases=['watchlist'])
+async def get_watchlist(ctx, print_info=False):
+    portfolio = portfolio_coll.find_one({'user': ctx.author.id})
+    watch_list = [] if portfolio is None else portfolio.get('watchlist', [])
+    if print_info:
+        await ctx.invoke(bot.get_command('ticker_info', watch_list))
+    else:
+        await ctx.send(f'Watchlist for {ctx.author}: {", ".join(watch_list)}')
 
 
 # noinspection PyTypeChecker

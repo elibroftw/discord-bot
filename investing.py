@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.18
+Version: 1.20
 Created: April 3rd 2020
-Updated: February 10th 2021
+Updated: February 11th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -18,7 +18,6 @@ Volatility (Standard Deviation) of a stock:
 from contextlib import suppress
 import csv
 from datetime import datetime, timedelta
-import multiprocessing
 import math
 from statistics import NormalDist
 # noinspection PyUnresolvedReferences
@@ -27,7 +26,6 @@ from pprint import pprint
 from bs4 import BeautifulSoup
 from fuzzywuzzy import process
 import random
-import pandas as pd
 import requests
 # import grequests
 import yfinance as yf
@@ -111,6 +109,10 @@ def get_sp500_tickers() -> dict:
             name = tds[1].text.strip()
             tickers[ticker] = {'symbol': ticker, 'name': name}
     return tickers
+
+
+def clean_ticker(ticker):
+    return ticker.strip().replace('$', '').upper()
 
 
 def clean_stock_info(stock_info):
@@ -621,6 +623,35 @@ def get_random_stocks(n=1) -> set:
     return return_stocks
 
 
+def find_stock(query):
+    """
+    Returns at most 10 results based on a search query
+    """
+    results = []
+    if isinstance(query, str):
+        query = {part.upper() for part in query.split()}
+    else:
+        query = {part.upper() for part in query}
+    for stock_info in ALL_STOCKS.values():
+        match, parts_matched = 0, 0
+        company_name = stock_info['name'].upper()
+        symbol = stock_info['symbol']
+        if symbol in query:
+            match += len(symbol)
+            parts_matched += 1
+        for part in query:
+            part_factor = company_name.count(part) * len(part)
+            if part_factor:
+                match += part_factor
+                parts_matched += 1
+        match /= len(company_name)
+        if match:
+            results.append((symbol, stock_info['name'], parts_matched, match))
+    # sort results by number of parts matched and % matched
+    results.sort(key=lambda item: (item[2], item[3]) , reverse=True)
+    return results[:12]
+
+
 # Options Section
 
 # Enums are used for some calculations
@@ -785,6 +816,9 @@ def run_tests():
     assert len(sample_target_prices) == 5
     assert isinstance(sample_target_prices, dict)
     assert 0 < get_risk_free_interest_rate(0) < 1
+    print('Testing find_stock')
+    pprint(find_stock('entertainment'))
+    pprint(find_stock('TWLO'))
     # test invalid ticker
     print('Testing Invalid Tickers')
     with suppress(ValueError):
