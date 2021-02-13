@@ -1540,7 +1540,7 @@ async def ticker_info(ctx, *tickers):
                     if change >= 0:
                         last_close_text += f'  +{change}  (+{change_percent}%)'
                     elif change < 0:
-                        last_close_text += f'  -{change}  (-{change_percent}%)'
+                        last_close_text += f'  {change}  ({change_percent}%)'
 
                 hour = info['timestamp'].strftime('%I')
                 if hour[0] == '0': hour = hour[1]
