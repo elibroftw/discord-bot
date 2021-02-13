@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.22
+Version: 1.23
 Created: April 3rd 2020
 Updated: February 12th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -233,43 +233,71 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
     data_latest = yf_ticker.history(period='5d', interval='1m', prepost=True)
     timestamp = data_latest.last_valid_index()
     latest_price = float(data_latest.tail(1)['Close'].iloc[0])
-    # get previous closing price
-    # TODO: test in different time zones
+    # if market is open: most recent close
+    # else: close before most recent close
+    previous_close = info['regularMarketPreviousClose']
+    eps_ttm = info['trailingEps']
+    dividend_yield = info['trailingAnnualDividendYield']
+    last_dividend = info['lastDividendValue']
+    if last_dividend is None:
+        dividend_yield = 0
+        last_dividend = 0
+    # get most recent price
     timestamp_ending = str(timestamp)[-6:]
-    if (timestamp.hour >= 16):  # post market
+    extended_hours = not (16 > timestamp.hour > 9 or (timestamp.hour == 9 and timestamp.min <= 30))
+    if (timestamp.hour >= 16):  # timestamp is from post market
         today = datetime(timestamp.year, timestamp.month, timestamp.day, 15, 59)
-        _closing_timestamp = today.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')
-        closing_price = data_latest.loc[_closing_timestamp]['Close']
-    else:  # market is currently open / pre-market
-        prev_day = datetime(timestamp.year, timestamp.month,
-                            timestamp.day, 15, 59) - timedelta(days=1)
+        closing_timestamp = today.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')
+        closing_price = data_latest.loc[closing_timestamp]['Open']
+        today = datetime(timestamp.year, timestamp.month, timestamp.day, 9, 30)
+    else:  # open-market / pre-market since timestamp is before 4:00 pm
+        # if pre-market, this close is after the previous close
+        latest_close = datetime(timestamp.year, timestamp.month,
+                                timestamp.day, 15, 59) - timedelta(days=1)
         while True:
             try:
-                prev_day_timestamp = prev_day.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')
-                closing_price = data_latest.loc[prev_day_timestamp]['Close']
+                prev_day_timestamp = latest_close.strftime(f'%Y-%m-%d %H:%M:%S{timestamp_ending}')
+                closing_price = data_latest.loc[prev_day_timestamp]['Open']
                 break
             except KeyError:
-                prev_day -= timedelta(days=1)
-    change = latest_price - closing_price
+                latest_close -= timedelta(days=1)
+
+    change = closing_price - previous_close
+    change_percent = change / previous_close * 100
+    latest_change = latest_price - closing_price
+    latest_change_percent = latest_change / closing_price * 100
+
     if round_values:
-        change = round(change, 4)
-        percent_change = round(change/closing_price * 100, 2)
-        latest_price = round(latest_price, 4)
-        closing_price = round(closing_price, 4)
-    else:
-        percent_change = change/closing_price * 100
-    name = info['longName']
-    dividend_yield = info['trailingAnnualDividendYield']
-    eps_ttm = info['trailingEps']
-    return_info = {'name': name,
-                   'price': latest_price,
-                   'last_close_price': closing_price,
-                   'dividend_yield': dividend_yield,
-                   'change': change, 'percent_change': percent_change,
-                   'timestamp': timestamp, 'symbol': ticker,
-                   'eps_ttm': eps_ttm,
-                   'volume': info['volume'],
-                   'last_dividend': info['lastDividendValue']}
+        previous_close = round(previous_close, 2)
+        latest_price = round(latest_price, 2)
+        closing_price = round(closing_price, 2)
+
+        change = round(change, 2)
+        change_percent = round(change_percent, 2)
+        latest_change = round(latest_change, 2)
+        latest_change_percent = round(latest_change_percent, 2)
+
+        dividend_yield = round(dividend_yield, 2)
+        last_dividend = round(last_dividend, 2)
+        eps_ttm = round(eps_ttm, 2)
+
+    return_info = {
+        'name': info['longName'],
+        'symbol': ticker,
+        'volume': info['volume'],
+        'eps_ttm': eps_ttm,
+        'dividend_yield': dividend_yield,
+        'last_dividend': last_dividend,
+        'price': latest_price,
+        'close_price': closing_price,
+        'previous_close_price': previous_close,
+        'change': change,
+        'change_percent': change_percent,
+        'latest_change': latest_change,
+        'latest_change_percent': latest_change_percent,
+        'extended_hours': extended_hours,
+        'timestamp': timestamp
+    }
     return return_info
 
 
@@ -774,8 +802,7 @@ def calc_option_vega(market_price, strike_price, days_to_expiry, volatility,
 
 def calc_option_rho(market_price, strike_price, days_to_expiry, volatility,
                     risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
-    block_1 = strike_price * \
-        math.e ** (-risk_free * days_to_expiry) * days_to_expiry
+    block_1 = strike_price * math.e ** (-risk_free * days_to_expiry) * days_to_expiry
     _d1 = d1(market_price, strike_price, days_to_expiry,
              volatility, risk_free, dividend_yield)
     _d2 = option_type * (_d1 - volatility * math.sqrt(days_to_expiry))
@@ -786,10 +813,8 @@ def calc_option_theta(market_price, strike_price, days_to_expiry, volatility,
                       risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
     _d1 = d1(market_price, strike_price, days_to_expiry,
              volatility, risk_free, dividend_yield)
-    block_1 = market_price * \
-        math.e ** (-dividend_yield * days_to_expiry) * csn(option_type * _d1)
-    block_2 = strike_price * \
-        math.e ** (-risk_free * days_to_expiry) * risk_free
+    block_1 = market_price * math.e ** (-dividend_yield * days_to_expiry) * csn(option_type * _d1)
+    block_2 = strike_price * math.e ** (-risk_free * days_to_expiry) * risk_free
     blocK_3 = market_price * math.e ** (-dividend_yield * days_to_expiry)
     blocK_3 *= volatility / (2 * math.sqrt(days_to_expiry)) * snd(_d1)
     return option_type * (block_1 - block_2) - blocK_3

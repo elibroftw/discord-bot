@@ -1520,24 +1520,37 @@ async def ticker_info(ctx, *tickers):
                     else:
                         ticker = results[0][0]
                         info = get_ticker_info(ticker)
-                if info['change'] < 0:
-                    embed_color = STOCKS_RED  # red
-                    info['change'] = f'{info["change"]} ({info["percent_change"]}%)'
-                elif info['change'] > 0:
+
+                if info['latest_change'] < 0:
+                    embed_color = STOCKS_RED
+                    # includes '-' prefix
+                    latest_change_text = f'{info["latest_change"]} ({info["latest_change_percent"]}%)'
+                elif info['latest_change'] > 0:
                     embed_color = STOCKS_GREEN
-                    info['change'] = f'+{info["change"]} (+{info["percent_change"]}%)'
+                    latest_change_text = f'+{info["latest_change"]} (+{info["latest_change_percent"]}%)'
                 else:
                     embed_color = discord.Color.light_grey()
-                    info['change'] = f'{info["change"]} ({info["percent_change"]}%)'
+                    latest_change_text = f'{info["latest_change"]} ({info["latest_change_percent"]}%)'
+
+                last_close_text = str(info['close_price'])
+                if info['extended_hours']:
+                    # change at close
+                    change = info['change']
+                    change_percent = info['change_percent']
+                    if change >= 0:
+                        last_close_text += f'  +{change}  (+{change_percent}%)'
+                    elif change < 0:
+                        last_close_text += f'  -{change}  (-{change_percent}%)'
+
                 hour = info['timestamp'].strftime('%I')
                 if hour[0] == '0': hour = hour[1]
                 timestamp = info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
                 url = f'https://finance.yahoo.com/quote/{ticker}'
                 embed = discord.Embed(title=info['name'] + f' ({ticker})', color=embed_color, url=url)
                 embed.set_footer(text=f'Last updated: {timestamp}')
-                embed.add_field(name='Last Price:', value=info['price'])
-                embed.add_field(name='Last Close:', value=info['last_close_price'])
-                embed.add_field(name='Change:', value=info['change'])
+                embed.add_field(name='Price', value=info['price'])
+                embed.add_field(name='Change', value=latest_change_text)
+                embed.add_field(name='At Close', value=last_close_text, inline=False)
                 if to_dm: run_coroutine(author.send(embed=embed))
                 else: run_coroutine(ctx.send(embed=embed))
             except ValueError as e:
