@@ -542,7 +542,13 @@ async def summon(ctx):
     author: discord.Member = ctx.author
     data_dict[guild.id]['text_channel'] = ctx.channel.id
     if not author.voice:
-        return await discord.utils.get(guild.voice_channels, name='music').connect()
+        # try finding and joining a "music" voice channel
+        try:
+            await discord.utils.get(guild.voice_channels, name='music').connect()
+        except AttributeError:
+            error_msg = 'ERROR: I could not find any voice channel titled "music". '
+            error_msg += 'Please join a voice channel before using any music commands'
+            await ctx.send(error_msg, delete_after=10)
     else:
         voice_client: discord.VoiceClient = guild.voice_client
         channel: discord.VoiceChannel = author.voice.channel
