@@ -20,3 +20,4 @@ yahoo_fin
 requests_html
 numpy
 pytz
+feedparser

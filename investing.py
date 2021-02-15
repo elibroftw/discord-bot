@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.23
+Version: 1.24
 Created: April 3rd 2020
-Updated: February 12th 2021
+Updated: February 14th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -35,6 +35,7 @@ import numpy as np
 from functools import lru_cache, wraps
 import time
 import re
+import feedparser
 
 
 def time_cache(max_age, maxsize=128, typed=False):
@@ -683,6 +684,36 @@ def find_stock(query):
     # sort results by number of parts matched and % matched
     results.sort(key=lambda item: (item[2], item[3]) , reverse=True)
     return results[:12]
+
+
+def get_trading_halts(days_back=0):
+    days_back = abs(days_back)
+    if days_back:
+        date = datetime.today() - timedelta(days=days_back)
+        date = date.strftime('%m%d%Y')
+        url = f'http://www.nasdaqtrader.com/rss.aspx?feed=tradehalts&haltdate={date}'
+    else:
+        url = 'http://www.nasdaqtrader.com/rss.aspx?feed=tradehalts'
+    feed = feedparser.parse(url)
+    del feed['headers']
+    halts = []
+    for halt in feed['entries']:
+        soup = BeautifulSoup(halt['summary'], 'html.parser')
+
+        values = [td.text.strip() for td in soup.find_all('tr')[1].find_all('td')]
+        halts.append({
+            'symbol': values[0],
+            'name': values[1],
+            'market': {'Q': 'NASDAQ'}.get(values[2], values[2]),
+            'reason_code': values[3],
+            'paused_price': values[4],
+            'halt_date': datetime.strptime(values[5], '%m/%d/%Y'),
+            'halt_time': values[6],
+            'resume_date': datetime.strptime(values[7], '%m/%d/%Y'),
+            'resume_quote_time': values[8],
+            'resume_trade_time': values[9]
+        })
+    return halts
 
 
 # Options Section
