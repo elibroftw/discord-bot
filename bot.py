@@ -214,12 +214,16 @@ async def shutdown_bot(ctx, save_data=True):
         if save_data:
             await bot.change_presence(activity=discord.Game('Saving Data'))
             save_to_file()
+        await bot.change_presence(activity=discord.Game('Backing up DB'))
+        print('Backing up database')
+        backup_db()
         await bot.change_presence(activity=discord.Game('Leaving Voice Chats'))
         for voice_client in bot.voice_clients:
             if voice_client.is_playing() or voice_client.is_paused():
                 no_after_play(data_dict[ctx.guild.id], voice_client)
             await voice_client.disconnect()
         await bot.change_presence(activity=discord.Game('Inactive'))
+
         print('Bot logged out')
         await bot.logout()
 
@@ -1831,7 +1835,14 @@ async def target_price(ctx, ticker: str):
             run_coroutine(m.edit(content=str(e)))
     bot.loop.run_in_executor(None, _get_target_price)
 
-# END of Investing
+
+@bot.command(aliases=['f&g', 'fear-and-greed', 'fg'])
+async def fear_and_greed(ctx):
+    """
+    Returns the fear and greed over time chart from CNN
+    """
+    await ctx.send('http://markets.money.cnn.com/Marketsdata/Api/Chart/FearGreedHistoricalImage?chartType=AvgPtileModel')
+
 
 print('Backing up database')
 backup_db()
