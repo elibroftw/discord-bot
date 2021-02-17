@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.24
+Version: 1.25
 Created: April 3rd 2020
-Updated: February 14th 2021
+Updated: February 16th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -163,40 +163,40 @@ def get_nyse_arca_tickers() -> dict:
     return tickers
 
 
-def get_tickers(market) -> dict:
-    market = market.upper()
+def get_tickers(category) -> dict:
+    category = category.upper()
     # OPTIONS: CUSTOM, ALL, US, NYSE, NASDAQ, S&P500, DOW/DJIA, TSX/CA
     tickers = dict()
-    # EXCHANGES
-    if market in {'S&P500', 'S&P 500'}:
+    # Indexes
+    if category in {'S&P500', 'S&P 500', 'SP500'}:
         tickers.update(get_sp500_tickers())
-    if market in {'DOW', 'DJIA'}:
+    if category in {'DOW', 'DJIA'}:
         tickers.update(get_dow_tickers())
-
-    if market in {'NASDAQ', 'US', 'ALL'}:
+    # Exchanges
+    if category in {'NASDAQ', 'US', 'ALL'}:
         tickers.update(get_nasdaq_tickers())
-    if market in {'NYSE', 'US', 'ALL'}:
+    if category in {'NYSE', 'US', 'ALL'}:
         tickers.update(get_nyse_tickers())
-    if market in {'AMEX', 'US', 'ALL'}:
+    if category in {'AMEX', 'US', 'ALL'}:
         tickers.update(get_amex_tickers())
-    if market in {'NYSEARCA', 'US', 'ALL'}:
+    if category in {'NYSEARCA', 'US', 'ALL'}:
         tickers.update(get_nyse_arca_tickers())
-    if market in {'TSX', 'CA', 'ALL'}:
+    if category in {'TSX', 'TMX', 'CA', 'ALL'}:
         tickers.update(get_tsx_tickers())
-    # elif market in {'MORTGAGE REITS', 'MREITS'}:
-    #     tickers_to_download = {'NLY', 'STWD', 'AGNC', 'TWO', 'PMT', 'MITT', 'NYMT', 'MFA',
-    #                            'IVR', 'NRZ', 'TRTX', 'RWT', 'DX', 'XAN', 'WMC'}
-    # elif market == 'OIL': tickers_to_download = {'DNR', 'PVAC', 'ROYT', 'SWN', 'CPE', 'CEQP', 'PAA', 'PUMP', 'PBF'}
-    # elif market in {'AUTO', 'AUTOMOBILE', 'CARS'}:
-    #     tickers_to_download={'TSLA', 'GM', 'F', 'NIO', 'RACE', 'FCAU', 'HMC', 'NIO', 'TTM', 'TM'}
-    # elif market in {'INDEXFUTURES', 'INDEX_FUTURES'}: tickers_to_download = {'YM=F', 'NQ=F', 'RTY=F', 'ES=F'}
-    # elif market == 'TANKERS':
-    #     tickers_to_download = {'EURN', 'TNK', 'TK', 'TNP', 'DSX', 'NAT',
+    # Industries
+    # elif category in {'MORTGAGE REITS', 'MREITS'}:
+    #     tickers = {'NLY', 'STWD', 'AGNC', 'TWO', 'PMT', 'MITT', 'NYMT', 'MFA',
+    #                       'IVR', 'NRZ', 'TRTX', 'RWT', 'DX', 'XAN', 'WMC'}
+    # elif category == 'OIL': tickers = {'DNR', 'PVAC', 'ROYT', 'SWN', 'CPE', 'CEQP', 'PAA', 'PUMP', 'PBF'}
+    # elif category in {'AUTO', 'AUTOMOBILE', 'CARS'}:
+    #     tickers = {'TSLA', 'GM', 'F', 'NIO', 'RACE', 'FCAU', 'HMC', 'NIO', 'TTM', 'TM'}
+    # elif category in {'INDEXFUTURES', 'INDEX_FUTURES'}: tickers = {'YM=F', 'NQ=F', 'RTY=F', 'ES=F'}
+    # elif category == 'TANKERS':
+    #     tickers = {'EURN', 'TNK', 'TK', 'TNP', 'DSX', 'NAT',
     #         'STNG', 'SFL', 'DHT', 'CPLP', 'DSSI', 'FRO', 'INSW', 'NNA', 'SBNA'}
-    # elif market in {'UTILS', 'UTILITIES'}:
-    #     tickers_to_download = {'PCG', 'ELLO', 'AT', 'ELP', 'ES', 'EDN', 'IDA', 'HNP', 'GPJA', 'NEP', 'SO', 'CEPU', 'AES', 'ETR', 'KEP', 'OGE', 'EIX', 'NEE', 'TVC', 'TAC', 'EE', 'CIG', 'PNW', 'EMP', 'EBR.B', 'CPL', 'DTE', 'POR', 'EAI',
+    # elif category in {'UTILS', 'UTILITIES'}:
+    #     tickers = {'PCG', 'ELLO', 'AT', 'ELP', 'ES', 'EDN', 'IDA', 'HNP', 'GPJA', 'NEP', 'SO', 'CEPU', 'AES', 'ETR', 'KEP', 'OGE', 'EIX', 'NEE', 'TVC', 'TAC', 'EE', 'CIG', 'PNW', 'EMP', 'EBR.B', 'CPL', 'DTE', 'POR', 'EAI',
     #         'NRG', 'CWEN', 'KEN', 'AGR', 'BEP', 'ORA', 'EAE', 'PPX', 'AZRE', 'ENIC', 'FE', 'CVA', 'BKH', 'ELJ', 'EZT', 'HE', 'VST', 'ELU', 'ELC', 'TVE', 'AQN', 'PAM', 'AEP', 'ENIA', 'EAB', 'PPL', 'CNP', 'D', 'PNM', 'EBR', 'FTS'}
-    # elif market == 'CUSTOM': pass
     return tickers
 
 
@@ -225,7 +225,7 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
     '''
     Throws ValueError
     '''
-    ticker = ticker.upper()
+    ticker = ticker.replace('$', '').upper()
     yf_ticker = yf.Ticker(ticker)
     try:
         info = yf_ticker.info
@@ -280,7 +280,8 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
 
         dividend_yield = round(dividend_yield, 2)
         last_dividend = round(last_dividend, 2)
-        eps_ttm = round(eps_ttm, 2)
+        with suppress(TypeError):
+            eps_ttm = round(eps_ttm, 2)
 
     return_info = {
         'name': info['longName'],
@@ -300,6 +301,32 @@ def get_ticker_info(ticker: str, round_values=True) -> dict:
         'timestamp': timestamp
     }
     return return_info
+
+
+async def async_get_ticker_info(ticker: str, round_values=True) -> dict:
+    """
+    Throws ValueError
+    """
+    try:
+        return get_ticker_info(ticker, round_values)
+    except ValueError as e:
+        results = find_stock(ticker)
+        if not results: raise e
+        else: return get_ticker_info(results[0][0], round_values)
+
+
+async def get_ticker_infos(tickers: list, round_values=True, errors_as_str=False) -> tuple:
+    """
+    returns: list[dict], list
+    """
+    ticker_infos = []
+    tickers_not_found = []
+    for coro in map(lambda t: async_get_ticker_info(t, round_values), tickers):
+        try:
+            ticker_infos.append(await coro)
+        except ValueError as e:
+            tickers_not_found.append(str(e) if errors_as_str else e)
+    return ticker_infos, tickers_not_found
 
 
 def get_data(tickers: set, start_date=None, end_date=None, period='3mo', group_by='ticker', interval='1d',

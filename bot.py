@@ -25,7 +25,7 @@ parsed_args = parser.parse_args()
 # in case restarted
 if parsed_args.restarted:
     print('--restarted was passed')
-    time.sleep(5)
+    time.sleep(2.5)
 
 try:
     os.remove('discord.log')
@@ -1517,60 +1517,44 @@ async def ticker_info(ctx, *tickers):
         to_dm, author = len(tickers) > 5, ctx.author
         msg = f'Getting stock info for: {", ".join(tickers)}'
         m = run_coroutine(author.send(msg) if to_dm else ctx.send(msg))
-        errors = []
-        for ticker in tickers:
-            ticker = ticker.replace('$', '').upper()
-            try:
-                try:
-                    info = get_ticker_info(ticker)
-                except ValueError as e:
-                    # try to search for stock if user doesn't know ticker
-                    results = find_stock(ticker)
-                    if not results: raise e
-                    else:
-                        ticker = results[0][0]
-                        info = get_ticker_info(ticker)
-
-                if info['latest_change'] < 0:
-                    embed_color = STOCKS_RED
-                    # includes '-' prefix
-                    latest_change_text = f'{info["latest_change"]} ({info["latest_change_percent"]}%)'
-                elif info['latest_change'] > 0:
-                    embed_color = STOCKS_GREEN
-                    latest_change_text = f'+{info["latest_change"]} (+{info["latest_change_percent"]}%)'
-                else:
-                    embed_color = discord.Color.light_grey()
-                    latest_change_text = f'{info["latest_change"]} ({info["latest_change_percent"]}%)'
-
-                last_close_text = str(info['close_price'])
-                if info['extended_hours']:
-                    # change at close
-                    change = info['change']
-                    change_percent = info['change_percent']
-                    if change >= 0:
-                        last_close_text += f'  +{change}  (+{change_percent}%)'
-                    elif change < 0:
-                        last_close_text += f'  {change}  ({change_percent}%)'
-
-                hour = info['timestamp'].strftime('%I')
-                if hour[0] == '0': hour = hour[1]
-                timestamp = info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
-                url = f'https://finance.yahoo.com/quote/{ticker}'
-                embed = discord.Embed(title=info['name'] + f' ({ticker})', color=embed_color, url=url)
-                embed.set_footer(text=f'Last updated: {timestamp}')
-                embed.add_field(name='Price', value=info['price'])
-                embed.add_field(name='Change', value=latest_change_text)
-                embed.add_field(name='At Close', value=last_close_text, inline=False)
-                if to_dm: run_coroutine(author.send(embed=embed))
-                else: run_coroutine(ctx.send(embed=embed))
-            except ValueError as e:
-                errors.append(str(e))
+        ticker_infos, errors = run_coroutine(get_ticker_infos(tickers, errors_as_str=True))
         if errors:
             embed = discord.Embed(title=f'Error(s) ({len(errors)})', description='\n'.join(errors))
             run_coroutine(m.edit(content='', embed=embed))
         else:
             run_coroutine(m.delete())
-
+        for info in ticker_infos:
+            if info['latest_change'] < 0:
+                embed_color = STOCKS_RED
+                # includes '-' prefix
+                latest_change_text = f'{info["latest_change"]} ({info["latest_change_percent"]}%)'
+            elif info['latest_change'] > 0:
+                embed_color = STOCKS_GREEN
+                latest_change_text = f'+{info["latest_change"]} (+{info["latest_change_percent"]}%)'
+            else:
+                embed_color = discord.Color.light_grey()
+                latest_change_text = f'{info["latest_change"]} ({info["latest_change_percent"]}%)'
+            last_close_text = str(info['close_price'])
+            if info['extended_hours']:
+                # change at close
+                change = info['change']
+                change_percent = info['change_percent']
+                if change >= 0:
+                    last_close_text += f'  +{change}  (+{change_percent}%)'
+                elif change < 0:
+                    last_close_text += f'  {change}  ({change_percent}%)'
+            hour = info['timestamp'].strftime('%I')
+            ticker = info['symbol']
+            if hour[0] == '0': hour = hour[1]
+            timestamp = info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
+            url = f'https://finance.yahoo.com/quote/{ticker}'
+            embed = discord.Embed(title=info['name'] + f' ({ticker})', color=embed_color, url=url)
+            embed.set_footer(text=f'Last updated: {timestamp}')
+            embed.add_field(name='Price', value=info['price'])
+            embed.add_field(name='Change', value=latest_change_text)
+            embed.add_field(name='At Close', value=last_close_text, inline=False)
+            if to_dm: run_coroutine(author.send(embed=embed))
+            else: run_coroutine(ctx.send(embed=embed))
     bot.loop.run_in_executor(None, _get_ticker_info)
 
 
