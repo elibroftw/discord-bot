@@ -797,10 +797,10 @@ def get_volatility(stock_ticker, tll_hash=None):
     return np.std(data['Returns']) * math.sqrt(252)
 
 
-def d1(market_price, strike_price, days_to_expiry, volatility, risk_free, dividend_yield):
-    block_3 = volatility * math.sqrt(days_to_expiry)
+def d1(market_price, strike_price, years_to_expiry, volatility, risk_free, dividend_yield):
+    block_3 = volatility * math.sqrt(years_to_expiry)
     block_1 = math.log(market_price / strike_price)
-    block_2 = days_to_expiry * \
+    block_2 = years_to_expiry * \
         (risk_free - dividend_yield + volatility ** 2 / 2)
     return (block_1 + block_2) / block_3
 
@@ -825,56 +825,62 @@ def snd(y):
 
 def calc_option_price(market_price, strike_price, days_to_expiry, volatility,
                       risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
+    years_to_expiry = days_to_expiry / 365
     _d1 = option_type * d1(market_price, strike_price,
-                           days_to_expiry, volatility, risk_free, dividend_yield)
-    _d2 = _d1 - option_type * volatility * math.sqrt(days_to_expiry)
+                           years_to_expiry, volatility, risk_free, dividend_yield)
+    _d2 = _d1 - option_type * volatility * math.sqrt(years_to_expiry)
     block_1 = market_price * \
-        math.e ** (-dividend_yield * days_to_expiry) * csn(_d1)
-    block_2 = strike_price * math.e ** (-risk_free * days_to_expiry) * csn(_d2)
+        math.e ** (-dividend_yield * years_to_expiry) * csn(_d1)
+    block_2 = strike_price * math.e ** (-risk_free * years_to_expiry) * csn(_d2)
     return option_type * (block_1 - block_2)
 
 
 def calc_option_delta(market_price, strike_price, days_to_expiry, volatility,
                       risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
-    block_1 = math.e ** (-dividend_yield * days_to_expiry)
-    _d1 = d1(market_price, strike_price, days_to_expiry,
+    years_to_expiry = days_to_expiry / 365
+    block_1 = math.e ** (-dividend_yield * years_to_expiry)
+    _d1 = d1(market_price, strike_price, years_to_expiry,
              volatility, risk_free, dividend_yield)
     return option_type * block_1 * csn(option_type * _d1)
 
 
 def calc_option_gamma(market_price, strike_price, days_to_expiry, volatility,
                       risk_free=get_risk_free_interest_rate(), dividend_yield=0):
-    block_1 = math.e ** (-dividend_yield * days_to_expiry)
-    _d1 = d1(market_price, strike_price, days_to_expiry,
+    years_to_expiry = days_to_expiry / 365
+    block_1 = math.e ** (-dividend_yield * years_to_expiry)
+    _d1 = d1(market_price, strike_price, years_to_expiry,
              volatility, risk_free, dividend_yield)
-    return block_1 / (market_price * volatility * math.sqrt(days_to_expiry)) * snd(_d1)
+    return block_1 / (market_price * volatility * math.sqrt(years_to_expiry)) * snd(_d1)
 
 
 def calc_option_vega(market_price, strike_price, days_to_expiry, volatility,
                      risk_free=get_risk_free_interest_rate(), dividend_yield=0):
-    block_1 = market_price * math.e ** (-dividend_yield * days_to_expiry)
-    _d1 = d1(market_price, strike_price, days_to_expiry,
+    years_to_expiry = days_to_expiry / 365
+    block_1 = market_price * math.e ** (-dividend_yield * years_to_expiry)
+    _d1 = d1(market_price, strike_price, years_to_expiry,
              volatility, risk_free, dividend_yield)
-    return block_1 * math.sqrt(days_to_expiry) * snd(_d1)
+    return block_1 * math.sqrt(years_to_expiry) * snd(_d1)
 
 
 def calc_option_rho(market_price, strike_price, days_to_expiry, volatility,
                     risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
-    block_1 = strike_price * math.e ** (-risk_free * days_to_expiry) * days_to_expiry
-    _d1 = d1(market_price, strike_price, days_to_expiry,
+    years_to_expiry = days_to_expiry / 365
+    block_1 = strike_price * math.e ** (-risk_free * years_to_expiry) * years_to_expiry
+    _d1 = d1(market_price, strike_price, years_to_expiry,
              volatility, risk_free, dividend_yield)
-    _d2 = option_type * (_d1 - volatility * math.sqrt(days_to_expiry))
+    _d2 = option_type * (_d1 - volatility * math.sqrt(years_to_expiry))
     return option_type * block_1 * csn(_d2)
 
 
 def calc_option_theta(market_price, strike_price, days_to_expiry, volatility,
                       risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
-    _d1 = d1(market_price, strike_price, days_to_expiry,
+    years_to_expiry = days_to_expiry / 365
+    _d1 = d1(market_price, strike_price, years_to_expiry,
              volatility, risk_free, dividend_yield)
-    block_1 = market_price * math.e ** (-dividend_yield * days_to_expiry) * csn(option_type * _d1)
-    block_2 = strike_price * math.e ** (-risk_free * days_to_expiry) * risk_free
-    blocK_3 = market_price * math.e ** (-dividend_yield * days_to_expiry)
-    blocK_3 *= volatility / (2 * math.sqrt(days_to_expiry)) * snd(_d1)
+    block_1 = market_price * math.e ** (-dividend_yield * years_to_expiry) * csn(option_type * _d1)
+    block_2 = strike_price * math.e ** (-risk_free * years_to_expiry) * risk_free
+    blocK_3 = market_price * math.e ** (-dividend_yield * years_to_expiry)
+    blocK_3 *= volatility / (2 * math.sqrt(years_to_expiry)) * snd(_d1)
     return option_type * (block_1 - block_2) - blocK_3
 
 
@@ -922,6 +928,6 @@ def run_tests():
     top_movers(market='DOW')
 
 
-ALL_STOCKS = get_tickers('ALL')
+# ALL_STOCKS = get_tickers('ALL')
 if __name__ == '__main__':
     run_tests()
