@@ -3,7 +3,7 @@ discord.py[voice]
 GitPython
 isodate~=0.6.0
 mutagen
-pymongo>=3.11,<4.0.0
+pymongo~=3.11
 PyNaCl
 requests
 simplejson
@@ -14,7 +14,6 @@ lxml
 fuzzywuzzy~=0.18.0
 python-Levenshtein
 pandas~=1.0.1
-requests~=2.22.0
 beautifulsoup4~=4.8.1
 yahoo_fin
 requests_html
