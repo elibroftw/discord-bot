@@ -1820,7 +1820,7 @@ async def target_price(ctx, ticker: str):
     bot.loop.run_in_executor(None, _get_target_price)
 
 
-@bot.command(aliases=['f&g', 'fear-and-greed', 'fg'])
+@bot.command(aliases=['f&g', 'fear-and-greed', 'fg', 'g&f', 'greed_and_fear', 'gaf'])
 async def fear_and_greed(ctx):
     """
     Returns the fear and greed over time chart from CNN
