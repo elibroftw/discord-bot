@@ -165,7 +165,7 @@ def get_tsx_tickers() -> dict:
     for stock in r['results']:
         ticker = stock['symbol'] + '.TO'
         name = stock['name'].replace('Common Stock', '').strip()
-        tickers[ticker] = {'symbol': ticker, 'name': name}
+        tickers[ticker] = {'symbol': ticker, 'name': name, 'exchange': 'TSX'}
     return tickers
 
 
@@ -178,7 +178,7 @@ def get_nyse_arca_tickers() -> dict:
     tickers = {}
     for stock in r:
         ticker = stock['symbolTicker']
-        tickers[ticker] = {'symbol': ticker, 'name': stock['instrumentName']}
+        tickers[ticker] = {'symbol': ticker, 'name': stock['instrumentName'], 'exchange': 'NYSE'}
     return tickers
 
 
@@ -259,10 +259,6 @@ def get_company_name(ticker: str):
             best_match = process.extractOne(ticker, list(results.keys()))[0]
             return results[best_match]['name']
     raise ValueError('Something went wrong')
-
-
-def parse_wsj_api_summary(summary):
-    pass
 
 
 def get_ticker_info(query: str, round_values=True):
