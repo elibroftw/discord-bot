@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.31
+Version: 1.34
 Created: April 3rd 2020
 Updated: February 24th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -330,25 +330,25 @@ def get_ticker_info(query: str, round_values=True):
 
     name = quote_data['Instrument']['CommonName']
     previous_close = financials['Previous']['Price']['Value']
-    latest_price = closing_price = quote_data['Trading']['Last']['Price']['Value']
+    latest_price = closing_price = quote_data['CompositeTrading']['Last']['Price']['Value']
     try:
-        latest_price = quote_data['BeforeHoursTrading']['Price']['Value']
+        latest_price = quote_data['CompositeBeforeHoursTrading']['Price']['Value']
     except TypeError:
         try:
-            latest_price = quote_data['AfterHoursTrading']['Price']['Value']
+            latest_price = quote_data['CompositeAfterHoursTrading']['Price']['Value']
         except TypeError:
             closing_price = previous_close
     volume = quote_data['Trading']['Volume']
     market_state = data['quote']['marketState'].get('CurrentState', 'Open')
     extended_hours = market_state in {'After-Market', 'Closed', 'Pre-Market'}
     if market_state in {'After-Market', 'Closed'}:
-        timestamp = quote_data['AfterHoursTrading']['Time']
+        timestamp = quote_data['CompositeAfterHoursTrading']['Time']
     elif market_state == 'Pre-Market':
-        timestamp = quote_data['BeforeHoursTrading']['Time']
+        timestamp = quote_data['CompositeBeforeHoursTrading']['Time']
     else:
-        timestamp = quote_data['Trading']['Last']['Time']
-    timestamp = int(timestamp.split('(', 1)[1].split('+', 1)[0])
-    timestamp = datetime.fromtimestamp(timestamp / 1e3, tz=timezone('GMT'))
+        timestamp = quote_data['CompositeTrading']['Last']['Time']
+    timestamp = int(timestamp.split('(', 1)[1].split('+', 1)[0]) / 1e3
+    timestamp = datetime.utcfromtimestamp(timestamp).astimezone(timezone('US/Eastern'))
 
     change = closing_price - previous_close
     change_percent = change / previous_close * 100
