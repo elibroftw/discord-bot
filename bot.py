@@ -410,7 +410,7 @@ async def search_twitter_user(ctx):
 
 @bot.command(aliases=['yt'])
 async def youtube(ctx):
-    try: url = youtube_search(' '.join(ctx.message.content.split()[1:]))
+    try: url = await youtube_search(' '.join(ctx.message.content.split()[1:]))
     except IndexError: url = 'No Video Found'
     await ctx.send(url)
 
@@ -793,7 +793,7 @@ async def play(ctx):
             from_soundcloud = True
             title = video_id = normalize_url(url_or_query)
         elif 'spotify.com' in url_or_query:
-            tracks = spotify_to_youtube(url_or_query)
+            tracks = await spotify_to_youtube(url_or_query)
             if not tracks:
                 # illegal Spotify link or empty playlist / album
                 return await ctx.send('ERROR: No tracks found with for that Spotify link')
@@ -805,7 +805,9 @@ async def play(ctx):
                 if len(tracks) == len(mq): await play_file(ctx)
                 return
         else:
-            try: title, video_id = youtube_search(url_or_query, return_info=True, limit_duration=True)[1:]
+            try:
+                result = await youtube_search(url_or_query, return_info=True, limit_duration=True)
+                title, video_id = result[1:]
             except (ValueError, IndexError):
                 return await ctx.send(f'No valid video found with query `{url_or_query}`')
         track = Track(title, video_id, from_soundcloud=from_soundcloud)
