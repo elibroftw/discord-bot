@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.30
+Version: 1.31
 Created: April 3rd 2020
-Updated: February 23rd 2021
+Updated: February 24th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -13,10 +13,13 @@ Black-Scholes formulas:
     https://quantpie.co.uk/bsm_formula/bs_summary.php
 Volatility (Standard Deviation) of a stock:
     https://tinytrader.io/how-to-calculate-historical-price-volatility-with-python/
+Concurrent Futures:
+    https://docs.python.org/3/library/concurrent.futures.html
 """
 
 from contextlib import suppress
 import csv
+import concurrent.futures
 from datetime import datetime, timedelta
 import math
 from statistics import NormalDist
@@ -39,7 +42,6 @@ from functools import lru_cache, wraps
 import time
 import re
 import feedparser
-import asyncio
 
 
 def time_cache(max_age, maxsize=128, typed=False):
@@ -80,7 +82,6 @@ GENERIC_HEADERS = {
 
 
 # noinspection PyShadowingNames
-@time_cache(24 * 3600)  # cache request for a full day
 def make_request(url, method='GET', headers=None, json=None):
     if headers is None:
         headers = GENERIC_HEADERS
@@ -92,6 +93,7 @@ def make_request(url, method='GET', headers=None, json=None):
         raise ValueError(f'Invalid method {method}')
 
 
+@time_cache(24 * 3600, maxsize=1)
 def get_dow_tickers() -> dict:
     resp = make_request(DOW_URL)
     soup = BeautifulSoup(resp.text, 'html.parser')
@@ -137,21 +139,25 @@ def clean_stock_info(info):
     return info
 
 
+@time_cache(24 * 3600, maxsize=1)
 def get_nasdaq_tickers() -> dict:
     r = make_request(NASDAQ_TICKERS_URL).json()
     return {stock['symbol']: clean_stock_info(stock) for stock in r['data']['rows']}
 
 
+@time_cache(24 * 3600, maxsize=1)
 def get_nyse_tickers() -> dict:
     r = make_request(NYSE_TICKERS_URL).json()
     return {stock['symbol']: clean_stock_info(stock) for stock in r['data']['rows']}
 
 
+@time_cache(24 * 3600, maxsize=1)
 def get_amex_tickers() -> dict:
     r = make_request(AMEX_TICKERS_URL).json()
     return {stock['symbol']: clean_stock_info(stock) for stock in r['data']['rows']}
 
 
+@time_cache(24 * 3600, maxsize=1)
 def get_tsx_tickers() -> dict:
     url = 'https://www.tsx.com/json/company-directory/search/tsx/^*'
     r = make_request(url).json()
@@ -163,6 +169,7 @@ def get_tsx_tickers() -> dict:
     return tickers
 
 
+@time_cache(24 * 3600, maxsize=1)
 def get_nyse_arca_tickers() -> dict:
     post_data = {'instrumentType': 'EXCHANGE_TRADED_FUND', 'pageNumber': 1, 'sortColumn': 'NORMALIZED_TICKER',
                  'sortOrder': 'ASC', 'maxResultsPerPage': 5000, 'filterToken': ''}
@@ -176,8 +183,7 @@ def get_nyse_arca_tickers() -> dict:
 
 
 # can cache this since info rarely changes
-# best to actually use a 24 hour timed cache
-@lru_cache(maxsize=100)
+@time_cache(24 * 3600, maxsize=100)
 def get_tickers(category) -> dict:
     """
     OPTIONS: ALL, US, NYSE, NASDAQ, SP500, DOW, TSX,
@@ -255,7 +261,11 @@ def get_company_name(ticker: str):
     raise ValueError('Something went wrong')
 
 
-def get_ticker_info(ticker: str, round_values=True):
+def parse_wsj_api_summary(summary):
+    pass
+
+
+def get_ticker_info(query: str, round_values=True):
     """
     Uses WSJ instead of yfinance to get stock info summary
     Sample Return:
@@ -278,7 +288,7 @@ def get_ticker_info(ticker: str, round_values=True):
      'timestamp': datetime.datetime(2021, 2, 23, 19, 59, 49, 906000, tzinfo=<StaticTzInfo 'GMT'>),
      'volume': 4531464}
     """
-    ticker = clean_ticker(ticker)
+    ticker = clean_ticker(query)
     country_code = 'CA' if '.TO' in ticker else 'US'
     ticker = ticker.replace('.TO', '')  # remove exchange
     query = {
@@ -286,14 +296,18 @@ def get_ticker_info(ticker: str, round_values=True):
         'countryCode': country_code,
         'path': ticker
     }
-    query = json.dumps(query, separators=(',', ':'))
+    api_query = json.dumps(query, separators=(',', ':'))
 
     source = f'https://www.wsj.com/market-data/quotes/{country_code}/{ticker}'
-    api_url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={query}&type=quotes_chart'
+    api_url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={api_query}&type=quotes_chart'
     r = make_request(api_url)
 
     if not r.ok:
-        raise ValueError(f'Invalid ticker "{ticker}"')
+        try:
+            ticker = find_stock(query)[0][0]
+            return get_ticker_info(ticker)
+        except IndexError:
+            raise ValueError(f'Invalid ticker "{query}"')
 
     data = r.json()['data']
     quote_data = data['quoteData']
@@ -316,16 +330,14 @@ def get_ticker_info(ticker: str, round_values=True):
 
     name = quote_data['Instrument']['CommonName']
     previous_close = financials['Previous']['Price']['Value']
-    closing_price = quote_data['Trading']['Last']['Price']['Value']
-    # TODO: test during market hours
+    latest_price = closing_price = quote_data['Trading']['Last']['Price']['Value']
     try:
         latest_price = quote_data['BeforeHoursTrading']['Price']['Value']
     except TypeError:
         try:
             latest_price = quote_data['AfterHoursTrading']['Price']['Value']
         except TypeError:
-            # e.g. no after-market price exists because security trades on TSX
-            latest_price = closing_price
+            closing_price = previous_close
     volume = quote_data['Trading']['Volume']
     market_state = data['quote']['marketState'].get('CurrentState', 'Open')
     extended_hours = market_state in {'After-Market', 'Closed', 'Pre-Market'}
@@ -500,7 +512,7 @@ async def async_get_ticker_info(ticker: str, round_values=True) -> dict:
         else: return get_ticker_info(results[0][0], round_values)
 
 
-async def get_ticker_infos(tickers, round_values=True, errors_as_str=False) -> tuple:
+async def get_ticker_infos_old(tickers, round_values=True, errors_as_str=False) -> tuple:
     """
     returns: list[dict], list
     """
@@ -514,11 +526,28 @@ async def get_ticker_infos(tickers, round_values=True, errors_as_str=False) -> t
     return ticker_infos, tickers_not_found
 
 
+def get_ticker_infos(tickers, round_values=True, errors_as_str=False) -> tuple:
+    """
+    returns: list[dict], list
+    uses a threadPoolExecutor instead of asyncio
+    """
+    ticker_infos = []
+    tickers_not_found = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=35) as executor:
+        future_to_info = [executor.submit(get_ticker_info, ticker, round_values=round_values) for ticker in tickers]
+        for future in concurrent.futures.as_completed(future_to_info):
+            try:
+                ticker_infos.append(future.result())
+            except ValueError as e:
+                tickers_not_found.append(str(e) if errors_as_str else e)
+    return ticker_infos, tickers_not_found
+
+
 def get_data(tickers: Iterator, start_date=None, end_date=None, period='3mo', group_by='ticker', interval='1d',
              show_progress=True):
     # http://www.datasciencemadesimple.com/union-and-union-all-in-pandas-dataframe-in-python-2/
     # new format
-    _key = ' '.join(tickers) + f' {start_date} {end_date} {period} {group_by}'
+    # _key = ' '.join(tickers) + f' {start_date} {end_date} {period} {group_by}'
     _data = yf.download(tickers, start_date, end_date, period=period, group_by=group_by, threads=3,
                         progress=show_progress, interval=interval)
     return _data
@@ -759,12 +788,7 @@ def get_target_price(ticker):
 
 
 def sort_by_dividend(tickers):
-    coroutine = get_ticker_infos(tickers)
-    try:
-        ticker_infos = asyncio.run(coroutine)[0]
-    except RuntimeError:
-        current_loop = asyncio.get_event_loop()
-        ticker_infos = asyncio.run_coroutine_threadsafe(coroutine, current_loop).result()[0]
+    ticker_infos = get_ticker_infos(tickers)[0]
     ticker_infos.sort(key=lambda v: v['dividend_yield'], reverse=True)
     return ticker_infos
 
@@ -817,12 +841,7 @@ def price_to_earnings(ticker):
 
 
 def sort_by_volume(tickers):
-    coroutine = get_ticker_infos(tickers)
-    try:
-        ticker_infos, _ = asyncio.run(coroutine)
-    except RuntimeError:
-        current_loop = asyncio.get_event_loop()
-        ticker_infos, _ = asyncio.run_coroutine_threadsafe(coroutine, current_loop).result()
+    ticker_infos = get_ticker_infos(tickers)[0]
     ticker_infos.sort(key=lambda v: v['volume'], reverse=True)
     return ticker_infos
 
@@ -1087,7 +1106,7 @@ def run_tests():
     assert get_company_name('NVDA') == 'NVIDIA Corporation'
     print('Getting 10 Random Stocks')
     pprint(get_random_stocks(10))
-    print('Testing get ticker info (non-async methods)')
+    print('Testing get ticker info')
     for ticker in ('RTX', 'PLTR', 'OVV.TO', 'SHOP.TO', 'AMD', 'CCIV'):
         # dividend, non-dividend, ca-dividend, ca-non-dividend, old
         get_ticker_info(ticker)
@@ -1109,7 +1128,7 @@ def run_tests():
     for ticker in tickers:
         assert find_stock(ticker)
     assert not find_stock('this should fail')
-    tickers_info, errors = asyncio.run(get_ticker_infos(tickers))
+    tickers_info, errors = get_ticker_infos(tickers)
     assert tickers_info and not errors
     print('Testing sort tickers by dividend yield')
     sort_by_dividend(get_dow_tickers())

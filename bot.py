@@ -1493,7 +1493,7 @@ async def ticker_info(ctx, *tickers):
         to_dm, author = len(tickers) > 5, ctx.author
         msg = f'Getting stock info for: {", ".join(tickers)}'
         m = run_coroutine(author.send(msg) if to_dm else ctx.send(msg))
-        ticker_infos, errors = run_coroutine(get_ticker_infos(tickers, errors_as_str=True))
+        ticker_infos, errors = get_ticker_infos(tickers, errors_as_str=True)
         if errors:
             embed = discord.Embed(title=f'Error(s) ({len(errors)})', description='\n'.join(errors))
             run_coroutine(m.edit(content='', embed=embed))
