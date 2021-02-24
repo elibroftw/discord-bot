@@ -283,7 +283,7 @@ def get_ticker_info(query: str, round_values=True):
      'name': 'International Business Machines Corp.',
      'previous_close_price': 120.86,
      'price': 120.7,
-     'source': 'https://www.wsj.com/market-data/quotes/US/IBM',
+     'source': 'https://www.marketwatch.com/investing/stock/IBM?countrycode=US',
      'symbol': 'IBM',
      'timestamp': datetime.datetime(2021, 2, 23, 19, 59, 49, 906000, tzinfo=<StaticTzInfo 'GMT'>),
      'volume': 4531464}
@@ -298,8 +298,7 @@ def get_ticker_info(query: str, round_values=True):
     }
     api_query = json.dumps(query, separators=(',', ':'))
 
-    source = f'https://www.wsj.com/market-data/quotes/{country_code}/{ticker}'
-    source = f'https://accounts.wsj.com/login?target={source}'
+    source = f'https://www.marketwatch.com/investing/stock/{ticker}?countrycode={country_code}'
     api_url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={api_query}&type=quotes_chart'
     r = make_request(api_url)
 
