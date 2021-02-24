@@ -299,6 +299,7 @@ def get_ticker_info(query: str, round_values=True):
     api_query = json.dumps(query, separators=(',', ':'))
 
     source = f'https://www.wsj.com/market-data/quotes/{country_code}/{ticker}'
+    source = f'https://accounts.wsj.com/login?target={source}'
     api_url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={api_query}&type=quotes_chart'
     r = make_request(api_url)
 
@@ -371,7 +372,7 @@ def get_ticker_info(query: str, round_values=True):
 
     return_info = {
         'name': name,
-        'symbol': ticker,
+        'symbol': ticker + ('.TO' if country_code == 'CA' else ''),
         'volume': volume,
         'eps_ttm': eps_ttm,
         'dividend_yield': dividend_yield,
