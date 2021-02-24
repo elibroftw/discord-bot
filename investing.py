@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.28
+Version: 1.30
 Created: April 3rd 2020
 Updated: February 23rd 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -29,7 +29,7 @@ from fuzzywuzzy import process
 import random
 import requests
 import json
-# import grequests
+import aiohttp
 import yfinance as yf
 from yahoo_fin import stock_info
 from enum import IntEnum
@@ -255,10 +255,28 @@ def get_company_name(ticker: str):
     raise ValueError('Something went wrong')
 
 
-def get_ticker_info_v3(ticker: str, round_values=True):
+def get_ticker_info(ticker: str, round_values=True):
     """
     Uses WSJ instead of yfinance to get stock info summary
-    Currently 1 second faster
+    Sample Return:
+    {'annualized_dividend': 6.52,
+     'api_url': 'https://www.wsj.com/market-data/quotes/IBM?id={"ticker":"IBM","countryCode":"CA","path":"IBM"}&type=quotes_chart',
+     'change': -0.15,
+     'change_percent': -0.12,
+     'close_price': 120.71,
+     'dividend_yield': 5.40,
+     'eps_ttm': 6.24,
+     'extended_hours': True,
+     'last_dividend': 1.63,
+     'latest_change': -0.01,
+     'latest_change_percent': -0.01,
+     'name': 'International Business Machines Corp.',
+     'previous_close_price': 120.86,
+     'price': 120.7,
+     'source': 'https://www.wsj.com/market-data/quotes/US/IBM',
+     'symbol': 'IBM',
+     'timestamp': datetime.datetime(2021, 2, 23, 19, 59, 49, 906000, tzinfo=<StaticTzInfo 'GMT'>),
+     'volume': 4531464}
     """
     ticker = clean_ticker(ticker)
     country_code = 'CA' if '.TO' in ticker else 'US'
@@ -269,8 +287,10 @@ def get_ticker_info_v3(ticker: str, round_values=True):
         'path': ticker
     }
     query = json.dumps(query, separators=(',', ':'))
-    url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={query}&type=quotes_chart'
-    r = make_request(url)
+
+    source = f'https://www.wsj.com/market-data/quotes/{country_code}/{ticker}'
+    api_url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={query}&type=quotes_chart'
+    r = make_request(api_url)
 
     if not r.ok:
         raise ValueError(f'Invalid ticker "{ticker}"')
@@ -317,7 +337,6 @@ def get_ticker_info_v3(ticker: str, round_values=True):
         timestamp = quote_data['Trading']['Last']['Time']
     timestamp = int(timestamp.split('(', 1)[1].split('+', 1)[0])
     timestamp = datetime.fromtimestamp(timestamp / 1e3, tz=timezone('GMT'))
-    timestamp = timestamp.astimezone(tz=timezone('America/New_York'))
 
     change = closing_price - previous_close
     change_percent = change / previous_close * 100
@@ -334,7 +353,7 @@ def get_ticker_info_v3(ticker: str, round_values=True):
         latest_change = round(latest_change, 2)
         latest_change_percent = round(latest_change_percent, 2)
 
-        dividend_yield = round(dividend_yield, 4)
+        dividend_yield = round(dividend_yield, 2)
         last_dividend = round(last_dividend, 2)
         eps_ttm = round(eps_ttm, 2)
 
@@ -354,14 +373,16 @@ def get_ticker_info_v3(ticker: str, round_values=True):
         'latest_change': latest_change,
         'latest_change_percent': latest_change_percent,
         'extended_hours': extended_hours,
-        'timestamp': timestamp
+        'timestamp': timestamp,
+        'source': source,
+        'api_url': api_url
     }
     return return_info
 
 
 # noinspection PyUnboundLocalVariable
 @time_cache(30)  # cache for 30 seconds
-def get_ticker_info(ticker: str, round_values=True, use_nasdaq=False) -> dict:
+def get_ticker_info_old(ticker: str, round_values=True, use_nasdaq=False) -> dict:
     """
     Raises ValueError
     Sometimes the dividend yield is incorrect
@@ -467,28 +488,25 @@ def get_ticker_info(ticker: str, round_values=True, use_nasdaq=False) -> dict:
     return return_info
 
 
-async def async_get_ticker_info(ticker: str, round_values=True, use_alternative=False) -> dict:
+async def async_get_ticker_info(ticker: str, round_values=True) -> dict:
     """
     Throws ValueError
     """
     try:
-        if use_alternative:
-            return get_ticker_info_v3(ticker, round_values=round_values)
-        else:
-            return get_ticker_info(ticker, round_values=round_values)
+        return get_ticker_info(ticker, round_values=round_values)
     except ValueError as e:
         results = find_stock(ticker)
         if not results: raise e
         else: return get_ticker_info(results[0][0], round_values)
 
 
-async def get_ticker_infos(tickers, round_values=True, use_alternative=False, errors_as_str=False) -> tuple:
+async def get_ticker_infos(tickers, round_values=True, errors_as_str=False) -> tuple:
     """
     returns: list[dict], list
     """
     ticker_infos = []
     tickers_not_found = []
-    for coroutine in map(lambda t: async_get_ticker_info(t, round_values, use_alternative=use_alternative), tickers):
+    for coroutine in map(lambda t: async_get_ticker_info(t, round_values), tickers):
         try:
             ticker_infos.append(await coroutine)
         except ValueError as e:
@@ -558,6 +576,7 @@ def get_parsed_data(_data=None, tickers: list = None, market='ALL', sort_key='Pe
             if not math.isnan(info['Start']):
                 parsed_info[ticker] = info
     elif of in {'day', '1d'}:
+        # TODO: use get_ticker_info instead
         # ALWAYS USE LATEST DATA
         _data = get_data(tickers, period='5d', interval='1m')
         market_day = _data.last_valid_index().date() == todays_date
@@ -740,12 +759,12 @@ def get_target_price(ticker):
 
 
 def sort_by_dividend(tickers):
-    coroutine = get_ticker_infos(tickers, use_alternative=True)
+    coroutine = get_ticker_infos(tickers)
     try:
-        ticker_infos, _ = asyncio.run(coroutine)
+        ticker_infos = asyncio.run(coroutine)[0]
     except RuntimeError:
         current_loop = asyncio.get_event_loop()
-        ticker_infos, _ = asyncio.run_coroutine_threadsafe(coroutine, current_loop).result()
+        ticker_infos = asyncio.run_coroutine_threadsafe(coroutine, current_loop).result()[0]
     ticker_infos.sort(key=lambda v: v['dividend_yield'], reverse=True)
     return ticker_infos
 
@@ -758,7 +777,6 @@ def sort_by_pe(tickers, output_to_csv='', console_output=True):
     :param console_output:
     :return:
     """
-    # TODO: use grequests
     pes = []
     for ticker in tickers:
         with suppress(ValueError):
@@ -799,7 +817,7 @@ def price_to_earnings(ticker):
 
 
 def sort_by_volume(tickers):
-    coroutine = get_ticker_infos(tickers, use_alternative=True)
+    coroutine = get_ticker_infos(tickers)
     try:
         ticker_infos, _ = asyncio.run(coroutine)
     except RuntimeError:
@@ -1073,15 +1091,9 @@ def run_tests():
     for ticker in ('RTX', 'PLTR', 'OVV.TO', 'SHOP.TO', 'AMD', 'CCIV'):
         # dividend, non-dividend, ca-dividend, ca-non-dividend, old
         get_ticker_info(ticker)
-        get_ticker_info(ticker, use_nasdaq=True)
-        get_ticker_info_v3(ticker)
     # test invalid ticker
     with suppress(ValueError):
         get_ticker_info('ZWC')
-    with suppress(ValueError):
-        get_ticker_info('ZWC', use_nasdaq=True)
-    with suppress(ValueError):
-        get_ticker_info_v3('ZWC')
     # test get target prices
     get_target_price('DOC')
     sample_target_prices = get_target_price('DOC')
@@ -1099,8 +1111,8 @@ def run_tests():
     assert not find_stock('this should fail')
     tickers_info, errors = asyncio.run(get_ticker_infos(tickers))
     assert tickers_info and not errors
-    print('Testing tickers by pe')
-    sort_by_pe(get_dow_tickers())
+    print('Testing sort tickers by dividend yield')
+    sort_by_dividend(get_dow_tickers())
     print('Testing top movers')
     top_movers(market='DOW')
 

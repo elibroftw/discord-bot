@@ -100,6 +100,16 @@ class Track:
         self.length = 'DOWNLOADING'
         self.from_soundcloud = from_soundcloud
 
+    @staticmethod
+    def from_dict(dict_obj):
+        return Track(dict_obj['title'], dict_obj['video_id'],
+                     from_soundcloud=dict_obj['from_soundcloud'],
+                     time_stamp=dict_obj['time_stamp'])
+
+    def to_dict(self):
+        return {'title': self.title, 'video_id': self._video_id, 'status': self.status,
+                'time_stamp': self.get_time_stamp(), 'from_soundcloud': self.from_soundcloud}
+
     def __hash__(self):
         return hash(self._video_id)
 
@@ -184,11 +194,6 @@ class Track:
 
     def get_video_id(self):
         return self._video_id
-
-    def to_dict(self):
-        return {'title': self.title, 'video_id': self._video_id, 'status': self.status,
-                'time_stamp': self.get_time_stamp()}
-
 
 YT_API_URL = 'https://www.googleapis.com/youtube/v3/'
 GOOGLE_API = os.environ['google']
@@ -643,11 +648,15 @@ def remove_silence(input_file, output_file):
     os.remove(input_file)
 
 
-if __name__ == '__main__':
+def run_tests():
+    """
+    Helper function tests
+    :return:
+    """
     print('running tests')
-    # tests go here
-    all_playlists = get_all_playlists()
-    playlists_from_search = get_all_playlists('chill trance')
+    # test database retrieval
+    get_all_playlists()
+    get_all_playlists('chill trance')
     # MUSIC RELATED TESTS
 
     # ZHU - Cold Blooded
@@ -687,3 +696,7 @@ if __name__ == '__main__':
     ytdl(bipolar_remix, '', verbose=True)
 
     print('ALL TESTS PASSED')
+
+
+if __name__ == '__main__':
+    run_tests()

@@ -1,5 +1,6 @@
 asyncio~=3.4.3
 discord.py[voice]
+aiohttp
 GitPython
 isodate~=0.6.0
 mutagen

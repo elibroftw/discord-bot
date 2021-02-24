@@ -40,7 +40,7 @@ For more info, view [bot.py](bot.py)
 - Shuffle (!shuffle)
 - Clear queue (!cq)
 - Play from Playlist (!pp <playlist_name/url> [--s])  // use --s for shuffle
-- Save to playlist (!sa <playlist_name>)
+- Save queue to playlist (!sq <playlist_name>)
 - View playlist (!vp <playlist_name/url>)  // use --2/3 for different scopes
 - Search playlists (!sp [--page 1] [--query query])  // alphabetically sorted
 - Load playlist (!lp <playlist_name/url>)  // adds tracks to current queue
@@ -51,7 +51,7 @@ For more info, view [bot.py](bot.py)
   - !v -20  # decrease volume by 20
   - !v +  # increase volume by 10
   - !v -  # decrease volume by 10
-- Leave Voice chat (!leave, !disconnect, !unsummon, !desummon, !dismiss)
+- Leave Voice chat (!leave, !dc)
 
 ### Investing
 - Get the prices of stock(s) (!stock <tickers>)

@@ -1,6 +1,4 @@
-import asyncio
 from copy import deepcopy
-from datetime import datetime
 import discord
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 from discord.ext import commands
@@ -10,7 +8,7 @@ from math import ceil
 from random import shuffle, randint
 import sys
 import argparse
-
+# helpers
 import tictactoe
 from helpers import *
 from investing import *
@@ -29,23 +27,16 @@ if parsed_args.restarted:
 
 try:
     os.remove('discord.log')
+except FileNotFoundError: pass
 except OSError:
     print(f'Bot is already running!')
     sys.exit()
-except FileNotFoundError: pass
-
-
-def positive_int(value):
-    ivalue = int(value)
-    if ivalue <= 0:
-        raise argparse.ArgumentTypeError(f'{value} is an invalid positive int value')
-    return ivalue
 
 
 # see search_playlists(ctx) for help messages
 search_playlists_parser = argparse.ArgumentParser(description='Search for playlists')
 search_playlists_parser.add_argument('--query', '-q', default=[], nargs='*')
-search_playlists_parser.add_argument('--page', '-p', default=1, type=positive_int)
+search_playlists_parser.add_argument('--page', '-p', default=1, type=int)
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -76,7 +67,7 @@ MOVERS_ETAS = {'DOW': '10 seconds', 'S&P500': '30 seconds', 'NASDAQ': '6 minutes
 
 LATEST_SORTED_INFO = {}  # last update, sorted_info list
 tic_tac_toe_data = {}
-data_dict = {'downloads': {}}
+data_dict: dict = {'downloads': {}}
 with suppress(FileExistsError): os.mkdir('music')
 
 
@@ -113,25 +104,23 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
     _save_dict = {'data_dict': {}}
     with suppress(FileNotFoundError, json.decoder.JSONDecodeError):
-        if os.path.exists('save.json'):
-            with open('save.json') as f:
-                _save_dict = json.load(f)
-    for guild_id, v in _save_dict['data_dict'].items():
+        with open('save.json') as save_file:
+            _save_dict = json.load(save_file)
+    for guild_id, guild_data in _save_dict['data'].items():
         if guild_id != 'downloads':
-            mq = v['music'] = [Track(s['title'], s['video_id'], time_stamp=s['time_stamp']) for s in v['music']]
-            v['done'] = [Track(s['title'], s['video_id'], time_stamp=s['time_stamp']) for s in v['done']]
-            # noinspection PyTypeChecker
-            data_dict[int(guild_id)] = v
-            vc_id = v['voice_channel']
+            mq = guild_data['music'] = [Track.from_dict(track) for track in guild_data['music']]
+            guild_data['done'] = [Track.from_dict(track) for track in guild_data['done']]
+            data_dict[int(guild_id)] = guild_data
+            vc_id = guild_data['voice_channel']
             if vc_id:
                 voice_channel = bot.get_channel(vc_id)
                 await voice_channel.connect()
-                tc = bot.get_channel(v['text_channel'])
-                if mq and tc is not None and not v['is_stopped']:
+                tc = bot.get_channel(guild_data['text_channel'])
+                if mq and tc is not None and not guild_data['is_stopped']:
                     print('Resuming playback')
                     m = await tc.send('Bot has been restarted, now resuming music', delete_after=3)
                     ctx = await bot.get_context(m)
-                    await play_file(ctx, v['music'][0].get_time_stamp())
+                    await play_file(ctx, guild_data['music'][0].get_time_stamp())
 
     for guild in bot.guilds:
         if guild.id not in data_dict:
@@ -183,18 +172,16 @@ async def about(ctx):
 
 
 def save_to_file():
-    save_dict = {'save_time': str(datetime.now()), 'data_dict': {}}
+    save_dict = {'save_time': str(datetime.now()), 'data': {}}
     for guild in bot.guilds:
         voice_client = guild.voice_client
         guild_data = deepcopy(data_dict.get(guild.id, {}))
         if voice_client: guild_data['voice_channel'] = voice_client.channel.id
         else: guild_data['voice_channel'] = None
-        mq = guild_data['music']
-        guild_data['music'] = [s.to_dict() for s in mq]
-        dq = guild_data['done']
-        guild_data['done'] = [s.to_dict() for s in dq]
-        # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
-        save_dict['data_dict'][guild.id] = guild_data
+        guild_data['music'] = [track.to_dict() for track in guild_data['music']]
+        guild_data['done'] = [track.to_dict() for track in guild_data['done']]
+        # guild_data['next_up'] = [track.to_dict() for track in next_up_queue]
+        save_dict['data'][guild.id] = guild_data
     try:
         with open('save.json', 'w') as fp:
             json.dump(save_dict, fp, indent=4)
@@ -242,7 +229,7 @@ async def restart(ctx, save_data=True):
                 no_after_play(data_dict[guild.id], voice_client)
                 await voice_client.disconnect()
         await bot.change_presence(activity=discord.Game('Restarting...'))
-        # guild_data['next_up'] = [s.to_dict() for s in next_up_queue]
+        # guild_data['next_up'] = [track.to_dict() for track in next_up_queue]
         if parsed_args.prod: subprocess.Popen('pythonw bot.py --prod --restarted')
         else: subprocess.Popen('python bot.py --restarted')
         await bot.logout()
@@ -270,28 +257,22 @@ async def clear(ctx, number: int = 1):
 @commands.check(in_guild)
 @commands.has_permissions(ban_members=True)
 @bot.command()
-async def ban(ctx):
+async def ban(ctx, *, user: discord.Member):
     author = ctx.author
-    args = ctx.message.content.split()[1:]
-    if args:
-        name = ' '.join(args)
-        user = discord.utils.get(ctx.guild.members, nick=name)
-        if not user:
-            user = discord.utils.get(ctx.guild.members, name=name)
 
-        if user:
-            def check_yn(waited_msg):
-                correct_prereqs = waited_msg.channel == ctx.channel and author == waited_msg.author
-                waited_msg = waited_msg.content.lower()
-                bool_value = waited_msg in ('y', 'ye', 'yes', 'n', 'no', 'na', 'nah')
-                return bool_value and correct_prereqs
+    def check_yn(waited_msg):
+        correct_prereqs = waited_msg.channel == ctx.channel and author == waited_msg.author
+        waited_msg = waited_msg.content.lower()
+        bool_value = waited_msg in ('y', 'ye', 'yes', 'n', 'no', 'na', 'nah')
+        return bool_value and correct_prereqs
 
-            await ctx.guild.ban(user)
-            await ctx.send(f'{user.mention} has been banished to the shadow realm.\nDo you want to undo the ban (Y/n)?')
-            user_msg = await bot.wait_for('message', check=check_yn, timeout=60)
-            if user_msg:
-                await ctx.guild.unban(user)
-                await ctx.send(f'{user.mention} has been unbanned')
+    await ctx.guild.ban(user)
+    m = await ctx.send(f'{user.mention} has been banished to the shadow realm.\nDo you want to undo the ban?')
+    user_msg = await bot.wait_for('message', check=check_yn, timeout=60)
+    await m.edit(content=f'{user.mention} has been banished to the shadow realm. Un-ban timed out')
+    if user_msg:
+        await ctx.guild.unban(user)
+        await ctx.send(f'{user.mention} has been unbanned')
 
 
 @bot.command(name='eval')
@@ -1100,9 +1081,9 @@ async def next_up(ctx, page=1):
     else: await ctx.send(embed=discord.Embed(title='Music Queue is empty', description='', color=BLUE))
 
 
-@bot.command(name='recently_played', aliases=['done_queue', 'dq', 'rp'])
+@bot.command(aliases=['done_queue', 'dq', 'rp'])
 @commands.check(in_guild)
-async def _recently_played(ctx, page=1):
+async def recently_played(ctx, page=1):
     # TODO: add reaction emoticons
     guild = ctx.guild
     dq = data_dict[guild.id]['done']
@@ -1169,7 +1150,7 @@ async def now_playing(ctx):
     if mq:
         track = mq[0]
         embed = discord.Embed(title=track.title, url=f'https://www.youtube.com/watch?v={track.get_video_id()}',
-                            description=track.get_time_stamp(True), color=0xff0000)
+                              description=track.get_time_stamp(True), color=0xff0000)
         embed.set_author(name='Now Playing')
         await ctx.send(embed=embed)
     else:
@@ -1177,15 +1158,15 @@ async def now_playing(ctx):
     # https://cog-creators.github.io/discord-embed-sandbox/
 
 
-@bot.command(aliases=['desummon', 'disconnect', 'unsummon', 'dismiss', 'd'])
+@bot.command(aliases=['disconnect', 'dismiss', 'dc'])
 @commands.check(in_guild)
-async def leave(ctx, clear_queue=False):
+async def leave(ctx, empty_queue=False):
     guild = ctx.guild
     voice_client: discord.VoiceClient = guild.voice_client
     if voice_client:
         await voice_client.disconnect()
         msg = 'Stopped playing music'
-        if clear_queue:
+        if empty_queue:
             guild_data = data_dict[guild.id]
             guild_data['music'].clear()
             guild_data['auto_play'] = False
@@ -1239,9 +1220,9 @@ async def volume(ctx):
         else: await ctx.send(f'{vc.source.volume * 100}%')
 
 
-@bot.command(aliases=['sa', 'spa', 'save-playlist', 'save_playlist', 'savep'])
+@bot.command(aliases=['sq', 'stp', 'save-queue', 'save-to-playlist'])
 @commands.check(in_guild)
-async def save_as(ctx):
+async def save_queue(ctx):
     playlist_name = ' '.join(ctx.message.content.split()[1:])
     if playlist_name:
         author_id = ctx.author.id
@@ -1263,9 +1244,7 @@ async def save_as(ctx):
 @bot.command(aliases=['pp', 'play-playlist'])
 @commands.check(in_guild)
 async def play_playlist(ctx):
-    split_content = ctx.message.content.split()
-    key_word = split_content[0]
-    playlist_name = ' '.join(split_content[1:])
+    playlist_name = ctx.message.content.split(maxsplit=1)[1]
     if playlist_name:
         guild_id = ctx.guild.id
         playlist_name = playlist_name.replace(' --s', '--s')
@@ -1321,12 +1300,8 @@ async def search_playlists(ctx):
         query = ' '.join(bp_args.query)
         all_playlists = sorted(get_all_playlists(query), key=lambda p: p['playlist_name'])
         max_pages = ceil(len(all_playlists) / 10)
-        page = bp_args.page
-        if page > max_pages: page = max_pages
+        page = min(max(-max_pages, bp_args.page), max_pages)
         playlists = all_playlists[10 * (page - 1): 10 * page]
-        members = bot.get_all_members()
-
-        # formatted_playlists = []
         msg = ''
         temp_creators = {}
         for playlist in playlists:
@@ -1491,8 +1466,7 @@ async def toggle_messages(ctx):
     user_id = ctx.author.id
     coll = dm_coll.find_one({'user_id': user_id, 'type': 'user_settings'})
     setting = True if coll is None else coll['allows_messages']
-    if setting: await ctx.invoke(bot.get_command('disable_messages'))
-    else:       await ctx.invoke(bot.get_command('enable_messages'))
+    await ctx.invoke(bot.get_command('disable_messages' if setting else 'enable_messages'))
 
 
 @bot.command(aliases=['anonstatus', 'anon-status'])
@@ -1547,8 +1521,7 @@ async def ticker_info(ctx, *tickers):
             ticker = info['symbol']
             if hour[0] == '0': hour = hour[1]
             timestamp = info['timestamp'].strftime(f'%B %d {hour}:%M%p %Z')
-            url = f'https://finance.yahoo.com/quote/{ticker}'
-            embed = discord.Embed(title=info['name'] + f' ({ticker})', color=embed_color, url=url)
+            embed = discord.Embed(title=info['name'] + f' ({ticker})', color=embed_color, url=info['source'])
             embed.set_footer(text=f'Last updated: {timestamp}')
             embed.add_field(name='Price', value=info['price'])
             embed.add_field(name='Change', value=latest_change_text)
@@ -1558,7 +1531,7 @@ async def ticker_info(ctx, *tickers):
     bot.loop.run_in_executor(None, _get_ticker_info)
 
 
-@bot.command(aliases=['find_stock', 'find-stock', 'fs', 'search-stock', 'find-ticker', 'find_ticker', 'fticker', 'fstock'])
+@bot.command(aliases=['find_stock', 'find-stock', 'fs', 'search-stock', 'find-ticker', 'find_ticker'])
 async def search_stock(ctx, *query):
     stock_results = find_stock(query)
     if not stock_results:
@@ -1716,7 +1689,6 @@ async def command_winners(ctx, market='ALL', of='day', show=5, sorted_info: list
         nonlocal market, show, sorted_info
         market = market.upper()
         eta = MOVERS_ETAS.get(market, '?')
-        start_time = time.time()
         if sorted_info is None:
             m = run_coroutine(ctx.send(f'Calculating Top Winners for {market} (ETA. {eta})'))
             sorted_info = get_latest_sorted_info(of, market)
@@ -1825,7 +1797,30 @@ async def fear_and_greed(ctx):
     """
     Returns the fear and greed over time chart from CNN
     """
-    await ctx.send('http://markets.money.cnn.com/Marketsdata/Api/Chart/FearGreedHistoricalImage?chartType=AvgPtileModel')
+    cnn_gf_url = 'http://markets.money.cnn.com/Marketsdata/Api/Chart/FearGreedHistoricalImage?chartType=AvgPtileModel'
+    await ctx.send(cnn_gf_url)
+
+
+@bot.command(aliases=['yield_sort', 'sort_by_yield', 'yield-sort', 'sort-by-yield', 'sort_by_dividend'])
+async def sort_by_dividend_yield(ctx, *tickers):
+    def _sort_by_dividend():
+        if len(tickers) > 10:
+            m = run_coroutine(ctx.author.send('Getting dividend yields for tickers...'))
+        else:
+            m = run_coroutine(ctx.send('Getting dividend yields for tickers...'))
+        results = sort_by_dividend(tickers)
+        desc = ''
+        for i, info in enumerate(results):
+            ticker = info['symbol']
+            dividend_yield = info['dividend_yield']
+            dividend = info['annualized_dividend']
+            price = info['price']
+            source = info['source']
+            desc += f'\n[{ticker}]({source}) {dividend_yield}% ({dividend}) | ${price}'
+        title = 'Dividend Yield Sort'
+        embed = discord.Embed(title=title, color=STOCKS_GREEN, description=desc)
+        run_coroutine(m.edit(embed=embed, content=''))
+    bot.loop.run_in_executor(None, _sort_by_dividend)
 
 
 print('Backing up database')
