@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.34
+Version: 1.35
 Created: April 3rd 2020
 Updated: February 24th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -32,7 +32,6 @@ from fuzzywuzzy import process
 import random
 import requests
 import json
-import aiohttp
 import yfinance as yf
 from yahoo_fin import stock_info
 from enum import IntEnum
@@ -296,6 +295,8 @@ def get_ticker_info(query: str, round_values=True):
 
     source = f'https://www.marketwatch.com/investing/stock/{ticker}?countrycode={country_code}'
     api_url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={api_query}&type=quotes_chart'
+    if ticker in get_nyse_arca_tickers():
+        return get_ticker_info_old(ticker, round_values=True, use_nasdaq=True)
     r = make_request(api_url)
 
     if not r.ok:
@@ -530,8 +531,8 @@ def get_ticker_infos(tickers, round_values=True, errors_as_str=False) -> tuple:
     ticker_infos = []
     tickers_not_found = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=35) as executor:
-        future_to_info = [executor.submit(get_ticker_info, ticker, round_values=round_values) for ticker in tickers]
-        for future in concurrent.futures.as_completed(future_to_info):
+        future_infos = [executor.submit(get_ticker_info, ticker, round_values=round_values) for ticker in tickers]
+        for future in concurrent.futures.as_completed(future_infos):
             try:
                 ticker_infos.append(future.result())
             except ValueError as e:
