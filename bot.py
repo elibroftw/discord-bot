@@ -1775,15 +1775,15 @@ async def target_price(ctx, ticker: str):
         ticker = ticker.replace('$', '').upper()
         m = run_coroutine(ctx.send(f'Getting target prices for {ticker}'))
         try:
-            target_prices = get_target_price(ticker)
+            target_prices = get_target_prices(ticker)
             price, eps_ttm = target_prices['price'], target_prices['eps_ttm']
-            avg_target = target_prices['avg']
-            if price > avg_target: color = STOCKS_RED
-            elif price < avg_target: color = STOCKS_GREEN
+            median_target = target_prices['median']
+            if price > median_target: color = STOCKS_RED
+            elif price < median_target: color = STOCKS_GREEN
             else: color = STOCKS_YELLOW
             title = f'{ticker} Target Prices'
             embed = discord.Embed(title=title, color=color)
-            embed.add_field(name='Avg', value=avg_target)
+            embed.add_field(name='Median', value=median_target)
             embed.add_field(name='Low', value=target_prices['low'])
             embed.add_field(name='High', value=target_prices['high'])
             embed.add_field(name='Price', value=price)

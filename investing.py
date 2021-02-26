@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.35
+Version: 1.36
 Created: April 3rd 2020
-Updated: February 25th 2021
+Updated: February 26th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -22,7 +22,7 @@ import csv
 import concurrent.futures
 from datetime import datetime, timedelta
 import math
-from statistics import NormalDist
+from statistics import NormalDist, median
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 from typing import Iterator
@@ -69,9 +69,10 @@ def time_cache(max_age, maxsize=128, typed=False):
 NASDAQ_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nasdaq&download=true'
 NYSE_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nyse&download=true'
 AMEX_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=amex&download=true'
-PREMARKET_FUTURES = 'https://ca.investing.com/indices/indices-futures'
+PREMARKET_FUTURES_URL = 'https://ca.investing.com/indices/indices-futures'
 SP500_URL = 'http://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
 DOW_URL = 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average'
+TIP_RANKS_API = 'https://www.tipranks.com/api/stocks/'
 SORTED_INFO_CACHE = {}  # for when its past 4 PM
 GENERIC_HEADERS = {
     'accept': 'text/html,application/xhtml+xml',
@@ -769,33 +770,40 @@ def top_movers(_data=None, tickers=None, market='ALL', of='day', start_date=None
 
 
 @time_cache(3600)  # cache for 1 hour
-def get_target_price(ticker):
+def get_target_prices(ticker):
     """
     ticker: yahoo finance ticker
     returns: {'avg': float, 'low': float, 'high': float, 'price': float, 'eps_ttm': float}
     """
     try:
-        ticker = ticker.upper()
-        quarterly_eps = stock_info.get_earnings(ticker)['quarterly_results']['actual'][-4:]
-        quote_table = stock_info.get_quote_table(ticker)
-        eps_estimates = stock_info.get_analysts_info(ticker)[
-            'Earnings Estimate']
-        price = quote_table['Quote Price']
-        eps_ttm = sum(quarterly_eps)
-        # if EPS data DNE for 4 quarters, annualize out of the current ones
-        if len(quarterly_eps) < 4:
-            eps_ttm = quarterly_eps / len(quarterly_eps) * 4
-        iloc_levels = {1: 'avg', 2: 'low', 3: 'high'}
+        ticker = clean_ticker(ticker)
+        timestamp = datetime.now().timestamp()
+        query = f'{TIP_RANKS_API}getData/?name={ticker}&benchmark=1&period=3&break={timestamp}'
+        r = make_request(query).json()
+
+        total = 0
+        estimates = []
         target_prices = {
-            'price': round(price, 2),
-            'eps_ttm': round(eps_ttm, 2)
+            'symbol': ticker,
+            'high': 0,
+            'low': 100000,
         }
-        for iloc_level, level in iloc_levels.items():
-            forward_eps = eps_estimates.iloc[iloc_level, -1]  # next year eps
-            target_price = price * forward_eps / eps_ttm
-            target_prices[level] = round(target_price, 2)
+
+        estimates = []
+        for expert in r['experts']:
+            # NOTE: maybe ignore based on timestamp (e.g. last 3 months)?
+            target_price = expert['ratings'][0]['priceTarget']
+            if target_price:
+                if target_price > target_prices['high']: target_prices['high'] = target_price
+                elif target_price < target_prices['low']: target_prices['low'] = target_price
+                total += target_price
+                estimates.append(target_price)
+        target_prices['avg'] = total / len(estimates) if estimates else 0
+        target_prices['median'] = median(estimates)
+        target_prices['estimates'] = estimates
+        target_prices['total_estimates'] = len(estimates)
         return target_prices
-    except KeyError:
+    except json.JSONDecodeError:
         raise ValueError(f'Invalid ticker "{ticker}"')
 
 
@@ -1126,12 +1134,12 @@ def run_tests():
     with suppress(ValueError):
         get_ticker_info('ZWC')
     # test get target prices
-    get_target_price('DOC')
-    sample_target_prices = get_target_price('DOC')
+    get_target_prices('DOC')
+    sample_target_prices = get_target_prices('DOC')
     assert len(sample_target_prices) == 5
     assert isinstance(sample_target_prices, dict)
     with suppress(ValueError):
-        get_target_price('ZWC')
+        get_target_prices('ZWC')
     assert 0 < get_risk_free_interest_rate(0) < 1
     print('Testing find_stock')
     pprint(find_stock('entertainment'))
