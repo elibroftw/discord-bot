@@ -902,7 +902,7 @@ def find_stock(query):
         if len(query) == 1 and symbol == clean_ticker(tuple(query)[0]):
             match += len(query) ** 2
             parts_matched += 1
-        elif symbol in query:
+        elif symbol in query or ''.join(query) in symbol:
             match += len(symbol)
             parts_matched += 1
         for part in query:
