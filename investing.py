@@ -91,8 +91,7 @@ def make_request(url, method='GET', headers=None, json=None):
         return requests.get(url, headers=headers)
     elif method == 'POST':
         return requests.post(url, json=json, headers=headers)
-    else:
-        raise ValueError(f'Invalid method {method}')
+    raise ValueError(f'Invalid method {method}')
 
 
 @time_cache(24 * 3600, maxsize=1)
@@ -221,7 +220,7 @@ def get_tickers(category) -> dict:
     if category in {'TSX', 'TMX', 'CA', 'ALL'}:
         tickers.update(get_tsx_tickers())
     if category in {'OTC', 'OTCMKTS', 'ALL'}:
-        tickers.update(get_tsx_tickers())
+        tickers.update(get_otc_tickers())
     # Industries
     elif category == 'DEFENCE':
         defence_tickers = {'LMT', 'BA', 'NOC', 'GD', 'RTX', 'LDOS'}
@@ -526,32 +525,6 @@ def get_ticker_info_old(ticker: str, round_values=True, use_nasdaq=False) -> dic
         'timestamp': timestamp
     }
     return return_info
-
-
-async def async_get_ticker_info(ticker: str, round_values=True) -> dict:
-    """
-    Throws ValueError
-    """
-    try:
-        return get_ticker_info(ticker, round_values=round_values)
-    except ValueError as e:
-        results = find_stock(ticker)
-        if not results: raise e
-        else: return get_ticker_info(results[0][0], round_values)
-
-
-async def get_ticker_infos_old(tickers, round_values=True, errors_as_str=False) -> tuple:
-    """
-    returns: list[dict], list
-    """
-    ticker_infos = []
-    tickers_not_found = []
-    for coroutine in map(lambda t: async_get_ticker_info(t, round_values), tickers):
-        try:
-            ticker_infos.append(await coroutine)
-        except ValueError as e:
-            tickers_not_found.append(str(e) if errors_as_str else e)
-    return ticker_infos, tickers_not_found
 
 
 def get_ticker_infos(tickers, round_values=True, errors_as_str=False) -> tuple:
@@ -921,6 +894,7 @@ def find_stock(query):
         query = {part.upper() for part in query.split()}
     else:
         query = {part.upper() for part in query}
+
     for info in get_tickers('ALL').values():
         match, parts_matched = 0, 0
         company_name = info['name'].upper()
@@ -931,7 +905,6 @@ def find_stock(query):
         elif symbol in query:
             match += len(symbol)
             parts_matched += 1
-
         for part in query:
             occurrences = company_name.count(part)
             part_factor = occurrences * len(part)
