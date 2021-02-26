@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.36
+Version: 1.37
 Created: April 3rd 2020
 Updated: February 26th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -67,8 +67,10 @@ def time_cache(max_age, maxsize=128, typed=False):
 
 
 NASDAQ_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nasdaq&download=true'
+OTC_TICKERS_URK = 'https://www.otcmarkets.com/research/stock-screener/api?securityType=Common%20Stock&market=20,21,22,10,6,5,2,1&sortField=symbol&pageSize=100000'
 NYSE_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nyse&download=true'
 AMEX_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=amex&download=true'
+TSX_TICKERS_URL = 'https://www.tsx.com/json/company-directory/search/tsx/^*'
 PREMARKET_FUTURES_URL = 'https://ca.investing.com/indices/indices-futures'
 SP500_URL = 'http://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
 DOW_URL = 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average'
@@ -159,8 +161,7 @@ def get_amex_tickers() -> dict:
 
 @time_cache(24 * 3600, maxsize=1)
 def get_tsx_tickers() -> dict:
-    url = 'https://www.tsx.com/json/company-directory/search/tsx/^*'
-    r = make_request(url).json()
+    r = make_request(TSX_TICKERS_URL).json()
     tickers = {}
     for stock in r['results']:
         ticker = stock['symbol'] + '.TO'
@@ -179,6 +180,18 @@ def get_nyse_arca_tickers() -> dict:
     for stock in r:
         ticker = stock['symbolTicker']
         tickers[ticker] = {'symbol': ticker, 'name': stock['instrumentName'], 'exchange': 'NYSE'}
+    return tickers
+
+
+@time_cache(24 * 3600, maxsize=1)
+def get_otc_tickers() -> dict:
+    r = make_request(OTC_TICKERS_URK).text.strip('"').replace('\\"', '"')
+    r = json.loads(r)['stocks']
+    tickers = {}
+    for stock in r:
+        symbol = stock['symbol']
+        info = {'symbol': stock['symbol'], 'name': stock['securityName'], 'exchange': 'OTC'}
+        tickers[symbol] = info
     return tickers
 
 
@@ -206,6 +219,8 @@ def get_tickers(category) -> dict:
     if category in {'ARCA', 'NYSEARCA', 'US', 'ALL'}:
         tickers.update(get_nyse_arca_tickers())
     if category in {'TSX', 'TMX', 'CA', 'ALL'}:
+        tickers.update(get_tsx_tickers())
+    if category in {'OTC', 'OTCMKTS', 'ALL'}:
         tickers.update(get_tsx_tickers())
     # Industries
     elif category == 'DEFENCE':
@@ -1120,6 +1135,8 @@ def run_tests():
     assert get_nyse_arca_tickers()['SPY']['name'] == 'SPDR S&P 500 ETF TRUST'
     print('Getting TSX')
     assert 'SHOP.TO' in get_tsx_tickers()
+    print('Getting OTC')
+    assert get_otc_tickers()['HTZGQ']['name'] == 'HERTZ GLOBAL HOLDINGS INC'
     print('Getting FUTURES')
     get_index_futures()
     print('Testing get_company_name')
