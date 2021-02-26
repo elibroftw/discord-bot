@@ -3,7 +3,7 @@ Investing Quick Analytics
 Author: Elijah Lopez
 Version: 1.35
 Created: April 3rd 2020
-Updated: February 24th 2021
+Updated: February 25th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -265,7 +265,7 @@ def get_ticker_info(query: str, round_values=True):
     Uses WSJ instead of yfinance to get stock info summary
     Sample Return:
     {'annualized_dividend': 6.52,
-     'api_url': 'https://www.wsj.com/market-data/quotes/IBM?id={"ticker":"IBM","countryCode":"CA","path":"IBM"}&type=quotes_chart',
+     'api_url': 'https://www.wsj.com/market-data/quotes/IBM?id={"ticker":"IBM","countryCode":"US","path":"IBM"}&type=quotes_chart',
      'change': -0.15,
      'change_percent': -0.12,
      'close_price': 120.71,
@@ -295,8 +295,11 @@ def get_ticker_info(query: str, round_values=True):
 
     source = f'https://www.marketwatch.com/investing/stock/{ticker}?countrycode={country_code}'
     api_url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={api_query}&type=quotes_chart'
-    if ticker in get_nyse_arca_tickers():
-        return get_ticker_info_old(ticker, round_values=True, use_nasdaq=True)
+    is_etf = ticker in get_nyse_arca_tickers()
+    if is_etf:
+        ckey = 'cecc4267a0'
+        entitlement_token = 'cecc4267a0194af89ca343805a3e57af'
+        api_url = f'https://api.wsj.net/api/dylan/quotes/v2/comp/quoteByDialect?dialect=official&needed=Financials|CompositeTrading|CompositeBeforeHoursTrading|CompositeAfterHoursTrading&MaxInstrumentMatches=1&accept=application/json&EntitlementToken={entitlement_token}&ckey={ckey}&dialects=Charting&id=ExchangeTradedFund-US-{ticker}'
     r = make_request(api_url)
 
     if not r.ok:
@@ -306,8 +309,8 @@ def get_ticker_info(query: str, round_values=True):
         except IndexError:
             raise ValueError(f'Invalid ticker "{query}"')
 
-    data = r.json()['data']
-    quote_data = data['quoteData']
+    data = r.json() if is_etf else r.json()['data']
+    quote_data = data['InstrumentResponses'][0]['Matches'][0] if is_etf else data['quoteData']
     financials = quote_data['Financials']
     try:
         eps_ttm = financials['LastEarningsPerShare']['Value']
@@ -335,8 +338,16 @@ def get_ticker_info(query: str, round_values=True):
             latest_price = quote_data['CompositeAfterHoursTrading']['Price']['Value']
         except TypeError:
             closing_price = previous_close
-    volume = quote_data['Trading']['Volume']
-    market_state = data['quote']['marketState'].get('CurrentState', 'Open')
+    volume = quote_data['CompositeTrading']['Volume']
+    if is_etf:
+        if quote_data['CompositeBeforeHoursTrading']:
+            market_state = 'Pre-Market'
+        elif quote_data['CompositeAfterHoursTrading']:
+            market_state = 'After-Market' if quote_data['CompositeAfterHoursTrading']['IsRealtime'] else 'Closed'
+        else:
+            market_state = 'Open'
+    else:
+        market_state = data['quote']['marketState'].get('CurrentState', 'Open')
     extended_hours = market_state in {'After-Market', 'Closed', 'Pre-Market'}
     if market_state in {'After-Market', 'Closed'}:
         timestamp = quote_data['CompositeAfterHoursTrading']['Time']
@@ -344,8 +355,12 @@ def get_ticker_info(query: str, round_values=True):
         timestamp = quote_data['CompositeBeforeHoursTrading']['Time']
     else:
         timestamp = quote_data['CompositeTrading']['Last']['Time']
-    timestamp = int(timestamp.split('(', 1)[1].split('+', 1)[0]) / 1e3
-    timestamp = datetime.utcfromtimestamp(timestamp).astimezone(timezone('US/Eastern'))
+    try:
+        timestamp = int(timestamp.split('(', 1)[1].split('+', 1)[0]) / 1e3
+        timestamp = datetime.utcfromtimestamp(timestamp).astimezone(timezone('US/Eastern'))
+    except IndexError:
+        # time format is: 2021-02-25T18:52:44.677
+        timestamp = datetime.strptime(timestamp.rsplit('.', 1)[0], '%Y-%m-%dT%H:%M:%S')
 
     change = closing_price - previous_close
     change_percent = change / previous_close * 100
@@ -1104,7 +1119,7 @@ def run_tests():
     print('Getting 10 Random Stocks')
     pprint(get_random_stocks(10))
     print('Testing get ticker info')
-    for ticker in ('RTX', 'PLTR', 'OVV.TO', 'SHOP.TO', 'AMD', 'CCIV'):
+    for ticker in ('RTX', 'PLTR', 'OVV.TO', 'SHOP.TO', 'AMD', 'CCIV', 'SPY', 'VOO'):
         # dividend, non-dividend, ca-dividend, ca-non-dividend, old
         get_ticker_info(ticker)
     # test invalid ticker
