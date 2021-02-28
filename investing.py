@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.37
+Version: 1.38
 Created: April 3rd 2020
-Updated: February 26th 2021
+Updated: February 27th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -301,12 +301,12 @@ def get_ticker_info(query: str, round_values=True):
     ticker = clean_ticker(query)
     country_code = 'CA' if '.TO' in ticker else 'US'
     ticker = ticker.replace('.TO', '')  # remove exchange
-    query = {
+    api_query = {
         'ticker': ticker,
         'countryCode': country_code,
         'path': ticker
     }
-    api_query = json.dumps(query, separators=(',', ':'))
+    api_query = json.dumps(api_query, separators=(',', ':'))
 
     source = f'https://www.marketwatch.com/investing/stock/{ticker}?countrycode={country_code}'
     api_url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={api_query}&type=quotes_chart'
@@ -327,6 +327,7 @@ def get_ticker_info(query: str, round_values=True):
     data = r.json() if is_etf else r.json()['data']
     quote_data = data['InstrumentResponses'][0]['Matches'][0] if is_etf else data['quoteData']
     financials = quote_data['Financials']
+    market_cap = financials['MarketCapitalization']['Value']
     try:
         eps_ttm = financials['LastEarningsPerShare']['Value']
     except TypeError:
@@ -335,9 +336,9 @@ def get_ticker_info(query: str, round_values=True):
         last_dividend = financials['LastDividendPerShare']['Value']
     except TypeError:
         last_dividend = None
+
     dividend_yield = financials['Yield']
     annualized_dividend = financials['AnnualizedDividend']
-
     if annualized_dividend is None:
         dividend_yield = 0
         last_dividend = 0
@@ -364,9 +365,9 @@ def get_ticker_info(query: str, round_values=True):
     else:
         market_state = data['quote']['marketState'].get('CurrentState', 'Open')
     extended_hours = market_state in {'After-Market', 'Closed', 'Pre-Market'}
-    if market_state in {'After-Market', 'Closed'}:
+    if market_state in {'After-Market', 'Closed'} and quote_data['CompositeAfterHoursTrading']:
         timestamp = quote_data['CompositeAfterHoursTrading']['Time']
-    elif market_state == 'Pre-Market':
+    elif market_state == 'Pre-Market' and quote_data['CompositeBeforeHoursTrading']:
         timestamp = quote_data['CompositeBeforeHoursTrading']['Time']
     else:
         timestamp = quote_data['CompositeTrading']['Last']['Time']
@@ -405,6 +406,7 @@ def get_ticker_info(query: str, round_values=True):
         'last_dividend': last_dividend,
         'annualized_dividend': annualized_dividend,
         'price': latest_price,
+        'market_cap': market_cap,
         'close_price': closing_price,
         'previous_close_price': previous_close,
         'change': change,
