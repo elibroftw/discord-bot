@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.38
+Version: 1.41
 Created: April 3rd 2020
-Updated: February 27th 2021
+Updated: March 1st 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -22,7 +22,7 @@ import csv
 import concurrent.futures
 from datetime import datetime, timedelta
 import math
-from statistics import NormalDist, median
+from statistics import NormalDist, median, StatisticsError
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 from typing import Iterator
@@ -143,19 +143,31 @@ def clean_stock_info(info):
 @time_cache(24 * 3600, maxsize=1)
 def get_nasdaq_tickers() -> dict:
     r = make_request(NASDAQ_TICKERS_URL).json()
-    return {stock['symbol']: clean_stock_info(stock) for stock in r['data']['rows']}
+    tickers = {}
+    for stock in r['data']['rows']:
+        symbol = stock['symbol'].strip()
+        tickers[symbol] = {**clean_stock_info(stock), 'exchange': 'NASDAQ'}
+    return tickers
 
 
 @time_cache(24 * 3600, maxsize=1)
 def get_nyse_tickers() -> dict:
     r = make_request(NYSE_TICKERS_URL).json()
-    return {stock['symbol']: clean_stock_info(stock) for stock in r['data']['rows']}
+    tickers = {}
+    for stock in r['data']['rows']:
+        symbol = stock['symbol'].strip()
+        tickers[symbol] = {**clean_stock_info(stock), 'exchange': 'NYSE'}
+    return tickers
 
 
 @time_cache(24 * 3600, maxsize=1)
 def get_amex_tickers() -> dict:
     r = make_request(AMEX_TICKERS_URL).json()
-    return {stock['symbol']: clean_stock_info(stock) for stock in r['data']['rows']}
+    tickers = {}
+    for stock in r['data']['rows']:
+        symbol = stock['symbol'].strip()
+        tickers[symbol] = {**clean_stock_info(stock), 'exchange': 'AMEX'}
+    return tickers
 
 
 @time_cache(24 * 3600, maxsize=1)
@@ -163,7 +175,7 @@ def get_tsx_tickers() -> dict:
     r = make_request(TSX_TICKERS_URL).json()
     tickers = {}
     for stock in r['results']:
-        ticker = stock['symbol'] + '.TO'
+        ticker = stock['symbol'].strip() + '.TO'
         name = stock['name'].replace('Common Stock', '').strip()
         tickers[ticker] = {'symbol': ticker, 'name': name, 'exchange': 'TSX'}
     return tickers
@@ -177,8 +189,8 @@ def get_nyse_arca_tickers() -> dict:
                       json=post_data).json()
     tickers = {}
     for stock in r:
-        ticker = stock['symbolTicker']
-        tickers[ticker] = {'symbol': ticker, 'name': stock['instrumentName'], 'exchange': 'NYSE'}
+        symbol = stock['symbolTicker'].strip()
+        tickers[symbol] = {'symbol': symbol, 'name': stock['instrumentName'], 'exchange': 'NYSEARCA'}
     return tickers
 
 
@@ -188,7 +200,7 @@ def get_otc_tickers() -> dict:
     r = json.loads(r)['stocks']
     tickers = {}
     for stock in r:
-        symbol = stock['symbol']
+        symbol = stock['symbol'].strip()
         info = {'symbol': stock['symbol'], 'name': stock['securityName'], 'exchange': 'OTC'}
         tickers[symbol] = info
     return tickers
@@ -272,7 +284,7 @@ def get_company_name(ticker: str):
                 results[s['symbol']] = s
             best_match = process.extractOne(ticker, list(results.keys()))[0]
             return results[best_match]['name']
-    raise ValueError('Something went wrong')
+    raise ValueError(f'could not get company name for {ticker}')
 
 
 def get_ticker_info(query: str, round_values=True):
@@ -299,6 +311,10 @@ def get_ticker_info(query: str, round_values=True):
      'volume': 4531464}
     """
     ticker = clean_ticker(query)
+    try:
+        is_etf = ticker in get_nyse_arca_tickers() or 'ETF' in get_company_name(ticker)
+    except ValueError:
+        is_etf = False
     country_code = 'CA' if '.TO' in ticker else 'US'
     ticker = ticker.replace('.TO', '')  # remove exchange
     api_query = {
@@ -310,7 +326,6 @@ def get_ticker_info(query: str, round_values=True):
 
     source = f'https://www.marketwatch.com/investing/stock/{ticker}?countrycode={country_code}'
     api_url = f'https://www.wsj.com/market-data/quotes/{ticker}?id={api_query}&type=quotes_chart'
-    is_etf = ticker in get_nyse_arca_tickers()
     if is_etf:
         ckey = 'cecc4267a0'
         entitlement_token = 'cecc4267a0194af89ca343805a3e57af'
@@ -320,30 +335,14 @@ def get_ticker_info(query: str, round_values=True):
     if not r.ok:
         try:
             ticker = find_stock(query)[0][0]
-            return get_ticker_info(ticker)
+            if ticker != query:
+                return get_ticker_info(ticker)
         except IndexError:
             raise ValueError(f'Invalid ticker "{query}"')
 
     data = r.json() if is_etf else r.json()['data']
     quote_data = data['InstrumentResponses'][0]['Matches'][0] if is_etf else data['quoteData']
     financials = quote_data['Financials']
-    market_cap = financials['MarketCapitalization']['Value']
-    try:
-        eps_ttm = financials['LastEarningsPerShare']['Value']
-    except TypeError:
-        eps_ttm = 0
-    try:
-        last_dividend = financials['LastDividendPerShare']['Value']
-    except TypeError:
-        last_dividend = None
-
-    dividend_yield = financials['Yield']
-    annualized_dividend = financials['AnnualizedDividend']
-    if annualized_dividend is None:
-        dividend_yield = 0
-        last_dividend = 0
-        annualized_dividend = 0
-
     name = quote_data['Instrument']['CommonName']
     previous_close = financials['Previous']['Price']['Value']
     latest_price = closing_price = quote_data['CompositeTrading']['Last']['Price']['Value']
@@ -383,6 +382,26 @@ def get_ticker_info(query: str, round_values=True):
     latest_change = latest_price - closing_price
     latest_change_percent = latest_change / closing_price * 100
 
+    try:
+        market_cap = financials['MarketCapitalization']['Value']
+    except TypeError:
+        market_cap = financials['SharesOutstanding'] * latest_price
+    try:
+        eps_ttm = financials['LastEarningsPerShare']['Value']
+    except TypeError:
+        eps_ttm = 0
+    try:
+        last_dividend = financials['LastDividendPerShare']['Value']
+    except TypeError:
+        last_dividend = None
+
+    dividend_yield = financials['Yield']
+    annualized_dividend = financials['AnnualizedDividend']
+    if annualized_dividend is None:
+        dividend_yield = 0
+        last_dividend = 0
+        annualized_dividend = 0
+
     if round_values:
         previous_close = round(previous_close, 2)
         latest_price = round(latest_price, 2)
@@ -396,6 +415,7 @@ def get_ticker_info(query: str, round_values=True):
         dividend_yield = round(dividend_yield, 2)
         last_dividend = round(last_dividend, 2)
         eps_ttm = round(eps_ttm, 2)
+        market_cap = round(market_cap)
 
     return_info = {
         'name': name,
@@ -760,12 +780,14 @@ def top_movers(_data=None, tickers=None, market='ALL', of='day', start_date=None
 
 
 @time_cache(3600)  # cache for 1 hour
-def get_target_prices(ticker):
+def get_target_price(ticker, round_values=True):
     """
     ticker: yahoo finance ticker
-    returns: {'avg': float, 'low': float, 'high': float, 'price': float, 'eps_ttm': float}
+    returns: {'avg': float, 'low': float, 'high': float, 'price': float,
+              'eps_ttm': float 'source': 'url', 'api_url': 'url'}
     """
     try:
+        # TODO: allow discriiminating based on [']
         ticker = clean_ticker(ticker)
         timestamp = datetime.now().timestamp()
         query = f'{TIP_RANKS_API}getData/?name={ticker}&benchmark=1&period=3&break={timestamp}'
@@ -775,26 +797,60 @@ def get_target_prices(ticker):
         estimates = []
         target_prices = {
             'symbol': ticker,
+            'name': r['companyName'],
             'high': 0,
             'low': 100000,
+            'price': r['prices'][-1]['p'],  # ~ latest price
+            'eps_ttm': r['portfolioHoldingData']['lastReportedEps']['reportedEPS'],  # *assumed to be ttm
+            'source': f'https://www.tipranks.com/stocks/{ticker}/forecast',
+            'api_url': query
         }
 
         estimates = []
         for expert in r['experts']:
-            # NOTE: maybe ignore based on timestamp (e.g. last 3 months)?
             target_price = expert['ratings'][0]['priceTarget']
+
             if target_price:
+                # if analysis had a price target
                 if target_price > target_prices['high']: target_prices['high'] = target_price
-                elif target_price < target_prices['low']: target_prices['low'] = target_price
+                if target_price < target_prices['low']: target_prices['low'] = target_price
                 total += target_price
                 estimates.append(target_price)
         target_prices['avg'] = total / len(estimates) if estimates else 0
-        target_prices['median'] = median(estimates)
+        try:
+            target_prices['median'] = median(estimates)
+        except StatisticsError:
+            target_prices['avg'] = target_prices['median'] = r['ptConsensus'][0]['priceTarget']
+            target_prices['high'] = r['ptConsensus'][0]['high']
+            target_prices['low'] = r['ptConsensus'][0]['low']
         target_prices['estimates'] = estimates
         target_prices['total_estimates'] = len(estimates)
+        target_prices['upside'] = 100 * target_prices['high'] / target_prices['price'] - 100
+        target_prices['downside'] = 100 * target_prices['low'] / target_prices['price'] - 100
+        if round_values:
+            target_prices['upside'] = round(target_prices['upside'], 2)
+            target_prices['downside'] = round(target_prices['downside'], 2)
         return target_prices
     except json.JSONDecodeError:
-        raise ValueError(f'Invalid ticker "{ticker}"')
+        raise ValueError(f'No Data Found for ticker "{ticker}"')
+
+
+def get_target_prices(tickers, errors_as_str=False) -> tuple:
+    """
+    returns: list[dict], list
+    uses a threadPoolExecutor instead of asyncio
+    """
+    target_prices = []
+    tickers_not_found = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=35) as executor:
+        future_infos = [executor.submit(get_target_price, ticker) for ticker in tickers]
+        for future in concurrent.futures.as_completed(future_infos):
+            try:
+                result = future.result()
+                target_prices.append(result)
+            except ValueError as e:
+                tickers_not_found.append(str(e) if errors_as_str else e)
+    return target_prices, tickers_not_found
 
 
 def sort_by_dividend(tickers):
@@ -857,7 +913,7 @@ def sort_by_volume(tickers):
 
 
 def get_index_futures():
-    resp = make_request(PREMARKET_FUTURES)
+    resp = make_request(PREMARKET_FUTURES_URL)
     soup = BeautifulSoup(resp.text, 'html.parser')
     # noinspection PyUnresolvedReferences
     quotes = soup.find('tbody').findAll('tr')
@@ -1032,7 +1088,9 @@ def snd(y):
 
 
 def calc_option_price(market_price, strike_price, days_to_expiry, volatility,
-                      risk_free=get_risk_free_interest_rate(), dividend_yield=0, option_type=Option.CALL):
+                      risk_free=None, dividend_yield=0, option_type=Option.CALL):
+    if risk_free is None:
+        risk_free = get_risk_free_interest_rate()
     years_to_expiry = days_to_expiry / 365
     _d1 = option_type * d1(market_price, strike_price,
                            years_to_expiry, volatility, risk_free, dividend_yield)
@@ -1117,31 +1175,34 @@ def run_tests():
     print('Testing get_company_name')
     assert get_company_name('NVDA') == 'NVIDIA Corporation'
     print('Getting 10 Random Stocks')
-    pprint(get_random_stocks(10))
+    print(get_random_stocks(10))
     print('Testing get ticker info')
-    for ticker in ('RTX', 'PLTR', 'OVV.TO', 'SHOP.TO', 'AMD', 'CCIV', 'SPY', 'VOO'):
+    real_tickers = ('RTX', 'PLTR', 'OVV.TO', 'SHOP.TO', 'AMD', 'CCIV', 'SPY', 'VOO')
+    for ticker in real_tickers:
         # dividend, non-dividend, ca-dividend, ca-non-dividend, old
         get_ticker_info(ticker)
     # test invalid ticker
     with suppress(ValueError):
         get_ticker_info('ZWC')
     # test get target prices
-    get_target_prices('DOC')
-    sample_target_prices = get_target_prices('DOC')
-    assert len(sample_target_prices) == 5
-    assert isinstance(sample_target_prices, dict)
+    print('Testing get target price')
+    get_target_price('DOC')
     with suppress(ValueError):
-        get_target_prices('ZWC')
+        get_target_price('ZWC')
     assert 0 < get_risk_free_interest_rate(0) < 1
     print('Testing find_stock')
     pprint(find_stock('entertainment'))
     pprint(find_stock('TWLO'))
     tickers = {'entertainment', 'Tesla', 'Twitter', 'TWLO', 'Paypal', 'Visa'}
-    for ticker in tickers:
+    for ticker in real_tickers:
         assert find_stock(ticker)
     assert not find_stock('this should fail')
+    print('Testing get ticker infos')
     tickers_info, errors = get_ticker_infos(tickers)
     assert tickers_info and not errors
+    print('Testing get target prices')
+    target_prices, errors = get_target_prices(tickers)
+    assert target_prices and errors
     print('Testing sort tickers by dividend yield')
     sort_by_dividend(get_dow_tickers())
     print('Testing top movers')

@@ -1769,28 +1769,36 @@ async def futures(ctx):
 
 
 @bot.command(aliases=['tp', 'get_target_price'])
-async def target_price(ctx, ticker: str):
+async def target_price(ctx, *tickers):
     def _get_target_price():
-        nonlocal ticker
-        ticker = ticker.replace('$', '').upper()
-        m = run_coroutine(ctx.send(f'Getting target prices for {ticker}'))
-        try:
-            target_prices = get_target_prices(ticker)
-            price, eps_ttm = target_prices['price'], target_prices['eps_ttm']
-            median_target = target_prices['median']
+        to_dm, author = len(tickers) > 5, ctx.author
+        msg = f'Getting target prices for: {", ".join(tickers)}'
+        m = run_coroutine(author.send(msg) if to_dm else ctx.send(msg))
+        target_prices, errors = get_target_prices(tickers, errors_as_str=True)
+        if errors:
+            embed = discord.Embed(title=f'Error(s) ({len(errors)})', description='\n'.join(errors))
+            run_coroutine(m.edit(content='', embed=embed))
+        else:
+            run_coroutine(m.delete())
+        for target_price in target_prices:
+            price = target_price['price']
+            median_target =  target_price['median']
             if price > median_target: color = STOCKS_RED
             elif price < median_target: color = STOCKS_GREEN
             else: color = STOCKS_YELLOW
-            title = f'{ticker} Target Prices'
-            embed = discord.Embed(title=title, color=color)
+            symbol = target_price['symbol']
+            title = f'{symbol} Target Prices'
+            upside = target_price['upside']
+            downside = target_price['downside']
+            embed = discord.Embed(title=title, color=color, url=target_price['source'])
             embed.add_field(name='Median', value=median_target)
-            embed.add_field(name='Low', value=target_prices['low'])
-            embed.add_field(name='High', value=target_prices['high'])
+            embed.add_field(name='Low', value= target_price['low'])
+            embed.add_field(name='High', value= target_price['high'])
             embed.add_field(name='Price', value=price)
-            embed.add_field(name='EPS (TTM)', value=eps_ttm)
-            run_coroutine(m.edit(content='', embed=embed))
-        except ValueError as e:
-            run_coroutine(m.edit(content=str(e)))
+            embed.add_field(name='Upside', value=f'{upside}%')
+            embed.add_field(name='Downside', value=f'{downside}%')
+            if to_dm: run_coroutine(author.send(embed=embed))
+            else: run_coroutine(ctx.send(embed=embed))
     bot.loop.run_in_executor(None, _get_target_price)
 
 
