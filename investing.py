@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.41
+Version: 1.42
 Created: April 3rd 2020
 Updated: March 1st 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -45,13 +45,11 @@ import feedparser
 
 def time_cache(max_age, maxsize=128, typed=False):
     """Least-recently-used cache decorator with time-based cache invalidation.
-
     Args:
         max_age: Time to live for cached results (in seconds).
         maxsize: Maximum cache size (see `functoolslru_cache`).
         typed: Cache on distinct input types (see `functools.lru_cache`).
     """
-
     def _decorator(fn):
         @lru_cache(maxsize=maxsize, typed=typed)
         def _new(*args, __time_salt, **kwargs):
@@ -60,10 +58,18 @@ def time_cache(max_age, maxsize=128, typed=False):
         @wraps(fn)
         def _wrapped(*args, **kwargs):
             return _new(*args, **kwargs, __time_salt=int(time.time() / max_age))
-
         return _wrapped
-
     return _decorator
+
+
+def timing(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        _start = time.time()
+        result = fn(*args, **kwargs)
+        print(f'@timing {fn.__name__} ELAPSED TIME:', time.time() - _start)
+        return result
+    return wrapper
 
 
 NASDAQ_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nasdaq&download=true'
@@ -72,8 +78,9 @@ NYSE_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nyse&dow
 AMEX_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=amex&download=true'
 TSX_TICKERS_URL = 'https://www.tsx.com/json/company-directory/search/tsx/^*'
 PREMARKET_FUTURES_URL = 'https://ca.investing.com/indices/indices-futures'
-SP500_URL = 'http://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
 DOW_URL = 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average'
+SP500_URL = 'http://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+RUT_2K_URL ='https://api.vanguard.com/rs/ire/01/ind/fund/VTWO/portfolio-holding/stock.json'
 TIP_RANKS_API = 'https://www.tipranks.com/api/stocks/'
 SORTED_INFO_CACHE = {}  # for when its past 4 PM
 GENERIC_HEADERS = {
@@ -110,6 +117,7 @@ def get_dow_tickers() -> dict:
     return tickers
 
 
+@time_cache(24 * 3600, maxsize=1)
 def get_sp500_tickers() -> dict:
     resp = make_request(SP500_URL)
     soup = BeautifulSoup(resp.text, 'html.parser')
@@ -122,6 +130,24 @@ def get_sp500_tickers() -> dict:
         if '.' not in ticker:
             name = tds[1].text.strip()
             tickers[ticker] = {'symbol': ticker, 'name': name}
+    return tickers
+
+
+@time_cache(24 * 3600, maxsize=1)
+def get_russel_2k_tickers() -> dict:
+    '''
+    Instead of calculating the russel 2k every time,
+    '''
+    data = make_request(RUT_2K_URL, headers={'Referer': RUT_2K_URL}).json()
+    tickers = {}
+    for stock in data['fund']['entity']:
+        ticker = stock['ticker']
+        # filter tickers
+        # if asset_class == 'Equity' and ticker != '-' and not bool(re.search(r'\d', ticker)):
+        tickers[ticker] = {
+            'symbol': ticker,
+            'name': stock['longName']
+        }
     return tickers
 
 
@@ -138,6 +164,16 @@ def clean_name(name: str):
 def clean_stock_info(info):
     info['name'] = clean_name(info['name'])
     return info
+
+
+@time_cache(24 * 3600, maxsize=1)
+def get_bats_tickers() -> dict:
+    r = make_request(NASDAQ_TICKERS_URL).json()
+    tickers = {}
+    for stock in r['data']['rows']:
+        symbol = stock['symbol'].strip()
+        tickers[symbol] = {**clean_stock_info(stock), 'exchange': 'NASDAQ'}
+    return tickers
 
 
 @time_cache(24 * 3600, maxsize=1)
@@ -1154,12 +1190,9 @@ def run_tests():
     print('Testing clean_ticker')
     assert clean_ticker('ac.to') == 'AC.TO'
     assert clean_ticker('23ac.to23@#0  ') == 'AC.TO'
-    print('Getting DOW')
-    assert get_dow_tickers()['AAPL']['name'] == 'Apple Inc.'
-    print('Getting S&P500')
-    assert get_sp500_tickers()['TSLA']['name'] == 'Tesla, Inc.'
     print('Getting NASDAQ')
-    assert get_nasdaq_tickers()['AMD']['name'] == 'Advanced Micro Devices Inc.'
+    nasdaq_tickers = get_nasdaq_tickers()
+    assert nasdaq_tickers['AMD']['name'] == 'Advanced Micro Devices Inc.'
     print('Getting AMEX')
     get_amex_tickers()
     print('Getting NYSE')
@@ -1170,6 +1203,15 @@ def run_tests():
     assert 'SHOP.TO' in get_tsx_tickers()
     print('Getting OTC')
     assert get_otc_tickers()['HTZGQ']['name'] == 'HERTZ GLOBAL HOLDINGS INC'
+    print('Getting DOW')
+    dow_tickers = get_dow_tickers()
+    assert dow_tickers['AAPL']['name'] == 'Apple Inc.'
+    print('Getting S&P500')
+    sp500_tickers = get_sp500_tickers()
+    assert sp500_tickers['TSLA']['name'] == 'Tesla, Inc.'
+    print('Getting Russel 2k')
+    rut2k_tickers = get_russel_2k_tickers()
+    assert rut2k_tickers['PZZA']['name'] == 'PAPA JOHNS INTERNATIONAL INC'
     print('Getting FUTURES')
     get_index_futures()
     print('Testing get_company_name')
