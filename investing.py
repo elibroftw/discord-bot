@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.42
+Version: 1.43
 Created: April 3rd 2020
-Updated: March 1st 2021
+Updated: March 3rd 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -348,7 +348,7 @@ def get_ticker_info(query: str, round_values=True):
     """
     ticker = clean_ticker(query)
     try:
-        is_etf = ticker in get_nyse_arca_tickers() or 'ETF' in get_company_name(ticker)
+        is_etf = ticker in get_nyse_arca_tickers() or 'ETF' in get_company_name(ticker).split()
     except ValueError:
         is_etf = False
     country_code = 'CA' if '.TO' in ticker else 'US'
@@ -377,10 +377,16 @@ def get_ticker_info(query: str, round_values=True):
             raise ValueError(f'Invalid ticker "{query}"')
 
     data = r.json() if is_etf else r.json()['data']
-    quote_data = data['InstrumentResponses'][0]['Matches'][0] if is_etf else data['quoteData']
+    try:
+        quote_data = data['InstrumentResponses'][0]['Matches'][0] if is_etf else data['quoteData']
+    except IndexError:
+        raise ValueError(f'Invalid ticker "{query}"')
     financials = quote_data['Financials']
     name = quote_data['Instrument']['CommonName']
-    previous_close = financials['Previous']['Price']['Value']
+    try:
+        previous_close = financials['Previous']['Price']['Value']
+    except TypeError:
+        raise ValueError(f'Invalid ticker "{query}"')
     latest_price = closing_price = quote_data['CompositeTrading']['Last']['Price']['Value']
     try:
         latest_price = quote_data['CompositeBeforeHoursTrading']['Price']['Value']
@@ -421,7 +427,10 @@ def get_ticker_info(query: str, round_values=True):
     try:
         market_cap = financials['MarketCapitalization']['Value']
     except TypeError:
-        market_cap = financials['SharesOutstanding'] * latest_price
+        try:
+            market_cap = financials['SharesOutstanding'] * latest_price
+        except TypeError:
+            market_cap = 0
     try:
         eps_ttm = financials['LastEarningsPerShare']['Value']
     except TypeError:
