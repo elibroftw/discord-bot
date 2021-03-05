@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.43
+Version: 1.44
 Created: April 3rd 2020
-Updated: March 3rd 2021
+Updated: March 5th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -37,7 +37,7 @@ from yahoo_fin import stock_info
 from enum import IntEnum
 import numpy as np
 from pytz import timezone
-from functools import lru_cache, wraps
+from functools import lru_cache, wraps, cmp_to_key
 import time
 import re
 import feedparser
@@ -447,6 +447,13 @@ def get_ticker_info(query: str, round_values=True):
         last_dividend = 0
         annualized_dividend = 0
 
+    pe = financials['PriceToEarningsRatio']
+    if pe is None:
+        try:
+            pe = closing_price / eps_ttm
+        except ZeroDivisionError:
+            pe = 0  # 0 = N/A
+
     if round_values:
         previous_close = round(previous_close, 2)
         latest_price = round(latest_price, 2)
@@ -467,6 +474,7 @@ def get_ticker_info(query: str, round_values=True):
         'symbol': ticker + ('.TO' if country_code == 'CA' else ''),
         'volume': volume,
         'eps_ttm': eps_ttm,
+        'pe': pe,
         'dividend_yield': dividend_yield,
         'last_dividend': last_dividend,
         'annualized_dividend': annualized_dividend,
@@ -912,28 +920,42 @@ def sort_by_pe(tickers, output_to_csv='', console_output=True):
     :param console_output:
     :return:
     """
-    pes = []
-    for ticker in tickers:
-        with suppress(ValueError):
-            pe = price_to_earnings(ticker)
-            if pe > 0:
-                pes.append((ticker, pe))
-    pes.sort(key=lambda item: item[1])
+    @cmp_to_key
+    def _pe_sort(left, right):
+        left, right = left['pe'], right['pe']
+        # smallest positive to smallest negative
+        # 0.1 ... 30 ... 0 ... -0.1 ... -100000
+        if left > 0 and right > 0:
+            # both are positive
+            # return number that is smaller
+            return left - right
+        elif left <= 0 and right <= 0:
+            # both are non-positive
+            # return number that is bigger
+            return right - left
+        # one of the pe's is positive and the other isn't
+        # positive comes before negative
+        return -1 if left > 0 else 1
+
+    ticker_infos = get_ticker_infos(tickers)[0]
+    ticker_infos.sort(key=_pe_sort, reverse=True)
     if console_output:
-        header = 'TOP 5 TICKERS BY P/E'
+        header = 'TOP 5 (UNDER VALUED) TICKERS BY P/E'
         line = '-' * len(header)
         print(f'{header}\n{line}')
-        for i, (ticker, pe) in enumerate(pes):
+        for i, ticker_info in enumerate(ticker_infos):
             if i == 5:
                 break
+            ticker = ticker_info['symbol']
+            pe = ticker_info ['pe']
             print(f'{ticker}: {round(pe, 2)}')
-    if output_to_csv:
-        with open(output_to_csv, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['TICKER', 'Price-earnings'])
-            for ticker in pes:
-                writer.writerow(ticker)
-    return pes
+    if output_to_csv and ticker_infos:
+        with open(output_to_csv, 'w') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=ticker_infos[0].keys())
+            writer.writeheader()
+            for ticker_info in ticker_infos:
+                writer.writerow(ticker_info)
+    return ticker_infos
 
 
 def price_to_earnings(ticker):
