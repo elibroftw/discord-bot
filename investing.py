@@ -1,7 +1,7 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.44
+Version: 1.46
 Created: April 3rd 2020
 Updated: March 5th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
@@ -840,21 +840,26 @@ def get_target_price(ticker, round_values=True):
               'eps_ttm': float 'source': 'url', 'api_url': 'url'}
     """
     try:
-        # TODO: allow discriiminating based on [']
-        ticker = clean_ticker(ticker)
+        ticker_info = get_ticker_info(ticker)
+        price = ticker_info['price']    # get latest price
+        ticker = ticker_info['symbol']  # get fixed ticker
         timestamp = datetime.now().timestamp()
         query = f'{TIP_RANKS_API}getData/?name={ticker}&benchmark=1&period=3&break={timestamp}'
         r = make_request(query).json()
-
         total = 0
         estimates = []
+        try:
+            # Assumed to be ttm
+            eps_ttm = r['portfolioHoldingData']['lastReportedEps']['reportedEPS']
+        except TypeError:
+            eps_ttm = 0
         target_prices = {
             'symbol': ticker,
             'name': r['companyName'],
             'high': 0,
             'low': 100000,
-            'price': r['prices'][-1]['p'],  # ~ latest price
-            'eps_ttm': r['portfolioHoldingData']['lastReportedEps']['reportedEPS'],  # *assumed to be ttm
+            'price': price,
+            'eps_ttm': eps_ttm,
             'source': f'https://www.tipranks.com/stocks/{ticker}/forecast',
             'api_url': query
         }
@@ -1242,7 +1247,7 @@ def run_tests():
     assert sp500_tickers['TSLA']['name'] == 'Tesla, Inc.'
     print('Getting Russel 2k')
     rut2k_tickers = get_russel_2k_tickers()
-    assert rut2k_tickers['PZZA']['name'] == 'PAPA JOHNS INTERNATIONAL INC'
+    assert rut2k_tickers['PZZA']['name'] == "Papa John's International Inc."
     print('Getting FUTURES')
     get_index_futures()
     print('Testing get_company_name')
@@ -1274,8 +1279,9 @@ def run_tests():
     tickers_info, errors = get_ticker_infos(tickers)
     assert tickers_info and not errors
     print('Testing get target prices')
+    tickers = {'Tesla', 'Twitter', 'TWLO', 'Paypal', 'Visa', 'OPEN', 'CRSR', 'PLTR', 'PTON', 'ZM'}
     target_prices, errors = get_target_prices(tickers)
-    assert target_prices and errors
+    assert target_prices and not errors
     print('Testing sort tickers by dividend yield')
     sort_by_dividend(get_dow_tickers())
     print('Testing top movers')

@@ -1,5 +1,5 @@
 asyncio~=3.4.3
-discord.py[voice]
+discord.py[voice]~=1.6
 httpx
 GitPython
 isodate~=0.6.0
@@ -7,7 +7,6 @@ mutagen
 pymongo~=3.11
 PyNaCl
 requests
-simplejson
 tweepy~=3.8.0
 youtube_dl
 yfinance~=0.1.54
