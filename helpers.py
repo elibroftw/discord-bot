@@ -14,7 +14,8 @@ from functools import wraps
 # noinspection PyUnresolvedReferences
 from pprint import pprint
 import time
-import httpx
+import aiohttp
+import requests
 from discord import opus
 from pymongo import MongoClient
 import tweepy
@@ -264,7 +265,7 @@ def youtube_search_old(text, parse_text=True, return_info=False, limit_duration=
     query = {'part': 'id,snippet', 'maxResults': min(results + 5, 50), 'order': 'relevance',
              'q': text, 'type': kind, 'key': GOOGLE_API}
     query_string = urlencode(query)
-    r = httpx.get(f'{YT_API_URL}search?{query_string}')
+    r = requests.get(f'{YT_API_URL}search?{query_string}')
     search_response = json.loads(r.text)
     videos, channels, play_lists = {}, [], []
     # Add each result to the appropriate list, and then display the lists of
@@ -303,7 +304,7 @@ def youtube_search_old(text, parse_text=True, return_info=False, limit_duration=
 def get_video_duration(video_id):
     query = {'part': 'contentDetails,snippet', 'id': video_id, 'key': GOOGLE_API}
     query_string = urlencode(query)
-    r = httpx.get(f'{YT_API_URL}videos?{query_string}')
+    r = requests.get(f'{YT_API_URL}videos?{query_string}')
     search_response = json.loads(r.text)
     item = search_response.get('items', [])[0]
     if item['snippet']['liveBroadcastContent'] == 'live': duration = 2088000
@@ -314,7 +315,7 @@ def get_video_duration(video_id):
 def get_video_durations(video_ids):
     video_ids = ','.join(video_ids)
     url = f'{YT_API_URL}videos?part=contentDetails&id={video_ids}&key={GOOGLE_API}'
-    search_response = json.loads(httpx.get(url).text)
+    search_response = json.loads(requests.get(url).text)
     return_dict = {}
     for item in search_response.get('items', []):
         return_dict[item['id']] = int(isodate.parse_duration(item['contentDetails']['duration']).total_seconds())
@@ -327,29 +328,29 @@ def get_spotify_auth():
         spotify_token_creation = time.time()
         header = {'Authorization': 'Basic ' + SPOTIFY_B64_AUTH_STR}
         data = {'grant_type': 'client_credentials'}
-        access_token_response = httpx.post('https://accounts.spotify.com/api/token', headers=header, data=data)
+        access_token_response = requests.post('https://accounts.spotify.com/api/token', headers=header, data=data)
         spotify_token = access_token_response.json()['access_token']
     return {'Authorization': f'Bearer {spotify_token}'}
 
 
 async def spotify_track_to_youtube(link):
     track_id = urlparse(link).path.split('/track/', 1)[1]
-    async with httpx.AsyncClient() as client:
-        r = await client.get(f'https://api.spotify.com/v1/tracks/{track_id}', headers=get_spotify_auth())
-        r = r.json()
-        track_name = r['name']
-        track_artist = r['artists'][0]['name']
-        search_query = f'{track_artist} - {track_name}'
-        result = await youtube_search(search_query, parse_text=False, return_info=True)
-        title, video_id = result[1:]
-        return Track(title, video_id)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://api.spotify.com/v1/tracks/{track_id}', headers=get_spotify_auth()) as r:
+            r = await r.json()
+    track_name = r['name']
+    track_artist = r['artists'][0]['name']
+    search_query = f'{track_artist} - {track_name}'
+    result = await youtube_search(search_query, parse_text=False, return_info=True)
+    title, video_id = result[1:]
+    return Track(title, video_id)
 
 
 async def spotify_album_to_youtube(link):
     album_id = urlparse(link).path.split('/album/', 1)[1]
-    async with httpx.AsyncClient as client:
-        r = await client.get(f'https://api.spotify.com/v1/albums/{album_id}/tracks', headers=get_spotify_auth())
-    r = r.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://api.spotify.com/v1/albums/{album_id}/tracks', headers=get_spotify_auth()) as r:
+            r = await r.json()
     tracks = []
     for track in r['items']:
         track_artist = track['artists'][0]['name']
@@ -362,9 +363,9 @@ async def spotify_album_to_youtube(link):
 
 async def spotify_playlist_to_youtube(link):
     playlist_id = urlparse(link).path.split('/playlist/', 1)[1]
-    async with httpx.AsyncClient() as client:
-        r = await client.get(f'https://api.spotify.com/v1/playlists/{playlist_id}/tracks', headers=get_spotify_auth())
-    r = r.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://api.spotify.com/v1/playlists/{playlist_id}/tracks', headers=get_spotify_auth()) as r:
+            r = await r.json()
     tracks = []
     coroutines = []
     for track in r['items']:
@@ -386,8 +387,7 @@ async def spotify_to_youtube(link):
         return await spotify_album_to_youtube(link)
     elif 'playlist' in link:
         return await spotify_playlist_to_youtube(link)
-    else:
-        return []
+    return []
 
 
 # def query_to_tracks(url_or_query):
@@ -451,7 +451,7 @@ def get_tracks_from_playlist(playlist_name, guild_id, author_id, to_play=False):
 
 def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
     query = {'part': 'snippet',  'playlistId': playlist_id, 'key': GOOGLE_API, 'maxResults': 50}
-    response = json.loads(httpx.get(f'{YT_API_URL}playlistItems?{urlencode(query)}').text)
+    response = json.loads(requests.get(f'{YT_API_URL}playlistItems?{urlencode(query)}').text)
     if to_play:
         tracks_dict = {item['snippet']['resourceId']['videoId']: item['snippet']['title'] for item in response['items']}
         durations = get_video_durations(tracks_dict.keys())
@@ -461,7 +461,7 @@ def get_videos_from_playlist(playlist_id, return_title=False, to_play=False):
 
     if return_title:
         query = {'part': 'snippet',  'id': playlist_id, 'key': GOOGLE_API}
-        response = json.loads(httpx.get(f'{YT_API_URL}playlists?{urlencode(query)}').text)
+        response = json.loads(requests.get(f'{YT_API_URL}playlists?{urlencode(query)}').text)
         return tracks, response['items'][0]['snippet']['title']
     return tracks
 
@@ -476,19 +476,19 @@ def get_all_playlists(query=''):
 def get_video_titles(video_ids):
     video_ids = ','.join(video_ids)
     url = f'{YT_API_URL}videos?part=contentDetails&id={video_ids}&key={GOOGLE_API}'
-    search_response = json.loads(httpx.get(url).text)['items']
+    search_response = json.loads(requests.get(url).text)['items']
     return [item['title'] for item in search_response]
 
 
 def get_video_title_old(video_id):
     query = {'part': 'snippet',  'id': video_id, 'key': GOOGLE_API}
-    response = json.loads(httpx.get(f'{YT_API_URL}videos?{urlencode(query)}').text)
+    response = json.loads(requests.get(f'{YT_API_URL}videos?{urlencode(query)}').text)
     title = response['items'][0]['snippet']['title']
     return fix_youtube_title(title)
 
 
 def get_video_title(video_id):
-    result = httpx.get(f'https://noembed.com/embed?url=https://www.youtube.com/watch?v={video_id}').json()
+    result = requests.get(f'https://noembed.com/embed?url=https://www.youtube.com/watch?v={video_id}').json()
     return result['title']
 
 
@@ -497,7 +497,7 @@ def get_related_video(video_id, done_queue):
     results = min(5 + len(dq), 50)
     query = {'part': 'id,snippet', 'maxResults': results, 'order': 'relevance', 'relatedToVideoId': video_id,
              'type': 'video', 'key': GOOGLE_API}
-    search_response = json.loads(httpx.get(f'{YT_API_URL}search?{urlencode(query)}').text)
+    search_response = json.loads(requests.get(f'{YT_API_URL}search?{urlencode(query)}').text)
     video_ids = [item['id']['videoId'] for item in search_response['items']]
     video_durations = get_video_durations(video_ids)
     for item in search_response['items']:
