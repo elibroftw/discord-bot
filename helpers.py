@@ -500,13 +500,15 @@ def get_related_video(video_id, done_queue):
     search_response = json.loads(requests.get(f'{YT_API_URL}search?{urlencode(query)}').text)
     video_ids = [item['id']['videoId'] for item in search_response['items']]
     video_durations = get_video_durations(video_ids)
+
     for item in search_response['items']:
-        title = item['snippet']['title']
-        video_id = item['id']['videoId']
-        related_track = Track(title, video_id)
-        if related_track not in dq and video_durations[video_id] <= MAX_TRACK_DURATION:
-            related_url = f'https://www.youtube.com/watch?v={video_id}'
-            return related_url, fix_youtube_title(title), video_id
+        with suppress(KeyError):
+            title = item['snippet']['title']
+            video_id = item['id']['videoId']
+            related_track = Track(title, video_id)
+            if related_track not in dq and video_durations[video_id] <= MAX_TRACK_DURATION:
+                related_url = f'https://www.youtube.com/watch?v={video_id}'
+                return related_url, fix_youtube_title(title), video_id
     raise Exception('No related videos found')
 
 
