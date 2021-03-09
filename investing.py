@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.46
+Version: 1.47
 Created: April 3rd 2020
-Updated: March 5th 2021
+Updated: March 9th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -365,6 +365,7 @@ def get_ticker_info(query: str, round_values=True):
     if is_etf:
         ckey = 'cecc4267a0'
         entitlement_token = 'cecc4267a0194af89ca343805a3e57af'
+        source = f'https://www.marketwatch.com/investing/fund/{ticker}?countrycode={country_code}'
         api_url = f'https://api.wsj.net/api/dylan/quotes/v2/comp/quoteByDialect?dialect=official&needed=Financials|CompositeTrading|CompositeBeforeHoursTrading|CompositeAfterHoursTrading&MaxInstrumentMatches=1&accept=application/json&EntitlementToken={entitlement_token}&ckey={ckey}&dialects=Charting&id=ExchangeTradedFund-US-{ticker}'
     r = make_request(api_url)
 
