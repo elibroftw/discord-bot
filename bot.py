@@ -1034,16 +1034,14 @@ async def shuffle_music(ctx):
 @commands.check(in_guild)
 async def clear_queue(ctx):
     guild = ctx.guild
-    moderator = discord.utils.get(guild.roles, name='Moderator')
-    if ctx.author.top_role >= moderator:
-        voice_client: discord.VoiceClient = guild.voice_client
-        mq = data_dict[guild.id]['music']
-        dq = data_dict[guild.id]['done']
-        if voice_client.is_playing() or voice_client.is_paused():
-            data_dict[guild.id]['music'] = mq[0:1]
-        else: mq.clear()
-        dq.clear()
-        await ctx.send('Cleared music queue')
+    voice_client: discord.VoiceClient = guild.voice_client
+    mq = data_dict[guild.id]['music']
+    dq = data_dict[guild.id]['done']
+    if voice_client.is_playing() or voice_client.is_paused():
+        data_dict[guild.id]['music'] = mq[0:1]
+    else: mq.clear()
+    dq.clear()
+    await ctx.send('Cleared music queue')
 
 
 @bot.command(aliases=['music_queue', 'mq', 'nu', 'queue', 'que', 'q'])
