@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.47
+Version: 1.48
 Created: April 3rd 2020
-Updated: March 9th 2021
+Updated: March 12th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -641,7 +641,10 @@ def parse_info(_data, ticker, start_date, end_date, start_price_key='Open'):
     end_price = _data[ticker]['Close'][end_date]
     change = end_price - start_price
     percent_change = change / start_price
-    start_volume = round(_data[ticker]['Volume'][start_date])
+    try:
+        start_volume = round(_data[ticker]['Volume'][start_date])
+    except ValueError:
+        start_volume = 0
     end_volume = round(_data[ticker]['Volume'][end_date])
     avg_volume = (start_volume + end_volume) / 2
     return {'Start': start_price, 'End': end_price, 'Change': change, 'Percent Change': percent_change,
