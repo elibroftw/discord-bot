@@ -1,9 +1,9 @@
 """
 Investing Quick Analytics
 Author: Elijah Lopez
-Version: 1.48
+Version: 1.50
 Created: April 3rd 2020
-Updated: March 12th 2021
+Updated: March 17th 2021
 https://gist.github.com/elibroftw/2c374e9f58229d7cea1c14c6c4194d27
 
 Resources:
@@ -33,7 +33,6 @@ import random
 import requests
 import json
 import yfinance as yf
-from yahoo_fin import stock_info
 from enum import IntEnum
 import numpy as np
 from pytz import timezone
@@ -73,8 +72,10 @@ def timing(fn):
 
 
 NASDAQ_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nasdaq&download=true'
-OTC_TICKERS_URK = 'https://www.otcmarkets.com/research/stock-screener/api?securityType=Common%20Stock&market=20,21,22,10,6,5,2,1&sortField=symbol&pageSize=100000'
-NYSE_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nyse&download=true'
+OTC_TICKERS_URL = 'https://www.otcmarkets.com/research/stock-screener/api?securityType=Common%20Stock&market=20,21,22,10,6,5,2,1&sortField=symbol&pageSize=100000'
+# NYSE_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=nyse&download=true'
+NYSE_TICKERS_URL = 'https://www.nyse.com/api/quotes/filter'
+NYSE_URL = 'https://www.nyse.com'
 AMEX_TICKERS_URL = 'https://api.nasdaq.com/api/screener/stocks?exchange=amex&download=true'
 TSX_TICKERS_URL = 'https://www.tsx.com/json/company-directory/search/tsx/^*'
 PREMARKET_FUTURES_URL = 'https://ca.investing.com/indices/indices-futures'
@@ -82,22 +83,23 @@ DOW_URL = 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average'
 SP500_URL = 'http://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
 RUT_2K_URL ='https://api.vanguard.com/rs/ire/01/ind/fund/VTWO/portfolio-holding/stock.json'
 TIP_RANKS_API = 'https://www.tipranks.com/api/stocks/'
+CIK_LIST_URL = 'https://www.sec.gov/include/ticker.txt'
 SORTED_INFO_CACHE = {}  # for when its past 4 PM
 GENERIC_HEADERS = {
-    'accept': 'text/html,application/xhtml+xml',
+    'accept': 'text/html,application/xhtml+xml,application/json',
     'user-agent': 'Mozilla/5.0'
 }
 # NOTE: something for later https://www.alphavantage.co/
 
 
 # noinspection PyShadowingNames
-def make_request(url, method='GET', headers=None, json=None):
+def make_request(url, method='GET', headers=None, json=None, data=None):
     if headers is None:
         headers = GENERIC_HEADERS
     if method == 'GET':
         return requests.get(url, headers=headers)
     elif method == 'POST':
-        return requests.post(url, json=json, headers=headers)
+        return requests.post(url, json=json, headers=headers, data=None)
     raise ValueError(f'Invalid method {method}')
 
 
@@ -188,10 +190,15 @@ def get_nasdaq_tickers() -> dict:
 
 @time_cache(24 * 3600, maxsize=1)
 def get_nyse_tickers() -> dict:
-    r = make_request(NYSE_TICKERS_URL).json()
+    payload = {"instrumentType": "EQUITY", "pageNumber": 1, "sortColumn": "NORMALIZED_TICKER", "sortOrder": "ASC",
+               "maxResultsPerPage": 10000, "filterToken": ""}
+    r = make_request(NYSE_TICKERS_URL, method='POST', json=payload).json()
+    with open('test2.json', 'w') as f:
+        json.dump(r, f, indent=4)
     tickers = {}
-    for stock in r['data']['rows']:
-        symbol = stock['symbol'].strip()
+    for stock in r:
+        symbol = stock['symbol'] = stock['symbolTicker'].strip()
+        stock['name'] = stock['instrumentName']
         tickers[symbol] = {**clean_stock_info(stock), 'exchange': 'NYSE'}
     return tickers
 
@@ -232,7 +239,7 @@ def get_nyse_arca_tickers() -> dict:
 
 @time_cache(24 * 3600, maxsize=1)
 def get_otc_tickers() -> dict:
-    r = make_request(OTC_TICKERS_URK).text.strip('"').replace('\\"', '"')
+    r = make_request(OTC_TICKERS_URL).text.strip('"').replace('\\"', '"')
     r = json.loads(r)['stocks']
     tickers = {}
     for stock in r:
@@ -303,6 +310,23 @@ def get_tickers(category) -> dict:
     return tickers
 
 
+@time_cache(24 * 3600, maxsize=1)
+def get_cik_mapping():
+    r = make_request(CIK_LIST_URL)
+    cik_mapping = {}
+    for line in r.text.splitlines():
+        line = line.strip()
+        ticker, cik = line.split()
+        ticker = ticker.upper()
+        cik_mapping[ticker] = cik
+    return cik_mapping
+
+
+@lru_cache(maxsize=10000)
+def get_cik(ticker):
+    return get_cik_mapping()[ticker]
+
+
 def get_company_name(ticker: str):
     ticker = clean_ticker(ticker)
     with suppress(KeyError):
@@ -323,6 +347,193 @@ def get_company_name(ticker: str):
     raise ValueError(f'could not get company name for {ticker}')
 
 
+
+@time_cache(10000)
+def get_financials_v2(ticker: str):
+    # TODO: https://api.nasdaq.com/api/company/IBM/financials?frequency=1
+    pass
+
+
+
+@time_cache(10000)
+def get_financials(ticker: str):
+    """
+    Scrapes MarketWatch and returns Total Assets, Net Incomes, and Return on Assets (ROA) [for now]
+    for US Companies that file with the SEC.
+    Performance: ~5 seconds cold start, ~1.5 seconds thereafter
+    Args:
+        ticker: US ticker to get data for
+        aggregate: Whether to parse all 10K files.      [future]
+        commit_db: Whether to handle the sqlite commit  [future]
+    Returns:
+    """
+    ticker = clean_ticker(ticker)
+    if ticker not in get_tickers('ALL'):
+        ticker = find_stock(ticker)[0][0]
+    url = f'https://finance.yahoo.com/quote/{ticker}/financials?p=IBM'
+    # TODO: make two functions?
+    r = make_request(url)
+    soup = BeautifulSoup(r.text, features='html.parser')
+    income_statement = soup.find('div', attrs={'class': 'M(0) Whs(n) BdEnd Bdc($seperatorColor) D(itb)'})
+    try:
+        periods = next(next(income_statement.children).children).children
+    except AttributeError:
+        print(ticker)
+        raise ValueError(f'Invalid ticker {ticker}')
+    data = list(income_statement.children)[1]
+    dates = []
+    financials = {'symbol': ticker, 'name': get_company_name(ticker)}
+    for period in periods:
+        period = period.text.lower()
+        if period == 'breakdown':
+            continue
+        if period == 'ttm':
+            dates.append(period)
+        else:
+            period = int(period.rsplit('/', 1)[1])
+            if 'latest_year' not in financials:
+                financials['latest_year'] = period
+            dates.append(period)
+        financials[period] = {}
+    for row in data.children:
+        with suppress(AttributeError):
+            values = row.find('div')
+            values = values.children
+            heading = next(values).text.lower().replace(' ', '_')
+            for i, value in enumerate(values):
+                key = dates[i]
+                try:
+                    value = int(value.text.replace(',', ''))
+                except ValueError:
+                    value = None
+                financials[key][heading] = value
+    url = f'https://finance.yahoo.com/quote/{ticker}/balance-sheet'
+    r = make_request(url)
+    soup = BeautifulSoup(r.text, features='html.parser')
+    balance_sheet = soup.find('div', attrs={'class': 'M(0) Whs(n) BdEnd Bdc($seperatorColor) D(itb)'})
+    periods = next(next(balance_sheet.children).children).children
+    data = list(balance_sheet.children)[1]
+    dates = []
+    for period in periods:
+        period = period.text.lower()
+        if period == 'breakdown':
+            continue
+        if period == 'ttm':
+            dates.append(period)
+        else:
+            period = int(period.rsplit('/', 1)[1])
+            if 'latest_year' not in financials:
+                financials['latest_year'] = period
+            dates.append(period)
+        if period not in financials:
+            financials[period] = {}
+    for row in data.children:
+        with suppress(AttributeError):
+            values = row.find('div')
+            values = values.children
+            heading = next(values).text.lower().replace(' ', '_')
+            for i, value in enumerate(values):
+                key = dates[i]
+                try:
+                    value = int(value.text.replace(',', ''))
+                except ValueError:
+                    value = None
+                financials[key][heading] = value
+    # calculate roa
+    latest_year = financials['latest_year']
+    while latest_year - 1 in financials:
+        assets_beginning = financials[latest_year - 1]['total_assets']
+        net_income = financials[latest_year]['net_income_common_stockholders']
+        financials[latest_year]['roa'] = net_income / assets_beginning
+        latest_year -= 1
+    financials['roa'] = financials[financials['latest_year']]['roa']
+    return financials
+
+
+@time_cache(10000)
+def get_financials_old(ticker: str, aggregate=False, commit_db=True):
+    """
+    Parses 10K file and returns Total Assets, Net Incomes, and Return on Assets (ROA) [for now]
+    for US Companies that file with the SEC.
+    Performance: ~5 seconds cold start, ~1.5 seconds thereafter
+    Args:
+        ticker: US ticker to get data for
+        aggregate: Whether to parse all 10K files.      [future]
+        commit_db: Whether to handle the sqlite commit  [future]
+    Returns:
+        {'name': 'Apple Inc.',
+         'net_incomes': {2018: 59531000000, 2019: 55256000000, 2020: 57411000000},
+         'return_on_assets': {2020: 16.959611953349324},
+         'roa': 16.959611953349324,
+         'symbol': 'AAPL',
+         'total_assets': {2019: 338516000000, 2020: 323888000000}}
+    """
+    # TODO: use a SQLITE database to cache data
+    #  and the latest 10K url
+    ticker = clean_ticker(ticker)
+    if ticker not in get_tickers('ALL'):
+        ticker = find_stock(ticker)[0][0]
+    company_name = get_company_name(ticker)
+    cik = get_cik(ticker).rjust(10, '0')
+    submission = make_request(f'https://data.sec.gov/submissions/CIK{cik}.json').json()
+    form_index = submission['filings']['recent']['form'].index('10-K')
+    accession = submission['filings']['recent']['accessionNumber'][form_index].replace('-', '')
+    file_name = submission['filings']['recent']['primaryDocument'][form_index]
+    file_name, ext = file_name.rsplit('.')
+    url = f'https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{file_name}_{ext}.xml'
+    r = make_request(url).text
+    soup = BeautifulSoup(r, 'lxml')
+
+    def get_context_date(context_ref, is_balance_sheet=False, only_year=False):
+        try:
+            _date = context_ref.rsplit('_I' if is_balance_sheet else '-', 1)[1]
+            int(_date)
+        except (IndexError, ValueError):
+            if context_ref.startswith('As_Of') or context_ref.startswith('PAsOn'):
+                m, d, y = re.findall('[0-9]+_[0-9]+_[0-9]+', context_ref)[0].split('_')
+                m, d = int(m), int(d)
+                _date = f'{y}{m:02}{d:02}'
+            elif context_ref.startswith('FI') or context_ref.startswith('FD'):
+                # only the year is available
+                return int(re.findall('[1-9][0-9][0-9][0-9]', context_ref)[0])
+            else:
+                m, d, y = re.findall('[0-9]+_[0-9]+_[0-9]+', context_ref)[1].split('_')
+                m, d = int(m), int(d)
+                _date = f'{y}{m:02}{d:02}'
+
+        return int(_date[:4]) if only_year else _date
+    total_assets = {get_context_date(tag['contextref'], True, True): int(tag.text) for tag in soup.find_all('us-gaap:assets')}
+    print(url)
+    pprint(soup.find_all('us-gaap:assets'))
+    net_income_loss = soup.find_all('us-gaap:netincomeloss')
+    # if tags not found use other alias
+    if not net_income_loss:
+        net_income_loss = soup.find_all('us-gaap:netincomelossavailabletocommonstockholdersbasic')
+    net_incomes = {}
+    for tag in net_income_loss:
+        try:
+            year = get_context_date(tag['contextref'], only_year=True)
+            if year not in net_incomes:
+                net_incomes[year] = int(tag.text)
+        except IndexError:
+            pprint(net_income_loss)
+    roas = {}
+    for year, value in total_assets.items():
+        with suppress(KeyError):
+            next_year = year + 1
+            roa = (net_incomes[next_year] / value) * 100  # %
+            roas[next_year] = roa
+    financials = {
+        'name': company_name,
+        'symbol': ticker,
+        'total_assets': total_assets,
+        'net_incomes': net_incomes,
+        'return_on_assets': roas,
+        'roa': sorted(roas.items())[0][1]
+    }
+    return financials
+
+
 def get_ticker_info(query: str, round_values=True):
     """
     Uses WSJ instead of yfinance to get stock info summary
@@ -334,6 +545,7 @@ def get_ticker_info(query: str, round_values=True):
      'close_price': 120.71,
      'dividend_yield': 5.40,
      'eps_ttm': 6.24,
+     'pe': 19.34,
      'extended_hours': True,
      'last_dividend': 1.63,
      'latest_change': -0.01,
@@ -967,25 +1179,21 @@ def sort_by_pe(tickers, output_to_csv='', console_output=True):
     return ticker_infos
 
 
-def price_to_earnings(ticker):
-    """
-    EPS: earnings per share
-    PER: price over earnings ratio
-    useful concept to keep in mind:
-    PER = Stock price / EPS
-    Stock price = PER * EPS
-    raises: ValueError
-    """
-    url = 'http://finviz.com/quote.ashx?t=' + ticker.upper()
-    soup = BeautifulSoup(make_request(url).content, 'html.parser')
-    # noinspection PyUnresolvedReferences
-    return float(soup.find(text='P/E').find_next(class_='snapshot-td2').text)
-
-
 def sort_by_volume(tickers):
     ticker_infos = get_ticker_infos(tickers)[0]
     ticker_infos.sort(key=lambda v: v['volume'], reverse=True)
     return ticker_infos
+
+
+def sort_by_roa(tickers):
+    financials = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        future_infos = [executor.submit(get_financials, ticker) for ticker in tickers]
+        for future in concurrent.futures.as_completed(future_infos):
+            with suppress(ValueError):
+                financials.append(future.result())
+    financials.sort(key=lambda v: v['roa'], reverse=True)
+    return financials
 
 
 def get_index_futures():
@@ -1022,6 +1230,7 @@ def get_random_stocks(n=1) -> set:
 def find_stock(query):
     """
     Returns at most 10 results based on a search query
+    TODO: return list of dictionaries
     """
     results = []
     if isinstance(query, str):
@@ -1233,10 +1442,11 @@ def run_tests():
     print('Getting NASDAQ')
     nasdaq_tickers = get_nasdaq_tickers()
     assert nasdaq_tickers['AMD']['name'] == 'Advanced Micro Devices Inc.'
+    print('Getting NYSE')
+    assert get_nyse_tickers()['V']['name'] == 'VISA INC'
+    assert get_nyse_tickers()['VZ']['name'] == 'VERIZON COMMUNICATIONS'
     print('Getting AMEX')
     get_amex_tickers()
-    print('Getting NYSE')
-    assert get_nyse_tickers()['V']['name'] == 'Visa Inc.'
     print('Getting NYSE ARCA')
     assert get_nyse_arca_tickers()['SPY']['name'] == 'SPDR S&P 500 ETF TRUST'
     print('Getting TSX')
@@ -1255,7 +1465,7 @@ def run_tests():
     print('Getting FUTURES')
     get_index_futures()
     print('Testing get_company_name')
-    assert get_company_name('NVDA') == 'NVIDIA Corporation'
+    assert get_company_name('NVDA') == 'NVIDIA CORP'
     print('Getting 10 Random Stocks')
     print(get_random_stocks(10))
     print('Testing get ticker info')
@@ -1277,8 +1487,11 @@ def run_tests():
     pprint(find_stock('TWLO'))
     tickers = {'entertainment', 'Tesla', 'Twitter', 'TWLO', 'Paypal', 'Visa'}
     for ticker in real_tickers:
-        assert find_stock(ticker)
-    assert not find_stock('this should fail')
+        try:
+            assert find_stock(ticker)
+        except AssertionError:
+            print(f'TEST FAILED: find_stock({ticker}')
+    assert not find_stock('thisshouldfail')
     print('Testing get ticker infos')
     tickers_info, errors = get_ticker_infos(tickers)
     assert tickers_info and not errors
@@ -1288,6 +1501,7 @@ def run_tests():
     assert target_prices and not errors
     print('Testing sort tickers by dividend yield')
     sort_by_dividend(get_dow_tickers())
+    sort_by_roa(get_dow_tickers())
     print('Testing top movers')
     top_movers(market='DOW')
 
