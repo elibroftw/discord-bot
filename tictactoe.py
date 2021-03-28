@@ -24,10 +24,11 @@ def start_board(start):
 
 
 def greeting(data, choice):
-    if choice == 'y' or choice == 'yes':
-        greet, comp_symbol, user_symbol, start = 'Here is the starting board', 'O', 'X', False
-    elif choice == 'n' or choice == 'n':
-        greet, comp_symbol, user_symbol, start = 'My Move', 'X', 'O', True
+    choice = choice.lower()
+    if choice in {'yes', 'y'}:
+        comp_symbol, user_symbol, start = 'O', 'X', False
+    elif choice in {'no', 'n'}:
+        comp_symbol, user_symbol, start = 'X', 'O', True
         data['comp_moves'].append(7)
     else:  # IMPOSSIBLE
         return 'Please enter "yes" or "no"'
@@ -131,21 +132,21 @@ def move_two(data: dict):
             data['comp_moves'].append(move2)
             board[move2 - 1] = comp_symbol
             return print_board(board)
-        else:
-            board[danger - 1] = comp_symbol
-            data['in_game'] = False
-            return print_board(board) + endgame(True)
-    else:
-        move2 = simple_move(board, data['user_moves'], data['comp_moves'], skip=True)
-        if move2 is None:
-            if board[4] == comp_symbol:
-                if board[1] == '   ': move2 = 2
-                elif board[2] == '   ': move2 = 3
+
+        board[danger - 1] = comp_symbol
+        data['in_game'] = False
+        return print_board(board) + endgame(True)
+
+    move2 = simple_move(board, data['user_moves'], data['comp_moves'], skip=True)
+    if move2 is None:
+        if board[4] == comp_symbol:
+            if board[1] == '   ': move2 = 2
             elif board[2] == '   ': move2 = 3
-            else: move2 = 9
-        data['comp_moves'].append(move2)
-        board[move2 - 1] = comp_symbol
-        return print_board(board)
+        elif board[2] == '   ': move2 = 3
+        else: move2 = 9
+    data['comp_moves'].append(move2)
+    board[move2 - 1] = comp_symbol
+    return print_board(board)
 
 
 def move_three(data: dict):
@@ -165,10 +166,10 @@ def move_three(data: dict):
                 board[5] = comp_symbol
                 data['comp_moves'].append(6)
                 return print_board(board)
-            else:
-                board[danger - 1] = comp_symbol
-                data['in_game'] = False
-                return print_board(board) + endgame(True)
+
+            board[danger - 1] = comp_symbol
+            data['in_game'] = False
+            return print_board(board) + endgame(True)
     else:
         move3 = simple_move(board, data['user_moves'], data['comp_moves'])
         if move3 is None:
@@ -182,9 +183,9 @@ def move_three(data: dict):
         if x in combos:
             data['in_game'] = False
             return print_board(board) + endgame(True)
-        else:
-            data['comp_moves'].append(move3)
-            return print_board(board)
+
+        data['comp_moves'].append(move3)
+        return print_board(board)
 
 
 def move_four(data: dict):
@@ -197,25 +198,25 @@ def move_four(data: dict):
         else: board[1] = comp_symbol
         data['in_game'] = False
         return print_board(board) + endgame(False)
-    else:
-        combos = [[1, 2, 3], [1, 4, 7], [1, 5, 9], [4, 5, 6], [3, 5, 7], [7, 8, 9], [2, 5, 8], [3, 6, 9]]
-        user_moves = data['user_moves']
-        comp_moves = data['comp_moves']
-        move4 = simple_move(board, user_moves, comp_moves)
-        # move4 = simpleMove(board, user_moves, comp_moves) - 1
-        if move4 is None: move4 = board.index('   ')
-        else: move4 -= 1
-        board[move4] = comp_symbol
-        comp_moves.append(move4 + 1)
-        win_combos = [[comp_moves[i], comp_moves[j], comp_moves[k]] for i in range(4) for j in range(i + 1, 4)
-                      for k in range(j + 1, 4) if i < j < k]
-        for x in win_combos:
-            x.sort()
-            if x in combos:
-                data['in_game'] = False
-                return print_board(board) + endgame(True)
-        data['comp_moves'].append(move4 + 1)
-        return print_board(board)
+
+    combos = [[1, 2, 3], [1, 4, 7], [1, 5, 9], [4, 5, 6], [3, 5, 7], [7, 8, 9], [2, 5, 8], [3, 6, 9]]
+    user_moves = data['user_moves']
+    comp_moves = data['comp_moves']
+    move4 = simple_move(board, user_moves, comp_moves)
+    # move4 = simpleMove(board, user_moves, comp_moves) - 1
+    if move4 is None: move4 = board.index('   ')
+    else: move4 -= 1
+    board[move4] = comp_symbol
+    comp_moves.append(move4 + 1)
+    win_combos = [[comp_moves[i], comp_moves[j], comp_moves[k]] for i in range(4) for j in range(i + 1, 4)
+                    for k in range(j + 1, 4) if i < j < k]
+    for x in win_combos:
+        x.sort()
+        if x in combos:
+            data['in_game'] = False
+            return print_board(board) + endgame(True)
+    data['comp_moves'].append(move4 + 1)
+    return print_board(board)
 
 
 def tic_tac_toe_move(data: dict, choice=None):
@@ -225,6 +226,6 @@ def tic_tac_toe_move(data: dict, choice=None):
     if ttt_round == 2: return move_two(data)
     if ttt_round == 3: return move_three(data)
     if ttt_round == 4: return move_four(data)
-    else:  # ttt_move == 5
-        data['in_game'] = False
-        return endgame(False)
+    # ttt_move == 5
+    data['in_game'] = False
+    return endgame(False)
