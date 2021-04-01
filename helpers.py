@@ -334,7 +334,11 @@ def get_spotify_auth():
 
 
 async def spotify_track_to_youtube(link):
-    track_id = urlparse(link).path.split('/track/', 1)[1]
+    try:
+        track_id = urlparse(link).path.split('/track/', 1)[1]
+    except IndexError:
+        # e.g. */album/*?highlight=spotify:track:587w9pOR9UNvFJOwkW7NgD
+        track_id = re.search(r'track:.*', link).group()[6:]
     async with aiohttp.ClientSession() as session:
         async with session.get(f'https://api.spotify.com/v1/tracks/{track_id}', headers=get_spotify_auth()) as r:
             r = await r.json()

@@ -193,8 +193,6 @@ def get_nyse_tickers() -> dict:
     payload = {"instrumentType": "EQUITY", "pageNumber": 1, "sortColumn": "NORMALIZED_TICKER", "sortOrder": "ASC",
                "maxResultsPerPage": 10000, "filterToken": ""}
     r = make_request(NYSE_TICKERS_URL, method='POST', json=payload).json()
-    with open('test2.json', 'w') as f:
-        json.dump(r, f, indent=4)
     tickers = {}
     for stock in r:
         symbol = stock['symbol'] = stock['symbolTicker'].strip()
