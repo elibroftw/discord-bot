@@ -54,7 +54,7 @@ load_opus_lib()
 INVITATION_CODE = os.environ['invite_code']
 MY_GUILD_ID = int(os.environ['guild_id'])
 MY_USER_ID = int(os.environ['user_id'])
-DEFAULT_ROLE = os.environ['default_role']
+DEFAULT_ROLE = os.environ.get('default_role', None)
 BLUE = discord.Color.blue()
 TWITTER_BLUE = discord.Color(5631660)
 SKY_BLUE = discord.Color.from_rgb(0, 191, 255)
@@ -134,8 +134,9 @@ async def on_member_join(member):
     guild = member.guild
     msg = f'Welcome inmate {member.mention} to {guild}!\n'
     msg += 'Use !help for my functions'
-    role = discord.utils.get(guild.roles, name=DEFAULT_ROLE)
-    await member.add_roles(role)
+    if DEFAULT_ROLE:
+        role = discord.utils.get(guild.roles, name=DEFAULT_ROLE)
+        if role: await member.add_roles(role)
     await member.send_message(member, msg)
 
 
