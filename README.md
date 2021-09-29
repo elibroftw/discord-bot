@@ -1,5 +1,5 @@
 # Multi Purpose Discord Bot
-My custom madeDiscord bot (called El Chapo) I self host and use in my personal server.
+My custom-made Discord bot (called MP bot) I self host and use in my personal server.
 Rather than having a sole purpose, this bot is aimed at doing all the tasks I want it to do. I made it for a singular server so it may not work for multiple servers (regarding the music playing features).
 
 ## Features

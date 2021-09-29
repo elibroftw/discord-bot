@@ -51,11 +51,10 @@ with open('.env') as f:
 
 
 MAX_TRACK_DURATION = 90 * 60  # 90 minutes is the max
-db_client = MongoClient('localhost', 27017)
-db = db_client.discord_bot
+db = MongoClient(username='admin', password=os.environ['mongodb_pw']).discord_bot  # local DB
 playlists_coll: pymongo.collection.Collection = db.playlists
 playlists_coll.create_index([('playlist_name', 'text')])
-
+roles_coll: pymongo.collection.Collection = db.self_roles
 dm_coll: pymongo.collection.Collection = db.anon_messages
 portfolio_coll: pymongo.collection.Collection = db.portfolios
 FFMPEG = Path(subprocess.check_output('where ffmpeg').decode()).parent

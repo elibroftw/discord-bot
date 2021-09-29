@@ -323,6 +323,56 @@ async def add_role(ctx):
             await ctx.send(f'{member} is now part of {role}')
 
 
+@bot.command(aliases=['selfrole', 'role', 'toggle_role', 'togglerole'])
+async def self_role(ctx, *role_names):
+    guild = ctx.guild
+    errors = []
+    for role_name in role_names:
+        doc = roles_coll.find_one({'role_name': role_name, 'guild_id': guild.id})
+        role = discord.utils.get(guild.roles, name=role_name)  # check if role_name is still valid
+        if None not in (doc, role):
+            user = ctx.msesage.author
+            if role not in user.roles:
+                await user.add_roles(role)
+                await ctx.send(f'Role assigned')
+            else:
+                await user.remove_roles(role)
+                await ctx.send(f'Role removed')
+        else:
+            errors.append(role_name)
+    if errors:
+        await ctx.send(f'Roles that could not be assigned/removed: ' + ', '.join(errors))
+
+
+@bot.command(aliases=['ssr'])
+@has_permissions(manage_roles=True)
+async def set_self_roles(ctx, *roles):
+    guild = ctx.guild
+    errors = []
+    for role_name in roles:
+        doc = roles_coll.find_one({'role_name': role_name, 'guild_id': guild.id})
+        role = discord.utils.get(guild.roles, name=role_name)  # role_name is valid
+        if None not in (role, doc):
+            # TODO: batch insert at end
+            roles_coll.insert_one({'role_name': role_name, 'guild_id': guild.id})
+        else:
+            errors.append(role_name)
+    if errors:
+        await ctx.send('Could not find these roles: ' + ', '.join(errors))
+
+
+@bot.command(aliases=['rsr'])
+@has_permissions(manage_roles=True)
+async def remove_self_roles(ctx, *role_names):
+    guild = ctx.guild
+    errors = []
+    for role_name in role_names:
+        r = roles_coll.delete_one({'role_name': role_name, 'guild_id': guild.id})
+        if r.deleted_count == 0:
+            errors.append(role_name)
+    await ctx.send("These Roles didn't have to be deleted: " + ', '.join(errors))
+
+
 # @bot.command()
 # async def remove_role(ctx):  # TODO
 #     raise NotImplementedError
