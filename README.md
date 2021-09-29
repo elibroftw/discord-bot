@@ -1,5 +1,5 @@
 # Multi Purpose Discord Bot
-My custom-made Discord bot (called MP bot) I self host and use in my personal server.
+My custom-made, self-hosted Discord bot, MP bot.
 Rather than having a sole purpose, this bot is aimed at doing all the tasks I want it to do. I made it for a singular server so it may not work for multiple servers (regarding the music playing features).
 
 ## Features
@@ -10,6 +10,11 @@ For more info, view [bot.py](bot.py)
     - Can clear up to 100 messages in chat (at the moment)
 - Ban (!ban nick/username)
 - Get creation date of user (!created_at <user=YOU>)
+- Set/get self-assignable roles (!ssr [role1 role2 ...])
+- Remove/get self-assignable roles (!rsr [role1 role2 ...])
+
+#### User
+- Self-set (or get) roles (!role [rolename])
 
 ### Anonymous Messaging Service
 - Send a dm to a user (!dm <user/nick> <message>) // send it to the bot
@@ -95,5 +100,3 @@ Note that this bot has only been tested on Windows
 6. Click [here](https://medium.com/@elijahlopezz/python-and-background-tasks-4f70b4a2efd8) to start from scratch
 
 [Join my server](https://discord.gg/pjpCs8v)
-
-[Add bot to your server](https://discordapp.com/oauth2/authorize?&client_id=282274755426385921&scope=bot&permissions=8) (WARNING: bot is not always online)

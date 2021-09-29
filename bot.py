@@ -251,7 +251,6 @@ async def clear(ctx, number: int = 1):
             if (datetime.now() - date).days > 14: await m.delete()
             else: messages.append(m)
         await channel.delete_messages(messages)
-        print(f'{ctx.message.author} cleared {number} messages')
     await bot.change_presence(activity=discord.Game('Prison Break (!)'))
 
 
@@ -280,7 +279,6 @@ async def ban(ctx, *, user: discord.Member):
 async def _eval(ctx):
     if ctx.author.id == MY_USER_ID:
         await ctx.send(str(eval(ctx.message.content[6:])))
-        print(f'{ctx.message.author} used eval')
 
 
 @bot.command(aliases=['createrole'])
@@ -326,39 +324,64 @@ async def add_role(ctx):
 @bot.command(aliases=['selfrole', 'role', 'toggle_role', 'togglerole'])
 async def self_role(ctx, *role_names):
     guild = ctx.guild
+    roles_assigned = []
+    roles_removed = []
     errors = []
+    message = ''
+    if not role_names:
+        docs = roles_coll.find({'guild_id': guild.id})
+        message = 'Self-assignable roles: ' + ', '.join((doc['role_name'] for doc in docs))
+        user_roles = ctx.message.author.roles
+        message += '\nYour roles: ' + ', '.join(user_roles)
+        return await ctx.send(message)
     for role_name in role_names:
         doc = roles_coll.find_one({'role_name': role_name, 'guild_id': guild.id})
         role = discord.utils.get(guild.roles, name=role_name)  # check if role_name is still valid
         if None not in (doc, role):
-            user = ctx.msesage.author
+            user = ctx.message.author
             if role not in user.roles:
                 await user.add_roles(role)
-                await ctx.send(f'Role assigned')
+                roles_assigned.append(role_name)
             else:
                 await user.remove_roles(role)
-                await ctx.send(f'Role removed')
+                roles_removed.append(role_name)
         else:
             errors.append(role_name)
+    message = ''
+    if roles_assigned:
+        message = 'Roles assigned: ' + ', '.join(roles_assigned)
+    if roles_removed:
+        message += '\nRoles removed: ' + ', '.join(roles_removed)
     if errors:
-        await ctx.send(f'Roles that could not be assigned/removed: ' + ', '.join(errors))
+        message += '\nRoles that could not be assigned/removed: ' + ', '.join(errors)
+    await ctx.send(message)
 
 
 @bot.command(aliases=['ssr'])
 @has_permissions(manage_roles=True)
-async def set_self_roles(ctx, *roles):
+async def set_self_roles(ctx, *role_names):
     guild = ctx.guild
     errors = []
-    for role_name in roles:
+    added = []
+    if not role_names:
+        docs = roles_coll.find({'guild_id': guild.id})
+        message = 'Self-assignable roles: ' + ', '.join((doc['role_name'] for doc in docs))
+        return await ctx.send(message)
+    for role_name in role_names:
         doc = roles_coll.find_one({'role_name': role_name, 'guild_id': guild.id})
         role = discord.utils.get(guild.roles, name=role_name)  # role_name is valid
-        if None not in (role, doc):
+        if doc is None and role is not None:
             # TODO: batch insert at end
             roles_coll.insert_one({'role_name': role_name, 'guild_id': guild.id})
+            added.append(role_name)
         else:
             errors.append(role_name)
+    message = ''
+    if added:
+        message = 'Roles added: ' + ', '.join(added)
     if errors:
-        await ctx.send('Could not find these roles: ' + ', '.join(errors))
+        message += '\nCould not find these roles: ' + ', '.join(errors)
+    await ctx.send(message)
 
 
 @bot.command(aliases=['rsr'])
@@ -366,11 +389,23 @@ async def set_self_roles(ctx, *roles):
 async def remove_self_roles(ctx, *role_names):
     guild = ctx.guild
     errors = []
+    removed = []
+    if not role_names:
+        docs = roles_coll.find({'guild_id': guild.id})
+        message = 'Self-assignable roles: ' + ', '.join((doc['role_name'] for doc in docs))
+        return await ctx.send(message)
     for role_name in role_names:
         r = roles_coll.delete_one({'role_name': role_name, 'guild_id': guild.id})
-        if r.deleted_count == 0:
+        if r.deleted_count:
+            removed.append(role_name)
+        else:
             errors.append(role_name)
-    await ctx.send("These Roles didn't have to be deleted: " + ', '.join(errors))
+    message = ''
+    if removed:
+        message = 'Roles removed: ' + ', '.join(removed)
+    if errors:
+        message += '\nRoles not needed to be deleted: ' + ', '.join(errors)
+    await ctx.send(message)
 
 
 # @bot.command()
@@ -393,10 +428,8 @@ async def delete_channel(ctx):
             channels_to_delete = msg_content.split(', ')
             for channel_name in channels_to_delete:
                 await discord.utils.get(guild_channels, name=channel_name).delete(reason='N/A')
-            print(f'{ctx.message.author} deleted channels: {channels_to_delete}')
         else:
             await discord.utils.get(guild_channels, name=msg_content).delete(reason='N/A')
-            print(f'{ctx.message.author} deleted channel {msg_content}')
 
 
 @bot.command()
