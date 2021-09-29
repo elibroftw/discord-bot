@@ -331,8 +331,7 @@ async def self_role(ctx, *role_names):
     if not role_names:
         docs = roles_coll.find({'guild_id': guild.id})
         message = 'Self-assignable roles: ' + ', '.join((doc['role_name'] for doc in docs))
-        user_roles = ctx.message.author.roles
-        message += '\nYour roles: ' + ', '.join(user_roles)
+        message += '\nYour roles: ' + ', '.join((str(role) for role in ctx.message.author.roles))
         return await ctx.send(message)
     for role_name in role_names:
         doc = roles_coll.find_one({'role_name': role_name, 'guild_id': guild.id})
