@@ -30,14 +30,13 @@ from subprocess import DEVNULL
 import pymongo.collection
 from pathlib import Path
 import platform
+import sys
 if __name__ != '__main__':
     if any(platform.win32_ver()):
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        pip_cmd = 'pip install --user --upgrade -r requirements.txt'
+        pip_cmd = f'{sys.executable} -m pip install --user --upgrade -r requirements.txt'
         subprocess.call(pip_cmd, startupinfo=startupinfo, stdout=DEVNULL, stderr=DEVNULL)
-    else:
-        subprocess.call(['pip3', 'install', '--upgrade', '-r', 'requirements.txt'], stdout=DEVNULL, stderr=DEVNULL)
 from youtube_dl import YoutubeDL
 
 
